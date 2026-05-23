@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n api,web \"tsx watch server/index.ts\" \"vite --host 127.0.0.1\"",
-    "build": "tsup server/index.ts --format esm --platform node --out-dir dist/server --clean && vite build",
+    "build": "vite build && tsup server/index.ts --format esm --platform node --out-dir dist/server --clean",
     "start": "node dist/server/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
