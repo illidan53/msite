@@ -1,0 +1,23 @@
+watchlists:
+  - id: semiconductors
+    name: Semiconductors
+    description: Large semiconductor names and user focus list
+    theme: semiconductors
+    pinnedSymbols:
+      - NVDA
+      - AMD
+    rows:
+      - id: leaders
+        name: Leaders
+        expandedByDefault: true
+        symbols:
+          - NVDA
+          - AMD
+          - AVGO
+      - id: equipment
+        name: Equipment
+        expandedByDefault: false
+        symbols:
+          - ASML
+          - AMAT
+          - LRCX

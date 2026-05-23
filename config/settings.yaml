@@ -1,0 +1,5 @@
+polygon:
+  plan: paid
+  paidPlanName: stocks-starter
+  warningThreshold: 0.75
+  hardThreshold: 0.95
