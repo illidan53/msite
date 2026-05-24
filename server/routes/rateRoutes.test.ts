@@ -62,4 +62,50 @@ describe("rate plan routes", () => {
       source: "rate",
     });
   });
+
+  it("rejects thresholds below the canonical settings range", async () => {
+    const response = await request(createApp())
+      .post("/api/rate-plan/evaluate")
+      .send({
+        plan: "custom",
+        customCallsPerMinute: 60,
+        warningThreshold: -1,
+        hardThreshold: 0,
+        activeSymbolCount: 1,
+        intervalSeconds: 15,
+        endpointCount: 3,
+        cacheHitRatio: 0,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.any(Array),
+      message: "Invalid rate plan input",
+      source: "rate",
+    });
+  });
+
+  it("rejects thresholds above the canonical settings range", async () => {
+    const response = await request(createApp())
+      .post("/api/rate-plan/evaluate")
+      .send({
+        plan: "custom",
+        customCallsPerMinute: 60,
+        warningThreshold: 0.75,
+        hardThreshold: 1.1,
+        activeSymbolCount: 1,
+        intervalSeconds: 15,
+        endpointCount: 3,
+        cacheHitRatio: 0,
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.any(Array),
+      message: "Invalid rate plan input",
+      source: "rate",
+    });
+  });
 });

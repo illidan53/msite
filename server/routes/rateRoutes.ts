@@ -10,11 +10,11 @@ const ratePlanEvaluationRequestSchema = z
     cacheHitRatio: z.number().finite(),
     customCallsPerMinute: z.number().finite().positive().optional(),
     endpointCount: z.number().finite().positive(),
-    hardThreshold: z.number().finite(),
+    hardThreshold: z.number().finite().min(0.1).max(1),
     intervalSeconds: z.number().finite().positive(),
     paidPlanName: z.string().optional(),
     plan: z.enum(["free", "paid", "custom"]),
-    warningThreshold: z.number().finite(),
+    warningThreshold: z.number().finite().min(0.1).max(1),
   })
   .refine((value) => value.warningThreshold < value.hardThreshold, {
     message: "warningThreshold must be lower than hardThreshold",
