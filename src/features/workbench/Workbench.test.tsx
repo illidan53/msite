@@ -35,6 +35,23 @@ describe("Workbench", () => {
     expect(fetchSnapshots).toHaveBeenCalledTimes(2);
   });
 
+  it("removes collapsed row symbols from the next snapshot request", async () => {
+    const user = userEvent.setup();
+    const fetchSnapshots = vi.fn(async () => []);
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]));
+
+    await user.click(screen.getByRole("button", { name: "Equipment" }));
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]));
+
+    await user.click(screen.getByRole("button", { name: "Leaders" }));
+
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["ASML"]));
+    expect(fetchSnapshots).toHaveBeenCalledTimes(3);
+  });
+
   it("does not fetch snapshots when no configured rows are expanded", async () => {
     const fetchSnapshots = vi.fn(async () => []);
 
@@ -52,6 +69,25 @@ describe("Workbench", () => {
     render(<Workbench api={api} />);
 
     expect(screen.getByText("Loading watchlists...")).toBeInTheDocument();
+  });
+
+  it("renders an accessible error when config loading fails", async () => {
+    const api = createApi({ configError: new Error("Config unavailable") });
+
+    render(<Workbench api={api} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Config unavailable");
+    expect(screen.queryByText("Loading watchlists...")).not.toBeInTheDocument();
+  });
+
+  it("renders an accessible error when snapshot fetching fails", async () => {
+    const fetchSnapshots = vi.fn(async () => {
+      throw new Error("Snapshots unavailable");
+    });
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Snapshots unavailable");
   });
 });
 
@@ -98,10 +134,12 @@ const noExpandedConfig: WorkbenchConfig = {
 
 function createApi({
   config = baseConfig,
+  configError,
   configPromise,
   fetchSnapshots = vi.fn(async () => []),
 }: {
   config?: WorkbenchConfig;
+  configError?: Error;
   configPromise?: Promise<WorkbenchConfig>;
   fetchSnapshots?: WorkbenchApi["fetchSnapshots"];
 } = {}): WorkbenchApi {
@@ -115,7 +153,13 @@ function createApi({
   };
 
   return {
-    getConfig: vi.fn(async () => configPromise ?? config),
+    getConfig: vi.fn(async () => {
+      if (configError) {
+        throw configError;
+      }
+
+      return configPromise ?? config;
+    }),
     fetchSnapshots,
     getHistory: vi.fn(async (symbol, range) => ({ symbol, range, bars: [] })),
     evaluateRatePlan: vi.fn(async () => ratePlanEvaluation),

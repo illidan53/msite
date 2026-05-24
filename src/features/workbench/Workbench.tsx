@@ -8,24 +8,41 @@ interface WorkbenchProps {
 
 export function Workbench({ api }: WorkbenchProps) {
   const [config, setConfig] = useState<WorkbenchConfig | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   const watchlist: Watchlist | undefined = config?.watchlists.watchlists[0];
 
   useEffect(() => {
-    let isMounted = true;
+    let isStale = false;
 
-    void api.getConfig().then((loadedConfig) => {
-      if (!isMounted) {
-        return;
-      }
+    setConfig(null);
+    setErrorMessage(null);
+    setExpandedRows({});
 
-      setConfig(loadedConfig);
-      setExpandedRows(initialExpandedRows(loadedConfig.watchlists.watchlists[0]));
-    });
+    void api
+      .getConfig()
+      .then((loadedConfig) => {
+        if (isStale) {
+          return;
+        }
+
+        setConfig(loadedConfig);
+        setErrorMessage(null);
+        setExpandedRows(initialExpandedRows(loadedConfig.watchlists.watchlists[0]));
+      })
+      .catch((error: unknown) => {
+        if (isStale) {
+          return;
+        }
+
+        setConfig(null);
+        setExpandedRows({});
+        setErrorMessage(formatErrorMessage(error, "Unable to load workbench configuration."));
+      });
 
     return () => {
-      isMounted = false;
+      isStale = true;
     };
   }, [api]);
 
@@ -47,8 +64,32 @@ export function Workbench({ api }: WorkbenchProps) {
       return;
     }
 
-    void api.fetchSnapshots(activeSymbols);
+    let isStale = false;
+
+    setErrorMessage(null);
+
+    void api
+      .fetchSnapshots(activeSymbols)
+      .catch((error: unknown) => {
+        if (isStale) {
+          return;
+        }
+
+        setErrorMessage(formatErrorMessage(error, "Unable to refresh market snapshots."));
+      });
+
+    return () => {
+      isStale = true;
+    };
   }, [api, activeSymbols]);
+
+  if (errorMessage && !config) {
+    return (
+      <main className="workbench">
+        <ErrorAlert message={errorMessage} />
+      </main>
+    );
+  }
 
   if (!config || !watchlist) {
     return (
@@ -60,6 +101,8 @@ export function Workbench({ api }: WorkbenchProps) {
 
   return (
     <main className="workbench">
+      {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
+
       <aside className="watchlist-rail" aria-label="Watchlists">
         <h1>Stock Workbench</h1>
         <p className="selected-watchlist">{watchlist.name}</p>
@@ -107,4 +150,16 @@ export function Workbench({ api }: WorkbenchProps) {
 
 function initialExpandedRows(watchlist?: Watchlist): Record<string, boolean> {
   return Object.fromEntries(watchlist?.rows.map((row) => [row.id, row.expandedByDefault]) ?? []);
+}
+
+function ErrorAlert({ message }: { message: string }) {
+  return (
+    <section className="workbench-error" role="alert">
+      <p>{message}</p>
+    </section>
+  );
+}
+
+function formatErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
 }
