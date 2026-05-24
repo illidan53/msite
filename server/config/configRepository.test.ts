@@ -222,7 +222,7 @@ describe("config routes", () => {
     expect(response.body.watchlists[0].rows[0].symbols).toEqual(["NVDA"]);
   });
 
-  it("defaults to local development writes when NODE_ENV and nodeEnv are not set", async () => {
+  it("fails closed for writes when NODE_ENV and nodeEnv are not set", async () => {
     delete process.env.NODE_ENV;
     const app = createApp({ configDir });
 
@@ -238,8 +238,11 @@ describe("config routes", () => {
         ],
       });
 
-    expect(response.status).toBe(200);
-    expect(response.body.watchlists[0].rows[0].symbols).toEqual(["NVDA"]);
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      code: "ADMIN_TOKEN_MISSING",
+      source: "config",
+    });
   });
 
   it("requires the configured admin token for production watchlist writes", async () => {
@@ -393,6 +396,21 @@ describe("config routes", () => {
     expect(response.status).toBe(400);
     expect(response.body).toMatchObject({
       code: "VALIDATION_ERROR",
+      source: "config",
+    });
+  });
+
+  it("reports malformed JSON request bodies as invalid JSON", async () => {
+    const app = createApp({ configDir, nodeEnv: "development" });
+
+    const response = await request(app)
+      .put("/api/config/watchlists")
+      .set("Content-Type", "application/json")
+      .send('{"watchlists":');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: "INVALID_JSON",
       source: "config",
     });
   });

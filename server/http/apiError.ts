@@ -29,6 +29,13 @@ export class ApiError extends Error {
   }
 }
 
+interface HttpRequestError extends Error {
+  expose?: boolean;
+  status?: number;
+  statusCode?: number;
+  type?: string;
+}
+
 export function errorToApiResponse(error: unknown): { body: ApiErrorBody; status: number } {
   if (error instanceof ZodError) {
     return {
@@ -57,6 +64,28 @@ export function errorToApiResponse(error: unknown): { body: ApiErrorBody; status
     };
   }
 
+  if (isInvalidJsonError(error)) {
+    return {
+      status: 400,
+      body: {
+        code: "INVALID_JSON",
+        message: "Invalid JSON request body",
+        source: "config",
+      },
+    };
+  }
+
+  if (isBadRequestError(error)) {
+    return {
+      status: 400,
+      body: {
+        code: "BAD_REQUEST",
+        message: "Bad request",
+        source: "config",
+      },
+    };
+  }
+
   return {
     status: 500,
     body: {
@@ -65,6 +94,36 @@ export function errorToApiResponse(error: unknown): { body: ApiErrorBody; status
       source: "config",
     },
   };
+}
+
+function isInvalidJsonError(error: unknown): error is HttpRequestError {
+  if (!isHttpRequestError(error)) {
+    return false;
+  }
+
+  return requestErrorStatus(error) === 400 && error.type === "entity.parse.failed";
+}
+
+function isBadRequestError(error: unknown): error is HttpRequestError {
+  return isHttpRequestError(error) && requestErrorStatus(error) === 400;
+}
+
+function isHttpRequestError(error: unknown): error is HttpRequestError {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const candidate = error as HttpRequestError;
+
+  return (
+    typeof candidate.status === "number" ||
+    typeof candidate.statusCode === "number" ||
+    typeof candidate.type === "string"
+  );
+}
+
+function requestErrorStatus(error: HttpRequestError): number | undefined {
+  return error.status ?? error.statusCode;
 }
 
 export const apiErrorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
