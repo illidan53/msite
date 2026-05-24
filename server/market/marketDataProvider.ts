@@ -1,4 +1,4 @@
-import type { MarketSnapshot, PriceSeries } from "../../shared/types";
+import type { MarketSnapshot, PriceBar, PriceSeries } from "../../shared/types";
 import { ApiError } from "../http/apiError";
 import { MemoryCache } from "./memoryCache";
 import type { PolygonClient } from "./polygonClient";
@@ -67,7 +67,7 @@ export class MarketDataProvider {
   }
 
   async getHistory(input: { range: HistoryRange; symbol: string }): Promise<PriceSeries> {
-    const symbol = normalizeHistorySymbol(input.symbol);
+    const symbol = normalizeMarketSymbol(input.symbol);
     const cacheKey = `history:${symbol}:${input.range}`;
     const cached = this.historyCache.get(cacheKey);
     if (cached !== undefined) {
@@ -81,7 +81,7 @@ export class MarketDataProvider {
       { adjusted: true, limit: 50_000, sort: "asc" },
     );
     const series: PriceSeries = {
-      bars: (response.results ?? []).map(mapPriceBar),
+      bars: trimBarsForRange(input.range, (response.results ?? []).map(mapPriceBar)),
       range: input.range,
       symbol: response.ticker?.toUpperCase() ?? symbol,
     };
@@ -92,12 +92,12 @@ export class MarketDataProvider {
 }
 
 function normalizeSymbols(symbols: string[]): string[] {
-  return [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))].sort();
+  return [...new Set(symbols.map(normalizeMarketSymbol))].sort();
 }
 
-function normalizeHistorySymbol(symbol: string): string {
+function normalizeMarketSymbol(symbol: string): string {
   const normalized = symbol.trim().toUpperCase();
-  if (!/^[A-Z0-9.-]+$/.test(normalized)) {
+  if (!/^(?=.*[A-Z0-9])[A-Z0-9.-]+$/.test(normalized)) {
     throw new ApiError(400, "INVALID_MARKET_SYMBOL", "Invalid market symbol", { source: "polygon" });
   }
 
@@ -131,7 +131,7 @@ function timestampNsToIso(timestampNs: number | undefined): string | null {
   return date.toISOString();
 }
 
-function mapPriceBar(bar: PolygonAggBar) {
+function mapPriceBar(bar: PolygonAggBar): PriceBar {
   return {
     close: bar.c,
     high: bar.h,
@@ -142,13 +142,23 @@ function mapPriceBar(bar: PolygonAggBar) {
   };
 }
 
+function trimBarsForRange(range: HistoryRange, bars: PriceBar[]): PriceBar[] {
+  if (range !== "1D" || bars.length === 0) {
+    return bars;
+  }
+
+  const latestTimestamp = bars.reduce((latest, bar) => (bar.timestamp > latest ? bar.timestamp : latest), bars[0].timestamp);
+  const latestDate = latestTimestamp.slice(0, 10);
+  return bars.filter((bar) => bar.timestamp.slice(0, 10) === latestDate);
+}
+
 function rangeToAggregates(range: HistoryRange): { from: string; multiplier: number; timespan: "day" | "minute"; to: string } {
   const to = new Date();
   const from = new Date(to);
 
   switch (range) {
     case "1D":
-      from.setDate(to.getDate() - 3);
+      from.setDate(to.getDate() - 7);
       break;
     case "5D":
       from.setDate(to.getDate() - 10);

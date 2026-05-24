@@ -185,8 +185,29 @@ describe("MarketDataProvider", () => {
     await provider.getHistory({ symbol: "msft", range: "1D" });
     await provider.getHistory({ symbol: "msft", range: "5D" });
 
-    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-23/2026-05-26");
+    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-19/2026-05-26");
     expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-16/2026-05-26");
+  });
+
+  it("trims 1D history to the latest returned trading date", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          ticker: "MSFT",
+          results: [
+            { t: Date.UTC(2026, 4, 22, 14, 0), o: 1, h: 2, l: 1, c: 2, v: 100 },
+            { t: Date.UTC(2026, 4, 26, 14, 0), o: 3, h: 4, l: 3, c: 4, v: 200 },
+            { t: Date.UTC(2026, 4, 26, 15, 0), o: 5, h: 6, l: 5, c: 6, v: 300 },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const series = await provider.getHistory({ symbol: "msft", range: "1D" });
+
+    expect(series.bars.map((bar) => bar.timestamp)).toEqual(["2026-05-26T14:00:00.000Z", "2026-05-26T15:00:00.000Z"]);
   });
 
   it("rejects path-breaking history symbols with a structured error", async () => {
@@ -194,6 +215,18 @@ describe("MarketDataProvider", () => {
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
     await expect(provider.getHistory({ symbol: "AAPL/../../MSFT?x#y", range: "1M" })).rejects.toMatchObject({
+      code: "INVALID_MARKET_SYMBOL",
+      source: "polygon",
+      status: 400,
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([".", ".."])("rejects dot-only history symbol %s with a structured error", async (symbol) => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "AAPL", results: [] }), { status: 200 }));
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await expect(provider.getHistory({ symbol, range: "1M" })).rejects.toMatchObject({
       code: "INVALID_MARKET_SYMBOL",
       source: "polygon",
       status: 400,
@@ -209,6 +242,21 @@ describe("MarketDataProvider", () => {
 
     expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toMatch(/^\/v2\/aggs\/ticker\/BRK\.B-A\/range\/1\/day\//);
   });
+
+  it.each(["AAPL,NVDA", "AAPL/../NVDA", "AAPL\u0000NVDA", "AAPL\nNVDA"])(
+    "rejects invalid snapshot symbol %s with a structured error",
+    async (symbol) => {
+      const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ tickers: [] }), { status: 200 }));
+      const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+      await expect(provider.getSnapshots([symbol])).rejects.toMatchObject({
+        code: "INVALID_MARKET_SYMBOL",
+        source: "polygon",
+        status: 400,
+      });
+      expect(fetcher).not.toHaveBeenCalled();
+    },
+  );
 
   it("caches snapshots by the normalized symbol set", async () => {
     const fetcher = vi.fn<typeof fetch>(async () =>
