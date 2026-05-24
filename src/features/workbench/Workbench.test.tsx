@@ -89,6 +89,43 @@ describe("Workbench", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Snapshots unavailable");
   });
+
+  it("evaluates the refresh budget with active symbol count after config loads", async () => {
+    const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
+
+    render(<Workbench api={createApi({ evaluateRatePlan })} />);
+
+    await waitFor(() =>
+      expect(evaluateRatePlan).toHaveBeenCalledWith({
+        ...baseConfig.settings.polygon,
+        activeSymbolCount: 2,
+        cacheHitRatio: 0.3,
+        endpointCount: 1,
+        intervalSeconds: 30,
+      }),
+    );
+  });
+
+  it("re-evaluates the refresh budget when the interval changes", async () => {
+    const user = userEvent.setup();
+    const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
+
+    render(<Workbench api={createApi({ evaluateRatePlan })} />);
+
+    await waitFor(() => expect(evaluateRatePlan).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "1m" }));
+
+    await waitFor(() =>
+      expect(evaluateRatePlan).toHaveBeenLastCalledWith({
+        ...baseConfig.settings.polygon,
+        activeSymbolCount: 2,
+        cacheHitRatio: 0.3,
+        endpointCount: 1,
+        intervalSeconds: 60,
+      }),
+    );
+  });
 });
 
 const baseConfig: WorkbenchConfig = {
@@ -132,26 +169,28 @@ const noExpandedConfig: WorkbenchConfig = {
   },
 };
 
+const ratePlanEvaluation: Awaited<ReturnType<WorkbenchApi["evaluateRatePlan"]>> = {
+  status: "ok",
+  plan: "paid",
+  intervalSeconds: 30,
+  estimatedCallsPerMinute: 2,
+  message: "ok",
+  disabledIntervals: [],
+};
+
 function createApi({
   config = baseConfig,
   configError,
   configPromise,
   fetchSnapshots = vi.fn(async () => []),
+  evaluateRatePlan = vi.fn(async () => ratePlanEvaluation),
 }: {
   config?: WorkbenchConfig;
   configError?: Error;
   configPromise?: Promise<WorkbenchConfig>;
   fetchSnapshots?: WorkbenchApi["fetchSnapshots"];
+  evaluateRatePlan?: WorkbenchApi["evaluateRatePlan"];
 } = {}): WorkbenchApi {
-  const ratePlanEvaluation: Awaited<ReturnType<WorkbenchApi["evaluateRatePlan"]>> = {
-    status: "ok",
-    plan: "paid",
-    intervalSeconds: 30,
-    estimatedCallsPerMinute: 2,
-    message: "ok",
-    disabledIntervals: [],
-  };
-
   return {
     getConfig: vi.fn(async () => {
       if (configError) {
@@ -162,6 +201,6 @@ function createApi({
     }),
     fetchSnapshots,
     getHistory: vi.fn(async (symbol, range) => ({ symbol, range, bars: [] })),
-    evaluateRatePlan: vi.fn(async () => ratePlanEvaluation),
+    evaluateRatePlan,
   };
 }

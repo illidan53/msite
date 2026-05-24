@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Watchlist } from "../../../shared/types";
+import type { RatePlanEvaluation, Watchlist } from "../../../shared/types";
+import { RefreshControls } from "../settings/RefreshControls";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
 
 interface WorkbenchProps {
@@ -10,6 +11,15 @@ export function Workbench({ api }: WorkbenchProps) {
   const [config, setConfig] = useState<WorkbenchConfig | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [intervalSeconds, setIntervalSeconds] = useState(30);
+  const [ratePlan, setRatePlan] = useState<RatePlanEvaluation>({
+    status: "ok",
+    plan: "paid",
+    intervalSeconds: 30,
+    estimatedCallsPerMinute: 0,
+    message: "Refresh interval is within the configured budget.",
+    disabledIntervals: [],
+  });
 
   const watchlist: Watchlist | undefined = config?.watchlists.watchlists[0];
 
@@ -83,6 +93,45 @@ export function Workbench({ api }: WorkbenchProps) {
     };
   }, [api, activeSymbols]);
 
+  useEffect(() => {
+    if (!config) {
+      return;
+    }
+
+    let isStale = false;
+
+    void api
+      .evaluateRatePlan({
+        ...config.settings.polygon,
+        activeSymbolCount: activeSymbols.length,
+        cacheHitRatio: 0.3,
+        endpointCount: 1,
+        intervalSeconds,
+      })
+      .then((evaluation) => {
+        if (isStale) {
+          return;
+        }
+
+        setRatePlan(evaluation);
+      })
+      .catch((error: unknown) => {
+        if (isStale) {
+          return;
+        }
+
+        setRatePlan((current) => ({
+          ...current,
+          status: "warning",
+          message: formatErrorMessage(error, "Unable to evaluate refresh budget."),
+        }));
+      });
+
+    return () => {
+      isStale = true;
+    };
+  }, [api, activeSymbols.length, config, intervalSeconds]);
+
   if (errorMessage && !config) {
     return (
       <main className="workbench">
@@ -102,6 +151,16 @@ export function Workbench({ api }: WorkbenchProps) {
   return (
     <main className="workbench">
       {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
+
+      <header className="workbench-topbar">
+        <RefreshControls
+          intervalSeconds={intervalSeconds}
+          disabledIntervals={ratePlan.disabledIntervals}
+          status={ratePlan.status}
+          message={ratePlan.message}
+          onChange={setIntervalSeconds}
+        />
+      </header>
 
       <aside className="watchlist-rail" aria-label="Watchlists">
         <h1>Stock Workbench</h1>
