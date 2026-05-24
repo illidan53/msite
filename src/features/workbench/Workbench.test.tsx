@@ -25,7 +25,10 @@ describe("Workbench", () => {
     expect(screen.getByText("23")).toBeInTheDocument();
     expect(screen.getByText("stocks-starter has unlimited REST calls for this planner.")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Change" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Session Chg" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Session Chg %" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Span Chg" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Span Chg %" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Dollar Volume" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Timeframe" })).toBeInTheDocument();
     expect(await screen.findByText("$39.1B")).toBeInTheDocument();
@@ -71,6 +74,30 @@ describe("Workbench", () => {
     expect(within(quoteTable).getByRole("button", { name: "GE" })).toBeInTheDocument();
   });
 
+  it("uses selected time span movement for heat sorting when history is available", async () => {
+    const user = userEvent.setup();
+    const getHistory = vi.fn(async (symbol, range) => {
+      if (symbol === "AMD") {
+        return priceSeries(symbol, range, [100, 125]);
+      }
+
+      if (symbol === "NVDA") {
+        return priceSeries(symbol, range, [100, 101]);
+      }
+
+      return priceSeries(symbol, range, [100, 100]);
+    });
+
+    render(<Workbench api={createApi({ getHistory })} />);
+
+    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    await waitFor(() => expect(within(quoteTable).getByText("+25.00%")).toBeInTheDocument());
+
+    await user.selectOptions(screen.getByLabelText("Sort by"), "heat");
+
+    await waitFor(() => expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent("AMD"));
+  });
+
   it("opens symbol history in an off-canvas detail panel and closes it", async () => {
     const user = userEvent.setup();
     const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
@@ -100,7 +127,7 @@ describe("Workbench", () => {
     const detailPanel = await screen.findByRole("dialog", { name: "NVDA details" });
     await user.click(within(detailPanel).getByRole("button", { name: "5y" }));
 
-    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("NVDA", "5y"));
+    await waitFor(() => expect(getHistory).toHaveBeenCalledWith("NVDA", "5y"));
   });
 
   it("uses the selected toolbar time span when opening history without changing refresh cadence", async () => {
@@ -117,7 +144,7 @@ describe("Workbench", () => {
     await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
 
     expect(await screen.findByRole("dialog", { name: "NVDA details" })).toBeInTheDocument();
-    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("NVDA", "5d"));
+    await waitFor(() => expect(getHistory).toHaveBeenCalledWith("NVDA", "5d"));
     expect(evaluateRatePlan).toHaveBeenCalledWith(expect.objectContaining({ intervalSeconds: 60 }));
   });
 
@@ -302,31 +329,33 @@ function snapshotFor(symbol: string): MarketSnapshot {
     price: overrides[symbol]?.price ?? fallbackPrice,
     change: overrides[symbol]?.change ?? 0.5,
     changePercent: overrides[symbol]?.changePercent ?? 0.5,
+    sessionChange: overrides[symbol]?.change ?? 0.5,
+    sessionChangePercent: overrides[symbol]?.changePercent ?? 0.5,
     volume: overrides[symbol]?.volume ?? 1_000_000 + Math.max(index, 0) * 1_000,
     updatedAt: "2026-05-23T14:30:00.000Z",
     timeframe: "DELAYED",
   };
 }
 
-function priceSeries(symbol: string, range: PriceSeries["range"]): PriceSeries {
+function priceSeries(symbol: string, range: PriceSeries["range"], closes = [11, 14]): PriceSeries {
   return {
     symbol,
     range,
     bars: [
       {
         timestamp: "2026-05-22T13:30:00.000Z",
-        open: 10,
-        high: 12,
-        low: 9,
-        close: 11,
+        open: closes[0] - 1,
+        high: closes[0] + 1,
+        low: closes[0] - 2,
+        close: closes[0],
         volume: 100,
       },
       {
         timestamp: "2026-05-23T13:30:00.000Z",
-        open: 11,
-        high: 15,
-        low: 10,
-        close: 14,
+        open: closes[1] - 1,
+        high: closes[1] + 1,
+        low: closes[1] - 2,
+        close: closes[1],
         volume: 200,
       },
     ],

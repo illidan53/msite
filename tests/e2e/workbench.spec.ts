@@ -15,7 +15,10 @@ test("covers the stock workbench sector dashboard without live market calls", as
   const quoteTable = page.getByRole("table", { name: "Semiconductors quotes" });
 
   await expect(quoteTable).toBeVisible();
+  await expect(quoteTable.getByRole("columnheader", { name: "Session Chg", exact: true })).toBeVisible();
+  await expect(quoteTable.getByRole("columnheader", { name: "Span Chg %", exact: true })).toBeVisible();
   await expect(quoteTable.getByRole("columnheader", { name: "Dollar Volume" })).toBeVisible();
+  await expect(quoteTable.getByText("NVIDIA")).toBeVisible();
   await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.length === sectorSymbols.length)).toBe(true);
   await expect(page.getByText("Live workspace")).toHaveCount(0);
   const toolbar = page.getByRole("toolbar", { name: "Table controls" });
@@ -273,6 +276,8 @@ function createSnapshot(symbol: string, name: string, price: number, changePerce
     price,
     change: Number((price * changePercent * 0.01).toFixed(2)),
     changePercent,
+    sessionChange: Number((price * changePercent * 0.01).toFixed(2)),
+    sessionChangePercent: changePercent,
     volume: 42_100_000,
     updatedAt: "2026-05-23T14:30:00.000Z",
     timeframe: "DELAYED",

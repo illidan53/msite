@@ -88,6 +88,8 @@ describe("market routes", () => {
         price: 950,
         change: 12.34,
         changePercent: 2.5,
+        sessionChange: 12.34,
+        sessionChangePercent: 2.5,
         volume: 123_456,
         updatedAt: "2024-05-22T17:46:40.000Z",
         timeframe: "DELAYED",

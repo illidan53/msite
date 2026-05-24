@@ -77,6 +77,7 @@ describe("MarketDataProvider", () => {
           tickers: [
             {
               ticker: "NVDA",
+              name: "NVIDIA Corporation",
               todaysChange: 12.34,
               todaysChangePerc: 2.5,
               updated: 1_716_400_000_000_000_000,
@@ -99,9 +100,12 @@ describe("MarketDataProvider", () => {
     expect(snapshots).toEqual([
       {
         symbol: "NVDA",
+        name: "NVIDIA Corporation",
         price: 950,
         change: 12.34,
         changePercent: 2.5,
+        sessionChange: 12.34,
+        sessionChangePercent: 2.5,
         volume: 123_456,
         updatedAt: "2024-05-22T17:46:40.000Z",
         timeframe: "DELAYED",
@@ -129,6 +133,33 @@ describe("MarketDataProvider", () => {
       expect.objectContaining({ symbol: "NVDA", updatedAt: "2024-05-22T17:46:40.000Z" }),
       expect.objectContaining({ symbol: "AAPL", updatedAt: null }),
     ]);
+  });
+
+  it("enriches missing snapshot names from ticker reference details", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (url) => {
+      const pathname = new URL(String(url)).pathname;
+      if (pathname === "/v2/snapshot/locale/us/markets/stocks/tickers") {
+        return new Response(
+          JSON.stringify({
+            tickers: [{ ticker: "NVDA", updated: 1_716_400_000_000_000_000, day: { c: 950, v: 123_456 } }],
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (pathname === "/v3/reference/tickers/NVDA") {
+        return new Response(JSON.stringify({ results: { ticker: "NVDA", name: "NVIDIA Corporation" } }), {
+          status: 200,
+        });
+      }
+
+      return new Response(JSON.stringify({ error: "unexpected url" }), { status: 500 });
+    });
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const snapshots = await provider.getSnapshots(["NVDA"]);
+
+    expect(snapshots).toEqual([expect.objectContaining({ name: "NVIDIA Corporation", symbol: "NVDA" })]);
   });
 
   it("falls back to previous day snapshot data when current day values are empty", async () => {
@@ -159,6 +190,60 @@ describe("MarketDataProvider", () => {
         price: 178.88,
         volume: 154_480_600,
         updatedAt: null,
+        timeframe: "PREVIOUS_CLOSE",
+      }),
+    ]);
+  });
+
+  it("compares previous close fallback prices with the prior regular-session close", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (url) => {
+      const pathname = new URL(String(url)).pathname;
+      if (pathname === "/v2/snapshot/locale/us/markets/stocks/tickers") {
+        return new Response(
+          JSON.stringify({
+            tickers: [
+              {
+                ticker: "NVDA",
+                name: "NVIDIA Corporation",
+                todaysChange: 0,
+                todaysChangePerc: 0,
+                updated: 0,
+                day: { c: 0, v: 0 },
+                prevDay: { c: 110, v: 154_480_600 },
+              },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      if (pathname.match(/^\/v2\/aggs\/ticker\/NVDA\/range\/1\/day\//)) {
+        return new Response(
+          JSON.stringify({
+            ticker: "NVDA",
+            results: [
+              { t: Date.parse("2026-05-21T04:00:00.000Z"), o: 96, h: 102, l: 95, c: 100, v: 10_000 },
+              { t: Date.parse("2026-05-22T04:00:00.000Z"), o: 101, h: 112, l: 100, c: 110, v: 12_000 },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      return new Response(JSON.stringify({ error: "unexpected url" }), { status: 500 });
+    });
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const snapshots = await provider.getSnapshots(["NVDA"]);
+
+    expect(snapshots).toEqual([
+      expect.objectContaining({
+        change: 10,
+        changePercent: 10,
+        price: 110,
+        sessionChange: 10,
+        sessionChangePercent: 10,
+        symbol: "NVDA",
         timeframe: "PREVIOUS_CLOSE",
       }),
     ]);
@@ -444,8 +529,8 @@ describe("MarketDataProvider", () => {
       new Response(
         JSON.stringify({
           tickers: [
-            { ticker: "AAPL", day: { c: 190, v: 10 } },
-            { ticker: "NVDA", day: { c: 950, v: 20 } },
+            { ticker: "AAPL", name: "Apple Inc.", day: { c: 190, v: 10 } },
+            { ticker: "NVDA", name: "NVIDIA Corporation", day: { c: 950, v: 20 } },
           ],
         }),
         { status: 200 },

@@ -239,7 +239,7 @@ button:disabled {
 
 .quote-table {
   width: 100%;
-  min-width: 1280px;
+  min-width: 1580px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 0.88rem;
@@ -277,19 +277,19 @@ button:disabled {
 }
 
 .quote-table th:nth-child(3),
-.quote-table td:nth-child(3),
+.quote-table td:nth-child(3) {
+  width: 120px;
+}
+
 .quote-table th:nth-child(4),
 .quote-table td:nth-child(4),
 .quote-table th:nth-child(5),
 .quote-table td:nth-child(5),
 .quote-table th:nth-child(6),
-.quote-table td:nth-child(6) {
-  width: 110px;
-}
-
+.quote-table td:nth-child(6),
 .quote-table th:nth-child(7),
 .quote-table td:nth-child(7) {
-  width: 150px;
+  width: 126px;
 }
 
 .quote-table th:nth-child(8),
@@ -299,6 +299,16 @@ button:disabled {
 
 .quote-table th:nth-child(9),
 .quote-table td:nth-child(9) {
+  width: 150px;
+}
+
+.quote-table th:nth-child(10),
+.quote-table td:nth-child(10) {
+  width: 150px;
+}
+
+.quote-table th:nth-child(11),
+.quote-table td:nth-child(11) {
   width: 168px;
 }
 
@@ -607,7 +617,7 @@ button:disabled {
   }
 
   .quote-table {
-    min-width: 1280px;
+    min-width: 1580px;
   }
 
   .table-toolbar,

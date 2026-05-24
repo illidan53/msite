@@ -36,6 +36,10 @@ export interface MarketSnapshot {
   price: number | null;
   change: number | null;
   changePercent: number | null;
+  sessionChange: number | null;
+  sessionChangePercent: number | null;
+  spanChange?: number | null;
+  spanChangePercent?: number | null;
   volume: number | null;
   updatedAt: string | null;
   timeframe: "DELAYED" | "PREVIOUS_CLOSE" | "REAL-TIME" | "UNKNOWN";

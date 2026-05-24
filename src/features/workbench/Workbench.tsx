@@ -9,6 +9,10 @@ interface WorkbenchProps {
 }
 
 type SortMode = "config" | "size" | "heat" | "volume" | "changePercent" | "price" | "updated";
+interface SpanMetric {
+  change: number | null;
+  changePercent: number | null;
+}
 
 const DEFAULT_INTERVAL_SECONDS = 60;
 const DEFAULT_RANGE: PriceSeries["range"] = "1h";
@@ -28,7 +32,7 @@ const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: "size", label: "Size" },
   { id: "heat", label: "Heat" },
   { id: "volume", label: "Volume" },
-  { id: "changePercent", label: "Change %" },
+  { id: "changePercent", label: "Session Chg %" },
   { id: "price", label: "Price" },
   { id: "updated", label: "Updated" },
 ];
@@ -43,6 +47,7 @@ export function Workbench({ api }: WorkbenchProps) {
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
   const [historyRequestCount, setHistoryRequestCount] = useState(0);
   const [snapshotsBySymbol, setSnapshotsBySymbol] = useState<Record<string, MarketSnapshot>>({});
+  const [spanMetricsByKey, setSpanMetricsByKey] = useState<Record<string, SpanMetric>>({});
   const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_INTERVAL_SECONDS);
   const [sortMode, setSortMode] = useState<SortMode>("config");
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,13 +71,25 @@ export function Workbench({ api }: WorkbenchProps) {
     () => uniqueUppercaseSymbols(watchlists.flatMap((item) => item.rows.flatMap((row) => row.symbols))),
     [watchlists],
   );
+  const spanMetricsBySymbol = useMemo(
+    () => mapSpanMetricsForRange(activeSymbols, spanMetricsByKey, selectedRange),
+    [activeSymbols, selectedRange, spanMetricsByKey],
+  );
   const sortedSymbols = useMemo(
-    () => sortSymbols(activeSymbols, snapshotsBySymbol, sortMode),
-    [activeSymbols, snapshotsBySymbol, sortMode],
+    () => sortSymbols(activeSymbols, snapshotsBySymbol, spanMetricsBySymbol, sortMode),
+    [activeSymbols, snapshotsBySymbol, sortMode, spanMetricsBySymbol],
   );
   const totalPages = Math.max(1, Math.ceil(sortedSymbols.length / pageSize));
   const boundedPage = Math.min(currentPage, totalPages);
-  const pageSymbols = sortedSymbols.slice((boundedPage - 1) * pageSize, boundedPage * pageSize);
+  const pageSymbols = useMemo(
+    () => sortedSymbols.slice((boundedPage - 1) * pageSize, boundedPage * pageSize),
+    [boundedPage, pageSize, sortedSymbols],
+  );
+  const spanSymbolsForHistory = useMemo(
+    () => (sortMode === "heat" ? activeSymbols : pageSymbols),
+    [activeSymbols, pageSymbols, sortMode],
+  );
+  const spanSymbolsForHistoryKey = spanSymbolsForHistory.join("|");
   const todayApiCalls = estimateTodayApiCalls(activeSymbols.length, intervalSeconds);
 
   useEffect(() => {
@@ -86,6 +103,7 @@ export function Workbench({ api }: WorkbenchProps) {
     configRef.current = null;
     setErrorMessage(null);
     setSnapshotsBySymbol({});
+    setSpanMetricsByKey({});
     setSelectedWatchlistId(null);
     setSelectedSymbol(null);
     setHistorySeries(null);
@@ -170,6 +188,51 @@ export function Workbench({ api }: WorkbenchProps) {
       window.clearInterval(intervalId);
     };
   }, [api, activeSymbols, intervalSeconds]);
+
+  useEffect(() => {
+    if (!config || spanSymbolsForHistory.length === 0) {
+      return;
+    }
+
+    const missingSymbols = spanSymbolsForHistory.filter(
+      (symbol) => spanMetricsByKey[spanMetricKey(symbol, selectedRange)] === undefined,
+    );
+    if (missingSymbols.length === 0) {
+      return;
+    }
+
+    let isStale = false;
+
+    setHistoryRequestCount((current) => current + missingSymbols.length);
+
+    void Promise.all(
+      missingSymbols.map(async (symbol) => {
+        const series = await api.getHistory(symbol, selectedRange);
+        return [spanMetricKey(symbol, selectedRange), spanMetricFromSeries(series)] as const;
+      }),
+    )
+      .then((entries) => {
+        if (isStale) {
+          return;
+        }
+
+        setSpanMetricsByKey((current) => ({
+          ...current,
+          ...Object.fromEntries(entries),
+        }));
+      })
+      .catch((error: unknown) => {
+        if (isStale) {
+          return;
+        }
+
+        setErrorMessage(formatErrorMessage(error, "Unable to load selected time span movement."));
+      });
+
+    return () => {
+      isStale = true;
+    };
+  }, [api, config, selectedRange, spanMetricsByKey, spanSymbolsForHistory, spanSymbolsForHistoryKey]);
 
   useEffect(() => {
     if (!selectedSymbol) {
@@ -372,8 +435,10 @@ export function Workbench({ api }: WorkbenchProps) {
                 <th scope="col">Symbol</th>
                 <th scope="col">Name</th>
                 <th scope="col">Price</th>
-                <th scope="col">Change</th>
-                <th scope="col">Change %</th>
+                <th scope="col">Session Chg</th>
+                <th scope="col">Session Chg %</th>
+                <th scope="col">Span Chg</th>
+                <th scope="col">Span Chg %</th>
                 <th scope="col">Volume</th>
                 <th scope="col">Dollar Volume</th>
                 <th scope="col">Timeframe</th>
@@ -383,6 +448,9 @@ export function Workbench({ api }: WorkbenchProps) {
             <tbody>
               {pageSymbols.map((symbol) => {
                 const snapshot = snapshotsBySymbol[symbol];
+                const spanMetric = spanMetricsBySymbol[symbol];
+                const sessionChange = snapshot?.sessionChange ?? snapshot?.change;
+                const sessionChangePercent = snapshot?.sessionChangePercent ?? snapshot?.changePercent;
 
                 return (
                   <tr key={symbol}>
@@ -398,9 +466,13 @@ export function Workbench({ api }: WorkbenchProps) {
                     </td>
                     <td>{snapshot?.name ?? "--"}</td>
                     <td>{formatPrice(snapshot?.price)}</td>
-                    <td className={formatChangeClass(snapshot?.change)}>{formatChange(snapshot?.change)}</td>
-                    <td className={formatChangeClass(snapshot?.changePercent)}>
-                      {formatChangePercent(snapshot?.changePercent)}
+                    <td className={formatChangeClass(sessionChange)}>{formatChange(sessionChange)}</td>
+                    <td className={formatChangeClass(sessionChangePercent)}>
+                      {formatChangePercent(sessionChangePercent)}
+                    </td>
+                    <td className={formatChangeClass(spanMetric?.change)}>{formatChange(spanMetric?.change)}</td>
+                    <td className={formatChangeClass(spanMetric?.changePercent)}>
+                      {formatChangePercent(spanMetric?.changePercent)}
                     </td>
                     <td>{formatVolume(snapshot?.volume)}</td>
                     <td>{formatDollarVolume(snapshot)}</td>
@@ -471,9 +543,40 @@ function uniqueUppercaseSymbols(symbols: string[]): string[] {
   return [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
 }
 
+function mapSpanMetricsForRange(
+  symbols: string[],
+  spanMetricsByKey: Record<string, SpanMetric>,
+  range: PriceSeries["range"],
+): Record<string, SpanMetric | undefined> {
+  return Object.fromEntries(symbols.map((symbol) => [symbol, spanMetricsByKey[spanMetricKey(symbol, range)]]));
+}
+
+function spanMetricKey(symbol: string, range: PriceSeries["range"]): string {
+  return `${symbol.toUpperCase()}:${range}`;
+}
+
+function spanMetricFromSeries(series: PriceSeries): SpanMetric {
+  if (series.bars.length < 2) {
+    return { change: null, changePercent: null };
+  }
+
+  const firstClose = series.bars[0]?.close;
+  const lastClose = series.bars[series.bars.length - 1]?.close;
+  if (!Number.isFinite(firstClose) || !Number.isFinite(lastClose)) {
+    return { change: null, changePercent: null };
+  }
+
+  const change = lastClose - firstClose;
+  return {
+    change,
+    changePercent: firstClose === 0 ? null : (change / firstClose) * 100,
+  };
+}
+
 function sortSymbols(
   symbols: string[],
   snapshotsBySymbol: Record<string, MarketSnapshot>,
+  spanMetricsBySymbol: Record<string, SpanMetric | undefined>,
   sortMode: SortMode,
 ): string[] {
   if (sortMode === "config") {
@@ -483,8 +586,8 @@ function sortSymbols(
   return [...symbols].sort((left, right) => {
     const leftSnapshot = snapshotsBySymbol[left];
     const rightSnapshot = snapshotsBySymbol[right];
-    const leftValue = sortValue(leftSnapshot, sortMode);
-    const rightValue = sortValue(rightSnapshot, sortMode);
+    const leftValue = sortValue(leftSnapshot, spanMetricsBySymbol[left], sortMode);
+    const rightValue = sortValue(rightSnapshot, spanMetricsBySymbol[right], sortMode);
 
     if (leftValue === null && rightValue === null) {
       return symbols.indexOf(left) - symbols.indexOf(right);
@@ -506,7 +609,11 @@ function sortSymbols(
   });
 }
 
-function sortValue(snapshot: MarketSnapshot | undefined, sortMode: SortMode): number | null {
+function sortValue(
+  snapshot: MarketSnapshot | undefined,
+  spanMetric: SpanMetric | undefined,
+  sortMode: SortMode,
+): number | null {
   if (!snapshot) {
     return null;
   }
@@ -514,12 +621,14 @@ function sortValue(snapshot: MarketSnapshot | undefined, sortMode: SortMode): nu
   switch (sortMode) {
     case "size":
       return dollarVolume(snapshot) ?? snapshot.volume;
-    case "heat":
-      return snapshot.changePercent === null ? null : Math.abs(snapshot.changePercent);
+    case "heat": {
+      const heatValue = spanMetric?.changePercent ?? snapshot.sessionChangePercent ?? snapshot.changePercent;
+      return heatValue === null || heatValue === undefined ? null : Math.abs(heatValue);
+    }
     case "volume":
       return snapshot.volume;
     case "changePercent":
-      return snapshot.changePercent;
+      return snapshot.sessionChangePercent ?? snapshot.changePercent;
     case "price":
       return snapshot.price;
     case "updated": {
