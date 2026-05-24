@@ -59,6 +59,59 @@ describe("recommendation routes", () => {
     expect(service.recommend).not.toHaveBeenCalled();
   });
 
+  it("rejects too many pinned symbols with a structured validation error", async () => {
+    const service: RecommendationRouteService = {
+      recommend: vi.fn(async () => []),
+    };
+
+    const response = await request(createRecommendationTestApp(service))
+      .post("/api/watchlists/recommendations")
+      .send({
+        theme: "semiconductors",
+        pinnedSymbols: Array.from({ length: 26 }, (_, index) => `SYM${index}`),
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.arrayContaining([
+        expect.objectContaining({
+          path: ["pinnedSymbols"],
+        }),
+      ]),
+      message: "Invalid recommendation input",
+      source: "recommendations",
+    });
+    expect(service.recommend).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsafe ticker symbols with a structured validation error", async () => {
+    const service: RecommendationRouteService = {
+      recommend: vi.fn(async () => []),
+    };
+
+    const response = await request(createRecommendationTestApp(service))
+      .post("/api/watchlists/recommendations")
+      .send({
+        theme: "semiconductors",
+        pinnedSymbols: ["AAPL/../../MSFT"],
+        excludedSymbols: ["NVDA"],
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      code: "VALIDATION_ERROR",
+      details: expect.arrayContaining([
+        expect.objectContaining({
+          path: ["pinnedSymbols", 0],
+        }),
+      ]),
+      message: "Invalid recommendation input",
+      source: "recommendations",
+    });
+    expect(service.recommend).not.toHaveBeenCalled();
+  });
+
   it("mounts recommendation validation under the shared api app", async () => {
     const response = await request(createApp())
       .post("/api/watchlists/recommendations")

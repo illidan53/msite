@@ -4,11 +4,21 @@ import type { RecommendationCandidate } from "../../shared/types";
 import { ApiError } from "../http/apiError";
 import type { RecommendInput } from "../recommendations/recommendationService";
 
+const safeTickerSymbolSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(20)
+  .transform((value) => value.toUpperCase())
+  .refine((value) => /^(?=.*[A-Z0-9])[A-Z0-9.-]+$/.test(value), {
+    message: "Invalid ticker symbol",
+  });
+
 const recommendationRequestSchema = z.object({
-  excludedSymbols: z.array(z.string().trim().min(1)).default([]),
+  excludedSymbols: z.array(safeTickerSymbolSchema).max(250).default([]),
   limit: z.number().int().min(1).max(50).default(8),
-  pinnedSymbols: z.array(z.string().trim().min(1)).default([]),
-  theme: z.string().trim().min(1),
+  pinnedSymbols: z.array(safeTickerSymbolSchema).max(25).default([]),
+  theme: z.string().trim().min(1).max(80),
 });
 
 export interface RecommendationRouteService {

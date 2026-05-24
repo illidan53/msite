@@ -149,6 +149,79 @@ describe("RecommendationService", () => {
       }),
     ).resolves.toHaveLength(3);
   });
+
+  it("bounds ticker detail lookups when references return many candidates", async () => {
+    const getTickerDetails = vi.fn(async (symbol: string) => ({
+      symbol,
+      name: symbol,
+      marketCap: 1,
+    }));
+    const service = new RecommendationService({
+      getTickerDetails,
+      async getRelatedTickers() {
+        return Array.from({ length: 60 }, (_, index) => `REL${index}`);
+      },
+      async searchTickers() {
+        return Array.from({ length: 60 }, (_, index) => `REF${index}`);
+      },
+    });
+
+    const result = await service.recommend({
+      theme: "semiconductors",
+      pinnedSymbols: ["NVDA", "AMD"],
+      excludedSymbols: [],
+      limit: 4,
+    });
+
+    expect(result).toHaveLength(4);
+    expect(getTickerDetails).toHaveBeenCalledTimes(12);
+    expect(getTickerDetails.mock.calls.map(([symbol]) => symbol)).toEqual([
+      "NVDA",
+      "AMD",
+      "REL0",
+      "REL1",
+      "REL2",
+      "REL3",
+      "REL4",
+      "REL5",
+      "REL6",
+      "REL7",
+      "REL8",
+      "REL9",
+    ]);
+  });
+
+  it("orders higher public scores before lower scores", async () => {
+    const service = new RecommendationService({
+      async getTickerDetails(symbol) {
+        return {
+          symbol,
+          name: symbol === "THEME" ? "Theme Semiconductor" : "Large Conglomerate",
+          marketCap:
+            {
+              BIG: 100_000_000_000,
+              THEME: 100_000_000_000,
+            }[symbol] ?? 0,
+        };
+      },
+      async getRelatedTickers() {
+        return [];
+      },
+      async searchTickers() {
+        return ["BIG", "THEME"];
+      },
+    });
+
+    const result = await service.recommend({
+      theme: "semiconductors",
+      pinnedSymbols: [],
+      excludedSymbols: [],
+      limit: 2,
+    });
+
+    expect(result[0].symbol).toBe("THEME");
+    expect(result[0].score).toBeGreaterThan(result[1].score);
+  });
 });
 
 const marketCaps: Record<string, number> = {

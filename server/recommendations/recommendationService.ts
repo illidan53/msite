@@ -1,5 +1,7 @@
 import type { RecommendationCandidate } from "../../shared/types";
 
+const MAX_DETAIL_LOOKUPS = 50;
+
 export interface TickerDetails {
   symbol: string;
   name?: string;
@@ -26,19 +28,12 @@ interface CandidateContext {
   symbol: string;
 }
 
-interface ScoredCandidate extends RecommendationCandidate {
-  sort: {
-    isPinned: number;
-    marketCap: number;
-    themeRelevance: number;
-  };
-}
-
 export class RecommendationService {
   constructor(private readonly source: RecommendationDataSource) {}
 
   async recommend(input: RecommendInput): Promise<RecommendationCandidate[]> {
     const theme = input.theme.trim();
+    const limit = normalizeLimit(input.limit);
     const pinned = uniqueSymbols(input.pinnedSymbols);
     const excluded = new Set(uniqueSymbols(input.excludedSymbols));
 
@@ -53,35 +48,31 @@ export class RecommendationService {
       related: uniqueSymbols(related),
       searched: uniqueSymbols(searched),
     });
+    const detailContexts = limitDetailContexts(contexts, limit);
+    const candidates: RecommendationCandidate[] = [];
 
-    const candidates = await Promise.all(
-      contexts.map(async (context): Promise<ScoredCandidate> => {
-        const details = await this.source.getTickerDetails(context.symbol);
-        const detailsSymbol = normalizeSymbol(details.symbol) ?? context.symbol;
-        const marketCap = numericMarketCap(details.marketCap);
-        const themeRelevance = scoreThemeRelevance(theme, details, context.fromSearch);
-        const source = context.isPinned ? "pinned" : context.fromRelated ? "related" : "reference";
-        const reasons = buildReasons({ context, marketCap, source, theme, themeRelevance });
+    for (const context of detailContexts) {
+      candidates.push(await this.buildCandidate(context, theme));
+    }
 
-        return {
-          name: details.name,
-          reasons,
-          score: scoreCandidate({ isPinned: context.isPinned, marketCap, themeRelevance }),
-          sort: {
-            isPinned: context.isPinned ? 1 : 0,
-            marketCap,
-            themeRelevance,
-          },
-          source,
-          symbol: detailsSymbol,
-        };
-      }),
-    );
+    return candidates.sort(compareCandidates).slice(0, limit);
+  }
 
-    return candidates
-      .sort(compareCandidates)
-      .slice(0, Math.max(0, Math.trunc(input.limit)))
-      .map(({ sort: _sort, ...candidate }) => candidate);
+  private async buildCandidate(context: CandidateContext, theme: string): Promise<RecommendationCandidate> {
+    const details = await this.source.getTickerDetails(context.symbol);
+    const detailsSymbol = normalizeSymbol(details.symbol) ?? context.symbol;
+    const marketCap = numericMarketCap(details.marketCap);
+    const themeRelevance = scoreThemeRelevance(theme, details, context.fromSearch);
+    const source = context.isPinned ? "pinned" : context.fromRelated ? "related" : "reference";
+    const reasons = buildReasons({ context, marketCap, source, theme, themeRelevance });
+
+    return {
+      name: details.name,
+      reasons,
+      score: scoreCandidate({ isPinned: context.isPinned, marketCap, themeRelevance }),
+      source,
+      symbol: detailsSymbol,
+    };
   }
 }
 
@@ -130,6 +121,20 @@ function mergeCandidates(input: {
 
 function uniqueSymbols(symbols: string[]): string[] {
   return [...new Set(symbols.flatMap((symbol) => normalizeSymbol(symbol) ?? []))];
+}
+
+function limitDetailContexts(contexts: CandidateContext[], limit: number): CandidateContext[] {
+  const pinnedCount = contexts.filter((context) => context.isPinned).length;
+  const maxDetailLookups = Math.max(pinnedCount, Math.min(Math.max(limit * 3, pinnedCount), MAX_DETAIL_LOOKUPS));
+  return contexts.slice(0, maxDetailLookups);
+}
+
+function normalizeLimit(limit: number): number {
+  if (!Number.isFinite(limit)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.trunc(limit));
 }
 
 function normalizeSymbol(symbol: string): string | null {
@@ -200,11 +205,21 @@ function buildReasons(input: {
   return reasons.length === 0 ? ["reference candidate"] : reasons;
 }
 
-function compareCandidates(left: ScoredCandidate, right: ScoredCandidate): number {
+function compareCandidates(left: RecommendationCandidate, right: RecommendationCandidate): number {
   return (
-    right.sort.isPinned - left.sort.isPinned ||
-    right.sort.marketCap - left.sort.marketCap ||
-    right.sort.themeRelevance - left.sort.themeRelevance ||
+    right.score - left.score ||
+    sourceRank(right.source) - sourceRank(left.source) ||
     left.symbol.localeCompare(right.symbol)
   );
+}
+
+function sourceRank(source: RecommendationCandidate["source"]): number {
+  switch (source) {
+    case "pinned":
+      return 3;
+    case "related":
+      return 2;
+    case "reference":
+      return 1;
+  }
 }
