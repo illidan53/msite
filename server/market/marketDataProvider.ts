@@ -42,6 +42,20 @@ interface PolygonAggBar {
   v: number;
 }
 
+interface PolygonTickerDetailsResponse {
+  results?: {
+    market_cap?: number;
+    name?: string;
+    ticker?: string;
+  };
+}
+
+interface PolygonTickerListResponse {
+  results?: Array<{
+    ticker?: string;
+  }>;
+}
+
 type HistoryRange = PriceSeries["range"];
 
 export class MarketDataProvider {
@@ -95,6 +109,41 @@ export class MarketDataProvider {
     this.historyCache.set(cacheKey, series, HISTORY_TTL_MS);
     return series;
   }
+
+  async getTickerDetails(symbol: string): Promise<{ marketCap?: number; name?: string; symbol: string }> {
+    const normalizedSymbol = normalizeMarketSymbol(symbol);
+    const response = await this.client.getJson<PolygonTickerDetailsResponse>(
+      `/v3/reference/tickers/${encodeURIComponent(normalizedSymbol)}`,
+    );
+
+    return {
+      marketCap: response.results?.market_cap,
+      name: response.results?.name,
+      symbol: normalizeReferenceTicker(response.results?.ticker) ?? normalizedSymbol,
+    };
+  }
+
+  async getRelatedTickers(seed: string): Promise<string[]> {
+    const normalizedSeed = tryNormalizeMarketSymbol(seed);
+    if (normalizedSeed === null) {
+      return [];
+    }
+
+    const response = await this.client.getJson<PolygonTickerListResponse>(
+      `/v1/related-companies/${encodeURIComponent(normalizedSeed)}`,
+    );
+    return mapReferenceTickers(response.results);
+  }
+
+  async searchTickers(query: string): Promise<string[]> {
+    const response = await this.client.getJson<PolygonTickerListResponse>("/v3/reference/tickers", {
+      active: true,
+      limit: 50,
+      market: "stocks",
+      search: query,
+    });
+    return mapReferenceTickers(response.results);
+  }
 }
 
 function normalizeSymbols(symbols: string[]): string[] {
@@ -102,12 +151,30 @@ function normalizeSymbols(symbols: string[]): string[] {
 }
 
 function normalizeMarketSymbol(symbol: string): string {
-  const normalized = symbol.trim().toUpperCase();
-  if (!/^(?=.*[A-Z0-9])[A-Z0-9.-]+$/.test(normalized)) {
+  const normalized = tryNormalizeMarketSymbol(symbol);
+  if (normalized === null) {
     throw new ApiError(400, "INVALID_MARKET_SYMBOL", "Invalid market symbol", { source: "polygon" });
   }
 
   return normalized;
+}
+
+function tryNormalizeMarketSymbol(symbol: string): string | null {
+  const normalized = symbol.trim().toUpperCase();
+  if (!/^(?=.*[A-Z0-9])[A-Z0-9.-]+$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function mapReferenceTickers(results: Array<{ ticker?: string }> | undefined): string[] {
+  return results?.flatMap((item) => normalizeReferenceTicker(item.ticker) ?? []) ?? [];
+}
+
+function normalizeReferenceTicker(ticker: string | undefined): string | undefined {
+  const normalized = ticker?.trim().toUpperCase();
+  return normalized === "" ? undefined : normalized;
 }
 
 function mapSnapshot(ticker: PolygonSnapshotTicker): MarketSnapshot {

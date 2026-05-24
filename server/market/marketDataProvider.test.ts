@@ -264,6 +264,92 @@ describe("MarketDataProvider", () => {
     expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toMatch(/^\/v2\/aggs\/ticker\/BRK\.B-A\/range\/1\/day\//);
   });
 
+  it("fetches normalized ticker details from the reference endpoint", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          results: {
+            ticker: "BRK.B-A",
+            name: "Berkshire Example",
+            market_cap: 123_456_789,
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const details = await provider.getTickerDetails(" brk.b-a ");
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requestedUrl.pathname).toBe("/v3/reference/tickers/BRK.B-A");
+    expect(details).toEqual({
+      symbol: "BRK.B-A",
+      name: "Berkshire Example",
+      marketCap: 123_456_789,
+    });
+  });
+
+  it("rejects invalid ticker detail symbols before interpolating a path", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ results: {} }), { status: 200 }));
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await expect(provider.getTickerDetails("AAPL/../../MSFT?x#y")).rejects.toMatchObject({
+      code: "INVALID_MARKET_SYMBOL",
+      source: "polygon",
+      status: 400,
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("fetches related ticker references for a valid seed", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          results: [{ ticker: "AMD" }, { ticker: "TSM" }, {}],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const related = await provider.getRelatedTickers(" nvda ");
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requestedUrl.pathname).toBe("/v1/related-companies/NVDA");
+    expect(related).toEqual(["AMD", "TSM"]);
+  });
+
+  it("returns no related tickers for invalid seeds without a Polygon request", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ results: [] }), { status: 200 }));
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await expect(provider.getRelatedTickers("AAPL/../../MSFT?x#y")).resolves.toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("searches active stock tickers through the reference endpoint", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          results: [{ ticker: "NVDA" }, { ticker: "AMD" }, {}],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const tickers = await provider.searchTickers("semiconductors");
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requestedUrl.pathname).toBe("/v3/reference/tickers");
+    expect(requestedUrl.searchParams.get("market")).toBe("stocks");
+    expect(requestedUrl.searchParams.get("active")).toBe("true");
+    expect(requestedUrl.searchParams.get("search")).toBe("semiconductors");
+    expect(requestedUrl.searchParams.get("limit")).toBe("50");
+    expect(tickers).toEqual(["NVDA", "AMD"]);
+  });
+
   it.each(["AAPL,NVDA", "AAPL/../NVDA", "AAPL\u0000NVDA", "AAPL\nNVDA"])(
     "rejects invalid snapshot symbol %s with a structured error",
     async (symbol) => {
