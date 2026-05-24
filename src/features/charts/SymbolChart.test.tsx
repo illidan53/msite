@@ -50,6 +50,17 @@ describe("SymbolChart", () => {
     expect(onRangeChange).toHaveBeenCalledWith("5D");
   });
 
+  it("preserves distinct intraday timestamps for 1D bars on the same date", () => {
+    render(<SymbolChart symbol="NVDA" series={intradaySeries} range="1D" onRangeChange={() => undefined} />);
+
+    const lineSeries = getCreatedCharts()[0].addLineSeries.mock.results[0].value;
+
+    expect(lineSeries.setData).toHaveBeenCalledWith([
+      { time: 1780061400, value: 11 },
+      { time: 1780061700, value: 12 },
+    ]);
+  });
+
   it("renders controls and chart container for an empty series", () => {
     render(
       <SymbolChart
@@ -97,6 +108,29 @@ const priceSeries: PriceSeries = {
       low: 10,
       close: 14,
       volume: 200,
+    },
+  ],
+};
+
+const intradaySeries: PriceSeries = {
+  symbol: "NVDA",
+  range: "1D",
+  bars: [
+    {
+      timestamp: "2026-05-29T13:30:00.000Z",
+      open: 10,
+      high: 12,
+      low: 9,
+      close: 11,
+      volume: 100,
+    },
+    {
+      timestamp: "2026-05-29T13:35:00.000Z",
+      open: 11,
+      high: 13,
+      low: 10,
+      close: 12,
+      volume: 150,
     },
   ],
 };

@@ -43,9 +43,9 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
     }) as unknown as SymbolChartApi;
 
     if (mode === "trend") {
-      addLineSeries(chart).setData(series.bars.map(toLinePoint));
+      addLineSeries(chart).setData(series.bars.map((bar) => toLinePoint(bar, range)));
     } else {
-      addCandlestickSeries(chart).setData(series.bars.map(toCandlePoint));
+      addCandlestickSeries(chart).setData(series.bars.map((bar) => toCandlePoint(bar, range)));
     }
 
     chart.timeScale().fitContent();
@@ -53,7 +53,7 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
     return () => {
       chart.remove();
     };
-  }, [mode, series.bars]);
+  }, [mode, range, series.bars]);
 
   return (
     <section className="symbol-chart" aria-label={`${symbol} chart`}>
@@ -88,9 +88,9 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
   );
 }
 
-function toLinePoint(bar: PriceBar) {
+function toLinePoint(bar: PriceBar, range: PriceSeries["range"]) {
   return {
-    time: toChartDate(bar.timestamp),
+    time: toChartTime(bar.timestamp, range),
     value: bar.close,
   };
 }
@@ -111,9 +111,9 @@ function addCandlestickSeries(chart: SymbolChartApi) {
   return chart.addSeries(CandlestickSeries);
 }
 
-function toCandlePoint(bar: PriceBar) {
+function toCandlePoint(bar: PriceBar, range: PriceSeries["range"]) {
   return {
-    time: toChartDate(bar.timestamp),
+    time: toChartTime(bar.timestamp, range),
     open: bar.open,
     high: bar.high,
     low: bar.low,
@@ -121,6 +121,10 @@ function toCandlePoint(bar: PriceBar) {
   };
 }
 
-function toChartDate(timestamp: string) {
+function toChartTime(timestamp: string, range: PriceSeries["range"]) {
+  if (range === "1D" || range === "5D") {
+    return Math.floor(Date.parse(timestamp) / 1000);
+  }
+
   return timestamp.slice(0, 10);
 }
