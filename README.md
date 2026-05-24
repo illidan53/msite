@@ -46,7 +46,7 @@ MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e
 
 - EC2 instance: tagged `Project=msite`, `App=msite-finance`, `Name=msite-finance-web`
 - Public entry: Elastic IP routed by Route53 `finance.nphunter.net`
-- Process manager: systemd `msite.service`
+- Runtime: Node.js 22 with systemd `msite.service`
 - Public proxy/TLS: Caddy on ports `80` and `443`
 - Runtime secrets: SSM SecureString parameters under `/msite/finance/`
 - Release artifact: private S3 bucket `msite-finance-deploy-612153676415-us-east-1`
