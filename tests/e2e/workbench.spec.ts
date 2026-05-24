@@ -1,14 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import type {
-  MarketSnapshot,
-  PriceSeries,
-  RatePlanEvaluation,
-  RecommendationCandidate,
-  SettingsConfig,
-  WatchlistsConfig,
-} from "../../shared/types";
+import type { MarketSnapshot, PriceSeries, RatePlanEvaluation, SettingsConfig, WatchlistsConfig } from "../../shared/types";
 
-test("covers the stock workbench flow without live market calls", async ({ page }) => {
+test("covers the stock workbench sector dashboard without live market calls", async ({ page }) => {
   const apiMocks = await mockWorkbenchApis(page);
 
   await page.goto("/");
@@ -16,75 +9,48 @@ test("covers the stock workbench flow without live market calls", async ({ page 
   await expect(page).toHaveTitle("Stock Workbench");
   await expect(page.getByRole("heading", { name: "Stock Workbench" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Semiconductors" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Leaders" })).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("button", { name: "Equipment" })).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByRole("button", { name: "ASML" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New Watchlist" })).toHaveCount(0);
+  await expect(page.getByRole("table", { name: "API usage summary" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Equipment" }).click();
+  const quoteTable = page.getByRole("table", { name: "Semiconductors quotes" });
 
-  await expect(page.getByRole("button", { name: "Equipment" })).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByRole("button", { name: "ASML" })).toBeVisible();
-  await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.includes("ASML"))).toBe(true);
+  await expect(quoteTable).toBeVisible();
+  await expect(quoteTable.getByRole("columnheader", { name: "Dollar Volume" })).toBeVisible();
+  await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.length === sectorSymbols.length)).toBe(true);
 
-  await page.getByRole("button", { name: "NVDA" }).click();
+  await page.getByLabel("Sort by").selectOption("heat");
+  await expect(quoteTable.getByRole("button").first()).toHaveText("NVDA");
 
-  await expect(page.getByRole("heading", { name: "NVDA" })).toBeVisible();
-  await expect(page.getByLabel("NVDA chart")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Candles" })).toHaveAttribute("aria-pressed", "false");
-  await expect
-    .poll(() => apiMocks.historyRequests.some((request) => request.symbol === "NVDA" && request.range === "1M"))
-    .toBe(true);
+  await quoteTable.getByRole("button", { name: "NVDA" }).click();
+  const detailPanel = page.getByRole("dialog", { name: "NVDA details" });
 
-  await page.getByRole("button", { name: "Candles" }).click();
+  await expect(detailPanel).toBeVisible();
+  await expect(detailPanel.getByLabel("NVDA chart")).toBeVisible();
+  await expect.poll(() => apiMocks.historyRequests.some((request) => request.symbol === "NVDA" && request.range === "1h")).toBe(true);
 
-  await expect(page.getByRole("button", { name: "Candles" })).toHaveAttribute("aria-pressed", "true");
+  await detailPanel.getByRole("button", { name: "5y" }).click();
 
-  await page.getByRole("button", { name: "New Watchlist" }).click();
-  const editor = page.getByRole("dialog", { name: "Watchlist editor" });
+  await expect.poll(() => apiMocks.historyRequests.some((request) => request.symbol === "NVDA" && request.range === "5y")).toBe(true);
+  await detailPanel.getByRole("button", { name: "Close details" }).click();
+  await expect(detailPanel).toBeHidden();
 
-  await expect(editor).toBeVisible();
-  await editor.getByLabel("Name").fill("AI Leaders");
-  await editor.getByLabel("Theme").fill("AI chips");
-  await editor.getByLabel("Pinned symbols").fill("nvda");
-  await editor.getByRole("button", { name: "Recommend" }).click();
-  await expect(editor.getByRole("checkbox", { name: /TSM/i })).toBeVisible();
-  await editor.getByRole("checkbox", { name: /TSM/i }).check();
-  await editor.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Next page" }).click();
 
-  await expect(editor).toBeHidden();
-  await expect(page.getByRole("button", { name: "AI Leaders" })).toBeVisible();
-  await expect.poll(() => apiMocks.savedWatchlists.length).toBe(1);
+  await expect(page.getByText("Page 2 of 2")).toBeVisible();
+  await expect(quoteTable.getByRole("button", { name: "GE" })).toBeVisible();
 
-  expect(apiMocks.recommendationRequests).toEqual([
-    {
-      excludedSymbols: [],
-      limit: 8,
-      pinnedSymbols: ["NVDA"],
-      theme: "AI chips",
-    },
-  ]);
-  expect(apiMocks.savedWatchlists[0]?.watchlists).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        id: "ai-leaders",
-        name: "AI Leaders",
-        rows: [
-          expect.objectContaining({
-            id: "recommended",
-            name: "Recommended",
-            symbols: ["NVDA", "TSM"],
-          }),
-        ],
-      }),
-    ]),
-  );
+  await page.getByRole("button", { name: "Consumer Staples" }).click();
+
+  await expect(page.getByRole("table", { name: "Consumer Staples quotes" })).toBeVisible();
+  await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.join(",") === "COST,WMT,PG,KO")).toBe(true);
+
   expect(apiMocks.configRequests).toEqual(expect.arrayContaining(["GET /api/config"]));
   expect(apiMocks.configRequests.every((request) => request === "GET /api/config")).toBe(true);
   expect(apiMocks.ratePlanRequests).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        activeSymbolCount: 3,
-        intervalSeconds: 30,
+        activeSymbolCount: sectorSymbols.length,
+        intervalSeconds: 3_600,
         paidPlanName: "stocks-starter",
         plan: "paid",
       }),
@@ -98,8 +64,6 @@ async function mockWorkbenchApis(page: Page) {
   const snapshotRequests: string[][] = [];
   const historyRequests: Array<{ range: PriceSeries["range"]; symbol: string }> = [];
   const ratePlanRequests: unknown[] = [];
-  const recommendationRequests: unknown[] = [];
-  const savedWatchlists: WatchlistsConfig[] = [];
   const unexpectedApiRequests: string[] = [];
 
   await page.route("**/api/**", async (route) => {
@@ -161,7 +125,7 @@ async function mockWorkbenchApis(page: Page) {
 
     const url = new URL(route.request().url());
     const symbol = (url.searchParams.get("symbol") ?? "NVDA").toUpperCase();
-    const range = (url.searchParams.get("range") ?? "1M") as PriceSeries["range"];
+    const range = (url.searchParams.get("range") ?? "1h") as PriceSeries["range"];
 
     historyRequests.push({ range, symbol });
 
@@ -183,40 +147,10 @@ async function mockWorkbenchApis(page: Page) {
     });
   });
 
-  await page.route("**/api/watchlists/recommendations", async (route) => {
-    if (route.request().method() !== "POST") {
-      await route.fallback();
-      return;
-    }
-
-    recommendationRequests.push(route.request().postDataJSON());
-
-    await route.fulfill({
-      json: recommendationCandidates,
-    });
-  });
-
-  await page.route("**/api/config/watchlists", async (route) => {
-    if (route.request().method() !== "PUT") {
-      await route.fallback();
-      return;
-    }
-
-    const payload = route.request().postDataJSON() as WatchlistsConfig;
-
-    savedWatchlists.push(payload);
-
-    await route.fulfill({
-      json: payload,
-    });
-  });
-
   return {
     configRequests,
     historyRequests,
     ratePlanRequests,
-    recommendationRequests,
-    savedWatchlists,
     snapshotRequests,
     unexpectedApiRequests,
   };
@@ -227,11 +161,35 @@ function isMockedApiRequest(method: string, url: URL) {
     (method === "POST" && url.pathname === "/api/market/snapshots") ||
     (method === "GET" && url.pathname === "/api/market/history") ||
     (method === "POST" && url.pathname === "/api/rate-plan/evaluate") ||
-    (method === "POST" && url.pathname === "/api/watchlists/recommendations") ||
-    (method === "GET" && url.pathname === "/api/config") ||
-    (method === "PUT" && url.pathname === "/api/config/watchlists")
+    (method === "GET" && url.pathname === "/api/config")
   );
 }
+
+const sectorSymbols = [
+  "NVDA",
+  "AMD",
+  "ASML",
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "META",
+  "TSLA",
+  "COST",
+  "WMT",
+  "PG",
+  "KO",
+  "PEP",
+  "JPM",
+  "BAC",
+  "XOM",
+  "CVX",
+  "UNH",
+  "LLY",
+  "GE",
+  "CAT",
+  "RTX",
+];
 
 const workbenchConfig: { settings: SettingsConfig; watchlists: WatchlistsConfig } = {
   settings: {
@@ -255,13 +213,28 @@ const workbenchConfig: { settings: SettingsConfig; watchlists: WatchlistsConfig 
             id: "leaders",
             name: "Leaders",
             expandedByDefault: true,
-            symbols: ["NVDA", "AMD", "AVGO"],
+            symbols: ["NVDA", "AMD", "ASML", "NVDA"],
           },
           {
-            id: "equipment",
-            name: "Equipment",
-            expandedByDefault: false,
-            symbols: ["ASML", "AMAT", "LRCX"],
+            id: "market",
+            name: "Market",
+            expandedByDefault: true,
+            symbols: sectorSymbols.slice(3),
+          },
+        ],
+      },
+      {
+        id: "consumer-staples",
+        name: "Consumer Staples",
+        description: "Large staples names",
+        theme: "consumer staples",
+        pinnedSymbols: ["COST"],
+        rows: [
+          {
+            id: "staples",
+            name: "Staples",
+            expandedByDefault: true,
+            symbols: ["COST", "WMT", "PG", "KO"],
           },
         ],
       },
@@ -272,8 +245,8 @@ const workbenchConfig: { settings: SettingsConfig; watchlists: WatchlistsConfig 
 const ratePlanEvaluation: RatePlanEvaluation = {
   status: "ok",
   plan: "paid",
-  intervalSeconds: 30,
-  estimatedCallsPerMinute: 2,
+  intervalSeconds: 3_600,
+  estimatedCallsPerMinute: 1,
   message: "Refresh interval is within the configured budget.",
   disabledIntervals: [],
 };
@@ -281,15 +254,12 @@ const ratePlanEvaluation: RatePlanEvaluation = {
 function snapshotFor(symbol: string): MarketSnapshot {
   const snapshots: Record<string, MarketSnapshot> = {
     AMD: createSnapshot("AMD", "Advanced Micro Devices", 164.1, -0.8),
-    AMAT: createSnapshot("AMAT", "Applied Materials", 211.77, 0.9),
     ASML: createSnapshot("ASML", "ASML Holding", 956.24, 1.35),
-    AVGO: createSnapshot("AVGO", "Broadcom", 1428.62, 0.6),
-    LRCX: createSnapshot("LRCX", "Lam Research", 921.4, -0.2),
-    NVDA: createSnapshot("NVDA", "NVIDIA", 119.08, 2.45),
-    TSM: createSnapshot("TSM", "Taiwan Semiconductor", 188.53, 1.1),
+    NVDA: createSnapshot("NVDA", "NVIDIA", 927.75, 2.45),
   };
+  const index = sectorSymbols.indexOf(symbol);
 
-  return snapshots[symbol] ?? createSnapshot(symbol, symbol, 100, 0);
+  return snapshots[symbol] ?? createSnapshot(symbol, `${symbol} Inc.`, 100 + Math.max(index, 0), 0.5);
 }
 
 function createSnapshot(symbol: string, name: string, price: number, changePercent: number): MarketSnapshot {
@@ -337,27 +307,3 @@ function historyFor(symbol: string, range: PriceSeries["range"]): PriceSeries {
     ],
   };
 }
-
-const recommendationCandidates: RecommendationCandidate[] = [
-  {
-    symbol: "NVDA",
-    name: "NVIDIA",
-    score: 1,
-    reasons: ["Pinned by user"],
-    source: "pinned",
-  },
-  {
-    symbol: "TSM",
-    name: "Taiwan Semiconductor",
-    score: 0.89,
-    reasons: ["Large semiconductor foundry"],
-    source: "reference",
-  },
-  {
-    symbol: "ASML",
-    name: "ASML Holding",
-    score: 0.82,
-    reasons: ["Semiconductor equipment exposure"],
-    source: "related",
-  },
-];
