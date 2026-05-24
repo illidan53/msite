@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PriceSeries } from "../../../shared/types";
 import { getCreatedCharts, resetLightweightChartsMock } from "../../test/lightweightChartsMock";
 import { SymbolChart } from "./SymbolChart";
@@ -8,9 +8,15 @@ import { SymbolChart } from "./SymbolChart";
 afterEach(() => {
   cleanup();
   resetLightweightChartsMock();
+  vi.unstubAllGlobals();
 });
 
 describe("SymbolChart", () => {
+  beforeEach(() => {
+    resizeObserverInstances.length = 0;
+    vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+  });
+
   it("renders symbol and switches to Candles aria-pressed true", async () => {
     const user = userEvent.setup();
 
@@ -87,6 +93,16 @@ describe("SymbolChart", () => {
 
     expect(chart.remove).toHaveBeenCalledTimes(1);
   });
+
+  it("resizes the chart when the container size changes", () => {
+    render(<SymbolChart symbol="NVDA" series={priceSeries} range="1M" onRangeChange={() => undefined} />);
+
+    const chart = getCreatedCharts()[0];
+
+    resizeObserverInstances[0].trigger({ width: 480, height: 260 });
+
+    expect(chart.resize).toHaveBeenCalledWith(480, 260);
+  });
 });
 
 const priceSeries: PriceSeries = {
@@ -134,3 +150,34 @@ const intradaySeries: PriceSeries = {
     },
   ],
 };
+
+interface ResizeObserverSize {
+  width: number;
+  height: number;
+}
+
+class ResizeObserverMock {
+  observe = vi.fn();
+  unobserve = vi.fn();
+  disconnect = vi.fn();
+
+  constructor(private readonly callback: ResizeObserverCallback) {
+    resizeObserverInstances.push(this);
+  }
+
+  trigger(size: ResizeObserverSize) {
+    this.callback(
+      [
+        {
+          contentRect: {
+            width: size.width,
+            height: size.height,
+          } as DOMRectReadOnly,
+        } as ResizeObserverEntry,
+      ],
+      this,
+    );
+  }
+}
+
+const resizeObserverInstances: ResizeObserverMock[] = [];

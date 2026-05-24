@@ -14,6 +14,7 @@ interface SymbolChartApi {
   addCandlestickSeries(): ChartSeriesApi;
   addHistogramSeries(): ChartSeriesApi;
   remove(): void;
+  resize(width: number, height: number): void;
   timeScale(): {
     fitContent(): void;
   };
@@ -27,6 +28,7 @@ export interface SymbolChartProps {
 }
 
 const RANGES: PriceSeries["range"][] = ["1D", "5D", "1M", "3M", "1Y"];
+const CHART_HEIGHT = 300;
 
 export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChartProps) {
   const [mode, setMode] = useState<ChartMode>("trend");
@@ -37,10 +39,22 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
       return;
     }
 
-    const chart = createChart(containerRef.current, {
-      height: 300,
-      width: containerRef.current.clientWidth || 640,
+    const container = containerRef.current;
+    const chart = createChart(container, {
+      height: CHART_HEIGHT,
+      width: container.clientWidth || 640,
     }) as unknown as SymbolChartApi;
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(([entry]) => {
+            const width = Math.floor(entry.contentRect.width);
+            const height = Math.floor(entry.contentRect.height) || CHART_HEIGHT;
+
+            if (width > 0) {
+              chart.resize(width, height);
+            }
+          });
 
     if (mode === "trend") {
       addLineSeries(chart).setData(series.bars.map((bar) => toLinePoint(bar, range)));
@@ -49,8 +63,10 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
     }
 
     chart.timeScale().fitContent();
+    resizeObserver?.observe(container);
 
     return () => {
+      resizeObserver?.disconnect();
       chart.remove();
     };
   }, [mode, range, series.bars]);

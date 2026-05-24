@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSnapshot, PriceSeries, RecommendationCandidate } from "../../../shared/types";
@@ -7,6 +7,7 @@ import { Workbench } from "./Workbench";
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
 });
 
 describe("Workbench", () => {
@@ -50,6 +51,78 @@ describe("Workbench", () => {
     expect(screen.getByRole("columnheader", { name: "Change %" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Volume" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Updated" })).toBeInTheDocument();
+  });
+
+  it("polls snapshots repeatedly and removes collapsed symbols from the active interval", async () => {
+    vi.useFakeTimers();
+    const fetchSnapshots = vi.fn(async () => []);
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    await flushPromises();
+    expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]);
+    expect(fetchSnapshots).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(fetchSnapshots).toHaveBeenCalledTimes(2);
+    expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Equipment" }));
+    await flushPromises();
+    expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Leaders" }));
+    await flushPromises();
+    expect(fetchSnapshots).toHaveBeenLastCalledWith(["ASML"]);
+
+    const callsAfterCollapse = fetchSnapshots.mock.calls.length;
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(fetchSnapshots).toHaveBeenCalledTimes(callsAfterCollapse + 1);
+    expect(fetchSnapshots).toHaveBeenLastCalledWith(["ASML"]);
+  });
+
+  it("ignores snapshot results from a stale polling cycle", async () => {
+    const user = userEvent.setup();
+    const staleSnapshots = createDeferred<MarketSnapshot[]>();
+    const currentSnapshots = createDeferred<MarketSnapshot[]>();
+    const fetchSnapshots = vi
+      .fn<WorkbenchApi["fetchSnapshots"]>()
+      .mockReturnValueOnce(staleSnapshots.promise)
+      .mockReturnValueOnce(currentSnapshots.promise);
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]));
+
+    await user.click(screen.getByRole("button", { name: "Equipment" }));
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]));
+
+    await act(async () => {
+      staleSnapshots.resolve([
+        {
+          ...marketSnapshots[0],
+          price: 999,
+          changePercent: 9.99,
+        },
+      ]);
+      await staleSnapshots.promise;
+    });
+
+    expect(screen.queryByText("$999.00")).not.toBeInTheDocument();
+
+    await act(async () => {
+      currentSnapshots.resolve(marketSnapshots);
+      await currentSnapshots.promise;
+    });
+
+    expect(await screen.findByText("$927.75")).toBeInTheDocument();
   });
 
   it("fetches history for the selected symbol and selected chart range", async () => {
@@ -104,6 +177,50 @@ describe("Workbench", () => {
     );
     expect(screen.queryByRole("dialog", { name: "Watchlist editor" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "AI Leaders" })).toBeInTheDocument();
+  });
+
+  it("serializes deferred watchlist saves so an earlier completion cannot overwrite a newer watchlist", async () => {
+    const user = userEvent.setup();
+    const firstSave = createDeferred<Awaited<ReturnType<WorkbenchApi["saveWatchlists"]>>>();
+    const secondSave = createDeferred<Awaited<ReturnType<WorkbenchApi["saveWatchlists"]>>>();
+    const saveWatchlists = vi
+      .fn<WorkbenchApi["saveWatchlists"]>()
+      .mockReturnValueOnce(firstSave.promise)
+      .mockReturnValueOnce(secondSave.promise);
+
+    render(<Workbench api={createApi({ saveWatchlists })} />);
+
+    await user.click(await screen.findByRole("button", { name: "New Watchlist" }));
+    await user.type(screen.getByLabelText("Name"), "First Save");
+    await user.type(screen.getByLabelText("Pinned symbols"), "aapl");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(saveWatchlists).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "New Watchlist" }));
+    await user.type(screen.getByLabelText("Name"), "Second Save");
+    await user.type(screen.getByLabelText("Pinned symbols"), "msft");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(saveWatchlists).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      firstSave.resolve(saveWatchlists.mock.calls[0][0]);
+      await firstSave.promise;
+    });
+
+    await waitFor(() => expect(saveWatchlists).toHaveBeenCalledTimes(2));
+    expect(saveWatchlists.mock.calls[1][0]).toEqual({
+      watchlists: [baseWatchlist, firstSavedWatchlist, secondSavedWatchlist],
+    });
+
+    await act(async () => {
+      secondSave.resolve(saveWatchlists.mock.calls[1][0]);
+      await secondSave.promise;
+    });
+
+    expect(await screen.findByRole("button", { name: "First Save" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Second Save" })).toBeInTheDocument();
   });
 
   it("keeps the watchlist editor open and shows an alert when save fails", async () => {
@@ -281,6 +398,36 @@ const ratePlanEvaluation: Awaited<ReturnType<WorkbenchApi["evaluateRatePlan"]>> 
   disabledIntervals: [],
 };
 
+const firstSavedWatchlist = {
+  id: "first-save",
+  name: "First Save",
+  theme: "",
+  pinnedSymbols: ["AAPL"],
+  rows: [
+    {
+      id: "recommended",
+      name: "Recommended",
+      expandedByDefault: true,
+      symbols: ["AAPL"],
+    },
+  ],
+};
+
+const secondSavedWatchlist = {
+  id: "second-save",
+  name: "Second Save",
+  theme: "",
+  pinnedSymbols: ["MSFT"],
+  rows: [
+    {
+      id: "recommended",
+      name: "Recommended",
+      expandedByDefault: true,
+      symbols: ["MSFT"],
+    },
+  ],
+};
+
 function createApi({
   config = baseConfig,
   configError,
@@ -379,4 +526,22 @@ function priceSeries(symbol: string, range: PriceSeries["range"]): PriceSeries {
       },
     ],
   };
+}
+
+async function flushPromises() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((nextResolve, nextReject) => {
+    resolve = nextResolve;
+    reject = nextReject;
+  });
+
+  return { promise, resolve, reject };
 }

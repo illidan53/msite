@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MarketSnapshot, PriceSeries, RatePlanEvaluation, Watchlist } from "../../../shared/types";
 import { SymbolChart } from "../charts/SymbolChart";
 import { RefreshControls } from "../settings/RefreshControls";
@@ -29,15 +29,23 @@ export function Workbench({ api }: WorkbenchProps) {
     message: "Refresh interval is within the configured budget.",
     disabledIntervals: [],
   });
+  const configRef = useRef<WorkbenchConfig | null>(null);
+  const editorSessionIdRef = useRef(0);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const watchlists = config?.watchlists.watchlists ?? [];
   const watchlist: Watchlist | undefined =
     watchlists.find((candidate) => candidate.id === selectedWatchlistId) ?? watchlists[0];
 
   useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  useEffect(() => {
     let isStale = false;
 
     setConfig(null);
+    configRef.current = null;
     setErrorMessage(null);
     setExpandedRows({});
     setSnapshotsBySymbol({});
@@ -54,6 +62,7 @@ export function Workbench({ api }: WorkbenchProps) {
         }
 
         setConfig(loadedConfig);
+        configRef.current = loadedConfig;
         setErrorMessage(null);
         setExpandedRows(initialExpandedRows(loadedConfig.watchlists.watchlists));
         setSelectedWatchlistId(loadedConfig.watchlists.watchlists[0]?.id ?? null);
@@ -64,6 +73,7 @@ export function Workbench({ api }: WorkbenchProps) {
         }
 
         setConfig(null);
+        configRef.current = null;
         setExpandedRows({});
         setSelectedWatchlistId(null);
         setErrorMessage(formatErrorMessage(error, "Unable to load workbench configuration."));
@@ -92,33 +102,41 @@ export function Workbench({ api }: WorkbenchProps) {
     }
 
     let isStale = false;
+    const pollingSymbols = [...activeSymbols];
 
-    setErrorMessage(null);
+    function refreshSnapshots() {
+      setErrorMessage(null);
 
-    void api
-      .fetchSnapshots(activeSymbols)
-      .then((snapshots) => {
-        if (isStale) {
-          return;
-        }
+      void api
+        .fetchSnapshots(pollingSymbols)
+        .then((snapshots) => {
+          if (isStale) {
+            return;
+          }
 
-        setSnapshotsBySymbol((current) => ({
-          ...current,
-          ...Object.fromEntries(snapshots.map((snapshot) => [snapshot.symbol.toUpperCase(), snapshot])),
-        }));
-      })
-      .catch((error: unknown) => {
-        if (isStale) {
-          return;
-        }
+          setSnapshotsBySymbol((current) => ({
+            ...current,
+            ...Object.fromEntries(snapshots.map((snapshot) => [snapshot.symbol.toUpperCase(), snapshot])),
+          }));
+        })
+        .catch((error: unknown) => {
+          if (isStale) {
+            return;
+          }
 
-        setErrorMessage(formatErrorMessage(error, "Unable to refresh market snapshots."));
-      });
+          setErrorMessage(formatErrorMessage(error, "Unable to refresh market snapshots."));
+        });
+    }
+
+    refreshSnapshots();
+
+    const intervalId = window.setInterval(refreshSnapshots, intervalSeconds * 1000);
 
     return () => {
       isStale = true;
+      window.clearInterval(intervalId);
     };
-  }, [api, activeSymbols]);
+  }, [api, activeSymbols, intervalSeconds]);
 
   useEffect(() => {
     if (!selectedSymbol) {
@@ -205,29 +223,54 @@ export function Workbench({ api }: WorkbenchProps) {
     setSelectedSymbol(symbol.toUpperCase());
   }
 
-  async function handleSaveWatchlist(savedWatchlist: Watchlist) {
-    if (!config) {
-      throw new Error("Workbench configuration is not loaded.");
-    }
+  function handleEditorOpen() {
+    editorSessionIdRef.current += 1;
+    setIsEditorOpen(true);
+  }
 
-    const existingWatchlists = config.watchlists.watchlists;
-    const nextWatchlists = existingWatchlists.some((watchlistItem) => watchlistItem.id === savedWatchlist.id)
-      ? existingWatchlists.map((watchlistItem) =>
-          watchlistItem.id === savedWatchlist.id ? savedWatchlist : watchlistItem,
-        )
-      : [...existingWatchlists, savedWatchlist];
-    const savedWatchlists = await api.saveWatchlists({
-      ...config.watchlists,
-      watchlists: nextWatchlists,
+  function handleEditorClose() {
+    editorSessionIdRef.current += 1;
+    setIsEditorOpen(false);
+  }
+
+  function handleSaveWatchlist(savedWatchlist: Watchlist) {
+    const saveSessionId = editorSessionIdRef.current;
+
+    const savePromise = saveQueueRef.current.then(async () => {
+      const currentConfig = configRef.current;
+
+      if (!currentConfig) {
+        throw new Error("Workbench configuration is not loaded.");
+      }
+
+      const existingWatchlists = currentConfig.watchlists.watchlists;
+      const nextWatchlists = existingWatchlists.some((watchlistItem) => watchlistItem.id === savedWatchlist.id)
+        ? existingWatchlists.map((watchlistItem) =>
+            watchlistItem.id === savedWatchlist.id ? savedWatchlist : watchlistItem,
+          )
+        : [...existingWatchlists, savedWatchlist];
+      const savedWatchlists = await api.saveWatchlists({
+        ...currentConfig.watchlists,
+        watchlists: nextWatchlists,
+      });
+      const nextConfig = { ...currentConfig, watchlists: savedWatchlists };
+
+      configRef.current = nextConfig;
+      setConfig(nextConfig);
+      setExpandedRows(initialExpandedRows(savedWatchlists.watchlists));
+      setSelectedWatchlistId(savedWatchlist.id);
+      setSelectedSymbol(null);
+      setHistorySeries(null);
+      setHistoryErrorMessage(null);
+
+      if (editorSessionIdRef.current === saveSessionId) {
+        setIsEditorOpen(false);
+      }
     });
 
-    setConfig({ ...config, watchlists: savedWatchlists });
-    setExpandedRows(initialExpandedRows(savedWatchlists.watchlists));
-    setSelectedWatchlistId(savedWatchlist.id);
-    setSelectedSymbol(null);
-    setHistorySeries(null);
-    setHistoryErrorMessage(null);
-    setIsEditorOpen(false);
+    saveQueueRef.current = savePromise.catch(() => undefined);
+
+    return savePromise;
   }
 
   if (errorMessage && !config) {
@@ -279,7 +322,7 @@ export function Workbench({ api }: WorkbenchProps) {
             </button>
           ))}
         </div>
-        <button type="button" className="new-watchlist-button" onClick={() => setIsEditorOpen(true)}>
+        <button type="button" className="new-watchlist-button" onClick={handleEditorOpen}>
           New Watchlist
         </button>
       </aside>
@@ -379,7 +422,7 @@ export function Workbench({ api }: WorkbenchProps) {
 
       <WatchlistEditor
         open={isEditorOpen}
-        onClose={() => setIsEditorOpen(false)}
+        onClose={handleEditorClose}
         onSave={handleSaveWatchlist}
         recommend={api.recommendWatchlist}
       />

@@ -393,19 +393,18 @@ button:disabled {
 .watchlist-editor {
   position: fixed;
   z-index: 20;
-  top: 48px;
-  left: 50%;
+  top: 16px;
+  right: 16px;
   display: grid;
   gap: 14px;
-  width: min(640px, calc(100vw - 32px));
-  max-height: calc(100vh - 96px);
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
   padding: 16px;
   overflow: auto;
-  transform: translateX(-50%);
   border: 1px solid #c9d5d3;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 24px 80px rgba(32, 37, 43, 0.22);
+  box-shadow: -14px 0 48px rgba(32, 37, 43, 0.18);
 }
 
 .watchlist-editor-header,
