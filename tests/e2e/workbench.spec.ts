@@ -17,8 +17,12 @@ test("covers the stock workbench sector dashboard without live market calls", as
   await expect(quoteTable).toBeVisible();
   await expect(quoteTable.getByRole("columnheader", { name: "Dollar Volume" })).toBeVisible();
   await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.length === sectorSymbols.length)).toBe(true);
+  await expect(page.getByText("Live workspace")).toHaveCount(0);
+  const toolbar = page.getByRole("toolbar", { name: "Table controls" });
+  await expect(toolbar.getByLabel("Time span")).toHaveValue("1h");
+  await expect(toolbar.getByLabel("Refresh interval")).toHaveValue("60");
 
-  await page.getByLabel("Sort by").selectOption("heat");
+  await toolbar.getByLabel("Sort by").selectOption("heat");
   await expect(quoteTable.getByRole("button").first()).toHaveText("NVDA");
 
   await quoteTable.getByRole("button", { name: "NVDA" }).click();
@@ -50,7 +54,7 @@ test("covers the stock workbench sector dashboard without live market calls", as
     expect.arrayContaining([
       expect.objectContaining({
         activeSymbolCount: sectorSymbols.length,
-        intervalSeconds: 3_600,
+        intervalSeconds: 60,
         paidPlanName: "stocks-starter",
         plan: "paid",
       }),
@@ -245,7 +249,7 @@ const workbenchConfig: { settings: SettingsConfig; watchlists: WatchlistsConfig 
 const ratePlanEvaluation: RatePlanEvaluation = {
   status: "ok",
   plan: "paid",
-  intervalSeconds: 3_600,
+  intervalSeconds: 60,
   estimatedCallsPerMinute: 1,
   message: "Refresh interval is within the configured budget.",
   disabledIntervals: [],

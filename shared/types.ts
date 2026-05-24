@@ -38,7 +38,7 @@ export interface MarketSnapshot {
   changePercent: number | null;
   volume: number | null;
   updatedAt: string | null;
-  timeframe: "DELAYED" | "REAL-TIME" | "UNKNOWN";
+  timeframe: "DELAYED" | "PREVIOUS_CLOSE" | "REAL-TIME" | "UNKNOWN";
 }
 
 export interface PriceBar {
@@ -52,7 +52,7 @@ export interface PriceBar {
 
 export interface PriceSeries {
   symbol: string;
-  range: "1h" | "3h" | "6h" | "1d" | "5d" | "30d" | "2month" | "3month" | "6month" | "1y" | "5y";
+  range: "1h" | "1d" | "5d" | "30d" | "3month" | "1y" | "5y";
   bars: PriceBar[];
 }
 

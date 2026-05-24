@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RefreshControls } from "./RefreshControls";
@@ -8,42 +8,44 @@ afterEach(() => {
 });
 
 describe("RefreshControls", () => {
-  it("disables blocked intervals and labels warning state", () => {
+  it("renders compact refresh interval options in a dropdown", () => {
     render(
       <RefreshControls
-        intervalSeconds={3_600}
-        disabledIntervals={[3_600, 10_800]}
-        status="warning"
-        message="Stocks Starter has unlimited REST calls, but this interval is aggressive."
+        intervalSeconds={60}
+        disabledIntervals={[10]}
         onChange={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "1h" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "1h" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "3h" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "2month" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "5y" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveClass("warning");
-    expect(screen.getByRole("status")).toHaveTextContent("aggressive");
+    const select = screen.getByLabelText("Refresh interval");
+
+    expect(select).toHaveValue("60");
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual([
+      "10s",
+      "1m",
+      "5m",
+      "30m",
+      "1h",
+      "1d",
+    ]);
+    expect(screen.getByRole("option", { name: "10s" })).toBeDisabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("calls onChange with seconds when an enabled interval is clicked", async () => {
+  it("calls onChange with seconds when the interval changes", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
     render(
       <RefreshControls
-        intervalSeconds={3_600}
-        disabledIntervals={[3_600]}
-        status="ok"
-        message="Refresh interval is within budget."
+        intervalSeconds={60}
+        disabledIntervals={[]}
         onChange={onChange}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "3h" }));
+    await user.selectOptions(screen.getByLabelText("Refresh interval"), "300");
 
-    expect(onChange).toHaveBeenCalledWith(10_800);
+    expect(onChange).toHaveBeenCalledWith(300);
   });
 });

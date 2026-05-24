@@ -131,16 +131,21 @@ describe("market routes", () => {
     expect(response.body).toEqual(series);
   });
 
-  it("accepts expanded history ranges for validated symbols", async () => {
+  it("accepts only dashboard history ranges for validated symbols", async () => {
     const provider = createFakeProvider();
 
     const response = await request(createMarketTestApp(provider)).get("/api/market/history").query({
+      symbol: "nvda",
+      range: "3month",
+    });
+    const removedRangeResponse = await request(createMarketTestApp(provider)).get("/api/market/history").query({
       symbol: "nvda",
       range: "2month",
     });
 
     expect(response.status).toBe(200);
-    expect(provider.getHistory).toHaveBeenCalledWith({ symbol: "NVDA", range: "2month" });
+    expect(provider.getHistory).toHaveBeenCalledWith({ symbol: "NVDA", range: "3month" });
+    expect(removedRangeResponse.status).toBe(400);
   });
 });
 

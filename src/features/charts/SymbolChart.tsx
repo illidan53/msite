@@ -27,18 +27,14 @@ export interface SymbolChartProps {
   onRangeChange(range: PriceSeries["range"]): void;
 }
 
-const RANGES: PriceSeries["range"][] = [
-  "1h",
-  "3h",
-  "6h",
-  "1d",
-  "5d",
-  "30d",
-  "2month",
-  "3month",
-  "6month",
-  "1y",
-  "5y",
+const RANGES: Array<{ label: string; value: PriceSeries["range"] }> = [
+  { label: "1h", value: "1h" },
+  { label: "1d", value: "1d" },
+  { label: "5d", value: "5d" },
+  { label: "30d", value: "30d" },
+  { label: "3months", value: "3month" },
+  { label: "1y", value: "1y" },
+  { label: "5y", value: "5y" },
 ];
 const CHART_HEIGHT = 300;
 
@@ -100,12 +96,12 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
         <div className="segmented-control" aria-label="Chart range">
           {RANGES.map((rangeOption) => (
             <button
-              key={rangeOption}
+              key={rangeOption.value}
               type="button"
-              aria-pressed={range === rangeOption}
-              onClick={() => onRangeChange(rangeOption)}
+              aria-pressed={range === rangeOption.value}
+              onClick={() => onRangeChange(rangeOption.value)}
             >
-              {rangeOption}
+              {rangeOption.label}
             </button>
           ))}
         </div>
@@ -150,7 +146,7 @@ function toCandlePoint(bar: PriceBar, range: PriceSeries["range"]) {
 }
 
 function toChartTime(timestamp: string, range: PriceSeries["range"]) {
-  if (range === "1h" || range === "3h" || range === "6h" || range === "1d" || range === "5d") {
+  if (range === "1h" || range === "1d" || range === "5d") {
     return Math.floor(Date.parse(timestamp) / 1000);
   }
 

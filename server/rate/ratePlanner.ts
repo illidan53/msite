@@ -17,17 +17,12 @@ export interface RatePlanInput {
 const FREE_CALLS_PER_MINUTE = 5;
 const DEFAULT_CUSTOM_CALLS_PER_MINUTE = 60;
 const DISABLEABLE_INTERVALS_SECONDS = [
+  10,
+  60,
+  300,
+  1_800,
   3_600,
-  10_800,
-  21_600,
   86_400,
-  432_000,
-  2_592_000,
-  5_184_000,
-  7_776_000,
-  15_552_000,
-  31_536_000,
-  157_680_000,
 ];
 
 export function evaluateRatePlan(input: RatePlanInput): RatePlanEvaluation {

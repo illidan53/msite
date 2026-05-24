@@ -19,7 +19,7 @@ describe("rate plan routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      disabledIntervals: [],
+      disabledIntervals: [10, 60, 300, 1_800],
       estimatedCallsPerMinute: 9,
       intervalSeconds: 3_600,
       message: expect.stringContaining("20 calls/min"),

@@ -19,14 +19,10 @@ const safeTickerSymbolSchema = z
 
 const historyRangeSchema = z.enum([
   "1h",
-  "3h",
-  "6h",
   "1d",
   "5d",
   "30d",
-  "2month",
   "3month",
-  "6month",
   "1y",
   "5y",
 ]);

@@ -36,7 +36,7 @@ describe("evaluateRatePlan", () => {
     });
 
     expect(result).toEqual({
-      disabledIntervals: [3_600, 10_800],
+      disabledIntervals: [10, 60, 300, 1_800, 3_600],
       estimatedCallsPerMinute: 17,
       intervalSeconds: 3_600,
       message: expect.stringContaining("5 calls/min"),
@@ -58,7 +58,7 @@ describe("evaluateRatePlan", () => {
     });
 
     expect(result).toEqual({
-      disabledIntervals: [],
+      disabledIntervals: [10, 60, 300, 1_800],
       estimatedCallsPerMinute: 7,
       intervalSeconds: 3_600,
       message: expect.stringContaining("12 calls/min"),
@@ -80,7 +80,7 @@ describe("evaluateRatePlan", () => {
     });
 
     expect(result).toEqual({
-      disabledIntervals: [],
+      disabledIntervals: [10, 60, 300, 1_800],
       estimatedCallsPerMinute: 38,
       intervalSeconds: 3_600,
       message: expect.stringContaining("60 calls/min"),

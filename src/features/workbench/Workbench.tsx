@@ -10,10 +10,19 @@ interface WorkbenchProps {
 
 type SortMode = "config" | "size" | "heat" | "volume" | "changePercent" | "price" | "updated";
 
-const DEFAULT_INTERVAL_SECONDS = 3_600;
+const DEFAULT_INTERVAL_SECONDS = 60;
 const DEFAULT_RANGE: PriceSeries["range"] = "1h";
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const TIME_SPAN_OPTIONS: Array<{ label: string; value: PriceSeries["range"] }> = [
+  { label: "1h", value: "1h" },
+  { label: "1d", value: "1d" },
+  { label: "5d", value: "5d" },
+  { label: "30d", value: "30d" },
+  { label: "3months", value: "3month" },
+  { label: "1y", value: "1y" },
+  { label: "5y", value: "5y" },
+];
 const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: "config", label: "Config order" },
   { id: "size", label: "Size" },
@@ -276,18 +285,47 @@ export function Workbench({ api }: WorkbenchProps) {
     <main className="workbench">
       {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
 
-      <header className="workbench-topbar">
-        <div>
-          <p className="workbench-kicker">Live workspace</p>
-          <p className="workbench-title">{watchlist.name}</p>
-        </div>
+      <header className="workbench-topbar" role="toolbar" aria-label="Table controls">
+        <label htmlFor="time-span">Time span</label>
+        <select
+          id="time-span"
+          value={selectedRange}
+          onChange={(event) => setSelectedRange(event.target.value as PriceSeries["range"])}
+        >
+          {TIME_SPAN_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
         <RefreshControls
           intervalSeconds={intervalSeconds}
           disabledIntervals={ratePlan.disabledIntervals}
-          status={ratePlan.status}
-          message={ratePlan.message}
           onChange={setIntervalSeconds}
         />
+
+        <label htmlFor="sort-mode">Sort by</label>
+        <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+          {SORT_OPTIONS.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="page-size">Rows</label>
+        <select
+          id="page-size"
+          value={pageSize}
+          onChange={(event) => setPageSize(Number(event.target.value))}
+        >
+          {PAGE_SIZE_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
       </header>
 
       <aside className="watchlist-rail" aria-label="Watchlists">
@@ -308,6 +346,9 @@ export function Workbench({ api }: WorkbenchProps) {
             </tr>
           </tbody>
         </table>
+        <p role="status" className={`rate-status ${ratePlan.status}`}>
+          {ratePlan.message}
+        </p>
         <div className="watchlist-buttons">
           {watchlists.map((watchlistOption) => (
             <button
@@ -324,30 +365,6 @@ export function Workbench({ api }: WorkbenchProps) {
       </aside>
 
       <section className="watchlist-main" aria-label={`${watchlist.name} dashboard`}>
-        <div className="table-toolbar">
-          <label htmlFor="sort-mode">Sort by</label>
-          <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-
-          <label htmlFor="page-size">Rows</label>
-          <select
-            id="page-size"
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <section className="watchlist-row sector-table-panel">
           <table className="quote-table sector-table" aria-label={`${watchlist.name} quotes`}>
             <thead>

@@ -1,53 +1,41 @@
-import clsx from "clsx";
-
 const INTERVALS = [
+  { label: "10s", seconds: 10 },
+  { label: "1m", seconds: 60 },
+  { label: "5m", seconds: 300 },
+  { label: "30m", seconds: 1_800 },
   { label: "1h", seconds: 3_600 },
-  { label: "3h", seconds: 10_800 },
-  { label: "6h", seconds: 21_600 },
   { label: "1d", seconds: 86_400 },
-  { label: "5d", seconds: 432_000 },
-  { label: "30d", seconds: 2_592_000 },
-  { label: "2month", seconds: 5_184_000 },
-  { label: "3month", seconds: 7_776_000 },
-  { label: "6month", seconds: 15_552_000 },
-  { label: "1y", seconds: 31_536_000 },
-  { label: "5y", seconds: 157_680_000 },
 ];
 
 export interface RefreshControlsProps {
   intervalSeconds: number;
   disabledIntervals: number[];
-  status: "ok" | "warning" | "blocked";
-  message: string;
   onChange(intervalSeconds: number): void;
 }
 
 export function RefreshControls({
   disabledIntervals,
   intervalSeconds,
-  message,
   onChange,
-  status,
 }: RefreshControlsProps) {
   return (
-    <section className="refresh-controls" aria-label="Refresh frequency">
-      <div className="segmented-control">
+    <>
+      <label htmlFor="refresh-interval">Refresh interval</label>
+      <select
+        id="refresh-interval"
+        value={intervalSeconds}
+        onChange={(event) => onChange(Number(event.target.value))}
+      >
         {INTERVALS.map((interval) => (
-          <button
+          <option
             key={interval.seconds}
-            type="button"
-            aria-pressed={intervalSeconds === interval.seconds}
-            className={clsx("segment", intervalSeconds === interval.seconds && "selected")}
+            value={interval.seconds}
             disabled={disabledIntervals.includes(interval.seconds)}
-            onClick={() => onChange(interval.seconds)}
           >
             {interval.label}
-          </button>
+          </option>
         ))}
-      </div>
-      <p role="status" className={clsx("rate-status", status)}>
-        {message}
-      </p>
-    </section>
+      </select>
+    </>
   );
 }

@@ -19,15 +19,37 @@ describe("Workbench", () => {
     await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols));
 
     expect(screen.queryByRole("button", { name: "New Watchlist" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Live workspace")).not.toBeInTheDocument();
     expect(screen.getByRole("table", { name: "API usage summary" })).toBeInTheDocument();
     expect(screen.getByText("Tracked symbols")).toBeInTheDocument();
     expect(screen.getByText("23")).toBeInTheDocument();
+    expect(screen.getByText("stocks-starter has unlimited REST calls for this planner.")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Change" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Dollar Volume" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Timeframe" })).toBeInTheDocument();
     expect(await screen.findByText("$39.1B")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  });
+
+  it("renders one toolbar with time span, refresh interval, sort, and rows controls", async () => {
+    render(<Workbench api={createApi()} />);
+
+    await screen.findByRole("table", { name: "Semiconductors quotes" });
+
+    const toolbar = screen.getByRole("toolbar", { name: "Table controls" });
+    const labels = within(toolbar).getAllByText(/^(Time span|Refresh interval|Sort by|Rows)$/);
+
+    expect(labels.map((label) => label.textContent)).toEqual(["Time span", "Refresh interval", "Sort by", "Rows"]);
+    expect(screen.getAllByRole("toolbar", { name: "Table controls" })).toHaveLength(1);
+    expect(within(toolbar).getByLabelText("Refresh interval")).toHaveValue("60");
+    expect(within(toolbar).getByLabelText("Time span")).toHaveValue("1h");
+    expect(
+      within(within(toolbar).getByLabelText("Refresh interval")).getAllByRole("option").map((option) => option.textContent),
+    ).toEqual(["10s", "1m", "5m", "30m", "1h", "1d"]);
+    expect(
+      within(within(toolbar).getByLabelText("Time span")).getAllByRole("option").map((option) => option.textContent),
+    ).toEqual(["1h", "1d", "5d", "30d", "3months", "1y", "5y"]);
   });
 
   it("sorts by heat and paginates the selected sector", async () => {
@@ -81,6 +103,24 @@ describe("Workbench", () => {
     await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("NVDA", "5y"));
   });
 
+  it("uses the selected toolbar time span when opening history without changing refresh cadence", async () => {
+    const user = userEvent.setup();
+    const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
+    const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
+
+    render(<Workbench api={createApi({ getHistory, evaluateRatePlan })} />);
+
+    const toolbar = await screen.findByRole("toolbar", { name: "Table controls" });
+    await user.selectOptions(within(toolbar).getByLabelText("Time span"), "5d");
+
+    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
+
+    expect(await screen.findByRole("dialog", { name: "NVDA details" })).toBeInTheDocument();
+    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("NVDA", "5d"));
+    expect(evaluateRatePlan).toHaveBeenCalledWith(expect.objectContaining({ intervalSeconds: 60 }));
+  });
+
   it("polls the newly selected sector as one flattened symbol list", async () => {
     const user = userEvent.setup();
     const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
@@ -116,7 +156,7 @@ describe("Workbench", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Snapshots unavailable");
   });
 
-  it("evaluates the refresh budget with selected sector symbol count and long interval", async () => {
+  it("evaluates the refresh budget with selected sector symbol count and default one minute interval", async () => {
     const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
 
     render(<Workbench api={createApi({ evaluateRatePlan })} />);
@@ -127,7 +167,7 @@ describe("Workbench", () => {
         activeSymbolCount: sectorSymbols.length,
         cacheHitRatio: 0.3,
         endpointCount: 1,
-        intervalSeconds: 3_600,
+        intervalSeconds: 60,
       }),
     );
   });
@@ -194,9 +234,9 @@ const baseConfig: WorkbenchConfig = {
 const ratePlanEvaluation: Awaited<ReturnType<WorkbenchApi["evaluateRatePlan"]>> = {
   status: "ok",
   plan: "paid",
-  intervalSeconds: 3_600,
+  intervalSeconds: 60,
   estimatedCallsPerMinute: 1,
-  message: "ok",
+  message: "stocks-starter has unlimited REST calls for this planner.",
   disabledIntervals: [],
 };
 

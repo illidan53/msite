@@ -5,12 +5,6 @@ import type { PolygonClient } from "./polygonClient";
 
 const SNAPSHOT_TTL_MS = 15_000;
 const HISTORY_TTL_MS = 60_000;
-const marketDateFormatter = new Intl.DateTimeFormat("en-US", {
-  day: "2-digit",
-  month: "2-digit",
-  timeZone: "America/New_York",
-  year: "numeric",
-});
 
 interface PolygonSnapshotResponse {
   tickers?: PolygonSnapshotTicker[];
@@ -22,6 +16,10 @@ interface PolygonSnapshotTicker {
     v?: number;
   };
   name?: string;
+  prevDay?: {
+    c?: number;
+    v?: number;
+  };
   ticker?: string;
   todaysChange?: number;
   todaysChangePerc?: number;
@@ -178,20 +176,24 @@ function normalizeReferenceTicker(ticker: string | undefined): string | undefine
 }
 
 function mapSnapshot(ticker: PolygonSnapshotTicker): MarketSnapshot {
+  const currentPrice = positiveFiniteNumberOrNull(ticker.day?.c);
+  const previousClose = positiveFiniteNumberOrNull(ticker.prevDay?.c);
+  const usePreviousClose = currentPrice === null && previousClose !== null;
+
   return {
     change: ticker.todaysChange ?? null,
     changePercent: ticker.todaysChangePerc ?? null,
     name: ticker.name,
-    price: ticker.day?.c ?? null,
+    price: usePreviousClose ? previousClose : currentPrice,
     symbol: ticker.ticker?.toUpperCase() ?? "",
-    timeframe: "DELAYED",
-    updatedAt: timestampNsToIso(ticker.updated),
-    volume: ticker.day?.v ?? null,
+    timeframe: usePreviousClose ? "PREVIOUS_CLOSE" : "DELAYED",
+    updatedAt: usePreviousClose ? null : timestampNsToIso(ticker.updated),
+    volume: usePreviousClose ? finiteNumberOrNull(ticker.prevDay?.v) : finiteNumberOrNull(ticker.day?.v),
   };
 }
 
 function timestampNsToIso(timestampNs: number | undefined): string | null {
-  if (timestampNs === undefined || !Number.isFinite(timestampNs)) {
+  if (timestampNs === undefined || timestampNs <= 0 || !Number.isFinite(timestampNs)) {
     return null;
   }
 
@@ -202,6 +204,14 @@ function timestampNsToIso(timestampNs: number | undefined): string | null {
   }
 
   return date.toISOString();
+}
+
+function finiteNumberOrNull(value: number | undefined): number | null {
+  return value === undefined || !Number.isFinite(value) ? null : value;
+}
+
+function positiveFiniteNumberOrNull(value: number | undefined): number | null {
+  return value === undefined || value <= 0 || !Number.isFinite(value) ? null : value;
 }
 
 function mapPriceBar(bar: PolygonAggBar): PriceBar {
@@ -216,24 +226,47 @@ function mapPriceBar(bar: PolygonAggBar): PriceBar {
 }
 
 function trimBarsForRange(range: HistoryRange, bars: PriceBar[]): PriceBar[] {
-  if (range !== "1d" || bars.length === 0) {
+  if (bars.length === 0) {
     return bars;
   }
 
-  const latestMarketDate = bars.reduce((latest, bar) => {
-    const marketDate = formatMarketDate(bar.timestamp);
-    return marketDate > latest ? marketDate : latest;
-  }, formatMarketDate(bars[0].timestamp));
-  return bars.filter((bar) => formatMarketDate(bar.timestamp) === latestMarketDate);
+  const latestTimestamp = Math.max(...bars.map((bar) => Date.parse(bar.timestamp)).filter(Number.isFinite));
+  if (!Number.isFinite(latestTimestamp)) {
+    return bars;
+  }
+
+  const cutoff = cutoffTimestampForRange(range, new Date(latestTimestamp));
+  return bars.filter((bar) => Date.parse(bar.timestamp) >= cutoff.getTime());
 }
 
-function formatMarketDate(timestamp: string): string {
-  const parts = marketDateFormatter.formatToParts(new Date(timestamp));
-  const year = parts.find((part) => part.type === "year")?.value;
-  const month = parts.find((part) => part.type === "month")?.value;
-  const day = parts.find((part) => part.type === "day")?.value;
+function cutoffTimestampForRange(range: HistoryRange, latest: Date): Date {
+  const cutoff = new Date(latest);
 
-  return `${year}-${month}-${day}`;
+  switch (range) {
+    case "1h":
+      cutoff.setHours(cutoff.getHours() - 1);
+      break;
+    case "1d":
+      cutoff.setDate(cutoff.getDate() - 1);
+      break;
+    case "5d":
+      cutoff.setDate(cutoff.getDate() - 5);
+      break;
+    case "30d":
+      cutoff.setDate(cutoff.getDate() - 30);
+      break;
+    case "3month":
+      cutoff.setMonth(cutoff.getMonth() - 3);
+      break;
+    case "1y":
+      cutoff.setFullYear(cutoff.getFullYear() - 1);
+      break;
+    case "5y":
+      cutoff.setFullYear(cutoff.getFullYear() - 5);
+      break;
+  }
+
+  return cutoff;
 }
 
 function rangeToAggregates(range: HistoryRange): { from: string; multiplier: number; timespan: "day" | "minute"; to: string } {
@@ -244,15 +277,7 @@ function rangeToAggregates(range: HistoryRange): { from: string; multiplier: num
 
   switch (range) {
     case "1h":
-      from.setHours(to.getHours() - 1);
-      timespan = "minute";
-      break;
-    case "3h":
-      from.setHours(to.getHours() - 3);
-      timespan = "minute";
-      break;
-    case "6h":
-      from.setHours(to.getHours() - 6);
+      from.setDate(to.getDate() - 7);
       timespan = "minute";
       break;
     case "1d":
@@ -268,14 +293,8 @@ function rangeToAggregates(range: HistoryRange): { from: string; multiplier: num
     case "30d":
       from.setMonth(to.getMonth() - 1);
       break;
-    case "2month":
-      from.setMonth(to.getMonth() - 2);
-      break;
     case "3month":
       from.setMonth(to.getMonth() - 3);
-      break;
-    case "6month":
-      from.setMonth(to.getMonth() - 6);
       break;
     case "1y":
       from.setFullYear(to.getFullYear() - 1);

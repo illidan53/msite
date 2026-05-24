@@ -7,7 +7,7 @@ Status: Approved design, pending implementation plan
 
 The current Stock Workbench loads watchlists from `config/watchlists.yaml`, lets the user create new watchlists through the frontend, polls expanded rows, and reserves a fixed right-side symbol detail panel. The next iteration changes the product shape from editable watchlists to a file-driven sector dashboard.
 
-The user confirmed that the time options `1h`, `3h`, `6h`, `1d`, `5d`, `30d`, `2month`, `3month`, `6month`, `1y`, and `5y` should be used for both automatic refresh cadence and the symbol history chart range.
+Follow-up refinement: refresh cadence and chart time span are separate controls. Refresh cadence controls polling; time span controls the history window used when opening symbol detail.
 
 ## Goals
 
@@ -18,7 +18,7 @@ The user confirmed that the time options `1h`, `3h`, `6h`, `1d`, `5d`, `30d`, `2
 5. Default pagination to 20 symbols per page.
 6. Replace the fixed right detail column with a right-side off-canvas detail panel opened by clicking a symbol.
 7. Let the main dashboard use the available width when the detail panel is closed.
-8. Replace short refresh choices with the shared long-range options.
+8. Keep refresh choices compact and separate from chart time span.
 9. Add a compact workbench stats table before sector selection showing estimated today's API calls, total tracked symbols, and estimated historical API calls.
 10. Add useful quote table columns beyond price, change, and volume.
 
@@ -64,49 +64,42 @@ Backend write and recommendation routes are removed so the product surface and A
 The app layout becomes a two-column workbench:
 
 - Left rail: title, compact stats table, sector buttons.
-- Main dashboard: top bar, sort/pagination controls, selected sector table.
+- Main dashboard: one top toolbar, selected sector table, pagination controls.
 
 The fixed `.symbol-detail` grid column will be removed from normal layout. Clicking a symbol opens an off-canvas panel from the right. The panel contains the selected symbol, selected time range, chart mode controls, chart range controls, loading/error states, and a close button. A backdrop or close button will dismiss it. The dashboard keeps its full width while the panel overlays the page.
 
 On narrow screens, the rail stacks above the main dashboard and the off-canvas panel uses nearly full viewport width.
 
-## Time Options
+## Refresh And Time Span
 
-The shared time options are:
+Refresh interval options are:
+
+- `10s`
+- `1m`
+- `5m`
+- `30m`
+- `1h`
+- `1d`
+
+The default refresh interval is `1m`.
+
+The chart time span options are:
 
 - `1h`
-- `3h`
-- `6h`
 - `1d`
 - `5d`
 - `30d`
-- `2month`
-- `3month`
-- `6month`
+- `3months`
 - `1y`
 - `5y`
 
-The frontend label set is reused by refresh controls and chart range controls. Internally, refresh options map to seconds:
+The backend maps time span to Polygon aggregate requests:
 
-- `1h`: 3,600
-- `3h`: 10,800
-- `6h`: 21,600
-- `1d`: 86,400
-- `5d`: 432,000
-- `30d`: 2,592,000
-- `2month`: 5,184,000
-- `3month`: 7,776,000
-- `6month`: 15,552,000
-- `1y`: 31,536,000
-- `5y`: 157,680,000
-
-Chart history ranges use the same labels in the API. The backend maps the range to Polygon aggregate requests:
-
-- `1h`, `3h`, `6h`: minute aggregates over the requested number of hours.
+- `1h`: minute aggregates over a wider calendar window, then trimmed to the last hour ending at the latest returned bar.
 - `1d`, `5d`: 5-minute aggregates with a wider calendar window to handle weekends and market holidays.
-- `30d`, `2month`, `3month`, `6month`, `1y`, `5y`: daily aggregates.
+- `30d`, `3months`, `1y`, `5y`: daily aggregates, trimmed to the requested window ending at the latest returned bar.
 
-The default selected option is `1h` for both refresh cadence and symbol chart range.
+The default selected time span is `1h`.
 
 ## Sorting
 

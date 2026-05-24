@@ -131,6 +131,39 @@ describe("MarketDataProvider", () => {
     ]);
   });
 
+  it("falls back to previous day snapshot data when current day values are empty", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          tickers: [
+            {
+              ticker: "NVDA",
+              todaysChange: 0,
+              todaysChangePerc: 0,
+              updated: 0,
+              day: { c: 0, v: 0 },
+              prevDay: { c: 178.88, v: 154_480_600 },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const snapshots = await provider.getSnapshots(["NVDA"]);
+
+    expect(snapshots).toEqual([
+      expect.objectContaining({
+        symbol: "NVDA",
+        price: 178.88,
+        volume: 154_480_600,
+        updatedAt: null,
+        timeframe: "PREVIOUS_CLOSE",
+      }),
+    ]);
+  });
+
   it("maps aggregate bars to PriceSeries", async () => {
     const fetcher = vi.fn<typeof fetch>(async () =>
       new Response(
@@ -182,23 +215,39 @@ describe("MarketDataProvider", () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "MSFT", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
+    await provider.getHistory({ symbol: "msft", range: "1h" });
     await provider.getHistory({ symbol: "msft", range: "1d" });
     await provider.getHistory({ symbol: "msft", range: "5d" });
 
-    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-19/2026-05-26");
-    expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-16/2026-05-26");
+    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/1/minute/2026-05-19/2026-05-26");
+    expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-19/2026-05-26");
+    expect(new URL(String(fetcher.mock.calls[2][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-16/2026-05-26");
   });
 
-  it("uses minute aggregates for hourly history ranges", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-05-26T15:30:00.000Z"));
-    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "NVDA", results: [] }), { status: 200 }));
+  it("trims hourly history to the last hour ending at the latest returned bar", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          ticker: "NVDA",
+          results: [
+            { t: Date.parse("2026-05-22T18:30:00.000Z"), o: 1, h: 2, l: 1, c: 2, v: 100 },
+            { t: Date.parse("2026-05-22T19:30:00.000Z"), o: 3, h: 4, l: 3, c: 4, v: 200 },
+            { t: Date.parse("2026-05-22T20:00:00.000Z"), o: 5, h: 6, l: 5, c: 6, v: 300 },
+            { t: Date.parse("2026-05-22T20:30:00.000Z"), o: 7, h: 8, l: 7, c: 8, v: 400 },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await provider.getHistory({ symbol: "nvda", range: "3h" });
+    const series = await provider.getHistory({ symbol: "nvda", range: "1h" });
 
-    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
-    expect(requestedUrl.pathname).toBe("/v2/aggs/ticker/NVDA/range/1/minute/2026-05-26/2026-05-26");
+    expect(series.bars.map((bar) => bar.timestamp)).toEqual([
+      "2026-05-22T19:30:00.000Z",
+      "2026-05-22T20:00:00.000Z",
+      "2026-05-22T20:30:00.000Z",
+    ]);
   });
 
   it("maps expanded daily history ranges to the correct calendar window", async () => {
@@ -207,10 +256,10 @@ describe("MarketDataProvider", () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "MSFT", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await provider.getHistory({ symbol: "msft", range: "2month" });
+    await provider.getHistory({ symbol: "msft", range: "3month" });
     await provider.getHistory({ symbol: "msft", range: "5y" });
 
-    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/1/day/2026-03-26/2026-05-26");
+    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/1/day/2026-02-26/2026-05-26");
     expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/1/day/2021-05-26/2026-05-26");
   });
 

@@ -52,6 +52,11 @@ describe("SymbolChart", () => {
     render(<SymbolChart symbol="NVDA" series={priceSeries} range="1h" onRangeChange={onRangeChange} />);
 
     expect(screen.getByRole("button", { name: "1h" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: "3h" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "6h" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "2month" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "6month" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "3months" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "5y" }));
 
