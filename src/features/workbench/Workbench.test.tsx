@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { MarketSnapshot, PriceSeries, RecommendationCandidate } from "../../../shared/types";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
 import { Workbench } from "./Workbench";
 
@@ -19,6 +20,108 @@ describe("Workbench", () => {
     expect(screen.getByRole("button", { name: "Leaders" })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "Equipment" })).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByText("Sync paused")).toBeInTheDocument();
+  });
+
+  it("shows collapsed row paused state and renders detail when a symbol is selected", async () => {
+    const user = userEvent.setup();
+    const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
+
+    render(<Workbench api={createApi({ getHistory })} />);
+
+    expect(await screen.findByText("Sync paused")).toBeInTheDocument();
+    expect(screen.queryByLabelText("NVDA chart")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "NVDA" }));
+
+    expect(await screen.findByLabelText("NVDA chart")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1M" })).toHaveAttribute("aria-pressed", "true");
+    expect(getHistory).toHaveBeenCalledWith("NVDA", "1M");
+  });
+
+  it("renders snapshot values in the quote table after refresh", async () => {
+    render(<Workbench api={createApi({ fetchSnapshots: vi.fn(async () => marketSnapshots) })} />);
+
+    expect(await screen.findByText("$927.75")).toBeInTheDocument();
+    expect(screen.getByText("+2.45%")).toBeInTheDocument();
+    expect(screen.getByText("42.1M")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-23 14:30 UTC")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Symbol" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Price" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Change %" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Volume" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Updated" })).toBeInTheDocument();
+  });
+
+  it("fetches history for the selected symbol and selected chart range", async () => {
+    const user = userEvent.setup();
+    const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
+
+    render(<Workbench api={createApi({ getHistory })} />);
+
+    await user.click(await screen.findByRole("button", { name: "AMD" }));
+    await waitFor(() => expect(getHistory).toHaveBeenCalledWith("AMD", "1M"));
+
+    await user.click(screen.getByRole("button", { name: "5D" }));
+
+    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("AMD", "5D"));
+  });
+
+  it("saves a recommended watchlist and adds it to the rail", async () => {
+    const user = userEvent.setup();
+    const saveWatchlists = vi.fn(async (watchlists) => watchlists);
+    const recommendWatchlist = vi.fn(async () => recommendationCandidates);
+
+    render(<Workbench api={createApi({ recommendWatchlist, saveWatchlists })} />);
+
+    await user.click(await screen.findByRole("button", { name: "New Watchlist" }));
+    await user.type(screen.getByLabelText("Name"), "AI Leaders");
+    await user.type(screen.getByLabelText("Theme"), "AI chips");
+    await user.type(screen.getByLabelText("Pinned symbols"), "nvda");
+    await user.click(screen.getByRole("button", { name: "Recommend" }));
+    await user.click(await screen.findByRole("checkbox", { name: /TSM/i }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(saveWatchlists).toHaveBeenCalledWith({
+        watchlists: [
+          baseWatchlist,
+          {
+            id: "ai-leaders",
+            name: "AI Leaders",
+            theme: "AI chips",
+            pinnedSymbols: ["NVDA"],
+            rows: [
+              {
+                id: "recommended",
+                name: "Recommended",
+                expandedByDefault: true,
+                symbols: ["NVDA", "TSM"],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(screen.queryByRole("dialog", { name: "Watchlist editor" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "AI Leaders" })).toBeInTheDocument();
+  });
+
+  it("keeps the watchlist editor open and shows an alert when save fails", async () => {
+    const user = userEvent.setup();
+    const saveWatchlists = vi.fn(async () => {
+      throw new Error("Config save failed");
+    });
+
+    render(<Workbench api={createApi({ saveWatchlists })} />);
+
+    await user.click(await screen.findByRole("button", { name: "New Watchlist" }));
+    await user.type(screen.getByLabelText("Name"), "Compounders");
+    await user.type(screen.getByLabelText("Pinned symbols"), "cost");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Config save failed");
+    expect(screen.getByRole("dialog", { name: "Watchlist editor" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Compounders" })).not.toBeInTheDocument();
   });
 
   it("adds collapsed row symbols to polling when the row is expanded", async () => {
@@ -183,13 +286,19 @@ function createApi({
   configError,
   configPromise,
   fetchSnapshots = vi.fn(async () => []),
+  getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range)),
   evaluateRatePlan = vi.fn(async () => ratePlanEvaluation),
+  recommendWatchlist = vi.fn(async () => []),
+  saveWatchlists = vi.fn(async (watchlists) => watchlists),
 }: {
   config?: WorkbenchConfig;
   configError?: Error;
   configPromise?: Promise<WorkbenchConfig>;
   fetchSnapshots?: WorkbenchApi["fetchSnapshots"];
+  getHistory?: WorkbenchApi["getHistory"];
   evaluateRatePlan?: WorkbenchApi["evaluateRatePlan"];
+  recommendWatchlist?: WorkbenchApi["recommendWatchlist"];
+  saveWatchlists?: WorkbenchApi["saveWatchlists"];
 } = {}): WorkbenchApi {
   return {
     getConfig: vi.fn(async () => {
@@ -199,10 +308,75 @@ function createApi({
 
       return configPromise ?? config;
     }),
-    saveWatchlists: vi.fn(async (watchlists) => watchlists),
+    saveWatchlists,
     fetchSnapshots,
-    getHistory: vi.fn(async (symbol, range) => ({ symbol, range, bars: [] })),
+    getHistory,
     evaluateRatePlan,
-    recommendWatchlist: vi.fn(async () => []),
+    recommendWatchlist,
+  };
+}
+
+const marketSnapshots: MarketSnapshot[] = [
+  {
+    symbol: "NVDA",
+    name: "Nvidia",
+    price: 927.75,
+    change: 22.18,
+    changePercent: 2.45,
+    volume: 42_100_000,
+    updatedAt: "2026-05-23T14:30:00.000Z",
+    timeframe: "DELAYED",
+  },
+  {
+    symbol: "AMD",
+    name: "Advanced Micro Devices",
+    price: null,
+    change: null,
+    changePercent: null,
+    volume: null,
+    updatedAt: null,
+    timeframe: "UNKNOWN",
+  },
+];
+
+const recommendationCandidates: RecommendationCandidate[] = [
+  {
+    symbol: "NVDA",
+    name: "Nvidia",
+    source: "pinned",
+    score: 100,
+    reasons: ["user pinned"],
+  },
+  {
+    symbol: "TSM",
+    name: "Taiwan Semiconductor",
+    source: "related",
+    score: 80,
+    reasons: ["related candidate"],
+  },
+];
+
+function priceSeries(symbol: string, range: PriceSeries["range"]): PriceSeries {
+  return {
+    symbol,
+    range,
+    bars: [
+      {
+        timestamp: "2026-05-22T13:30:00.000Z",
+        open: 10,
+        high: 12,
+        low: 9,
+        close: 11,
+        volume: 100,
+      },
+      {
+        timestamp: "2026-05-23T13:30:00.000Z",
+        open: 11,
+        high: 15,
+        low: 10,
+        close: 14,
+        volume: 200,
+      },
+    ],
   };
 }
