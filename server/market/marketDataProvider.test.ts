@@ -1,0 +1,165 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../http/apiError";
+import { MarketDataProvider } from "./marketDataProvider";
+import { MemoryCache } from "./memoryCache";
+import { PolygonClient } from "./polygonClient";
+
+describe("MemoryCache", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns undefined after the entry TTL expires", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-23T12:00:00.000Z"));
+    const cache = new MemoryCache<number>();
+
+    cache.set("answer", 42, 1_000);
+
+    expect(cache.get("answer")).toBe(42);
+    vi.advanceTimersByTime(1_000);
+    expect(cache.get("answer")).toBeUndefined();
+  });
+});
+
+describe("PolygonClient", () => {
+  it("throws a structured error when the API key is missing", async () => {
+    const client = new PolygonClient(undefined, vi.fn());
+
+    await expect(client.getJson("/v2/snapshot/locale/us/markets/stocks/tickers")).rejects.toMatchObject({
+      code: "POLYGON_API_KEY_MISSING",
+      source: "polygon",
+      status: 503,
+    });
+  });
+
+  it("does not expose the API key when Polygon requests fail", async () => {
+    const secret = "super-secret-polygon-key";
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 }));
+    const client = new PolygonClient(secret, fetcher);
+
+    let error: unknown;
+    try {
+      await client.getJson("/v2/snapshot/locale/us/markets/stocks/tickers", { tickers: "NVDA" });
+    } catch (caught) {
+      error = caught;
+    }
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({
+      code: "POLYGON_REQUEST_FAILED",
+      source: "polygon",
+      status: 401,
+    });
+    expect(String(error)).not.toContain(secret);
+    expect(JSON.stringify(error)).not.toContain(secret);
+  });
+});
+
+describe("MarketDataProvider", () => {
+  it("maps snapshot responses to MarketSnapshot DTOs and requests normalized tickers", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          status: "OK",
+          tickers: [
+            {
+              ticker: "NVDA",
+              todaysChange: 12.34,
+              todaysChangePerc: 2.5,
+              updated: 1716400000000,
+              day: { c: 950, v: 123_456 },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const snapshots = await provider.getSnapshots(["nvda"]);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0];
+    expect(String(url)).toContain("/v2/snapshot/locale/us/markets/stocks/tickers");
+    expect(new URL(String(url)).searchParams.get("tickers")).toBe("NVDA");
+    expect(init).toMatchObject({ headers: { accept: "application/json" } });
+    expect(snapshots).toEqual([
+      {
+        symbol: "NVDA",
+        price: 950,
+        change: 12.34,
+        changePercent: 2.5,
+        volume: 123_456,
+        updatedAt: "2024-05-22T17:46:40.000Z",
+        timeframe: "DELAYED",
+      },
+    ]);
+  });
+
+  it("maps aggregate bars to PriceSeries", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          ticker: "AAPL",
+          results: [{ t: 1716400000000, o: 190, h: 195, l: 188, c: 194, v: 1_000 }],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const series = await provider.getHistory({ symbol: "aapl", range: "1M" });
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requestedUrl.pathname).toMatch(/^\/v2\/aggs\/ticker\/AAPL\/range\/1\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$/);
+    expect(requestedUrl.searchParams.get("adjusted")).toBe("true");
+    expect(requestedUrl.searchParams.get("sort")).toBe("asc");
+    expect(requestedUrl.searchParams.get("limit")).toBe("50000");
+    expect(series).toEqual({
+      symbol: "AAPL",
+      range: "1M",
+      bars: [
+        {
+          timestamp: "2024-05-22T17:46:40.000Z",
+          open: 190,
+          high: 195,
+          low: 188,
+          close: 194,
+          volume: 1_000,
+        },
+      ],
+    });
+  });
+
+  it("uses 5 minute aggregates for 1D and 5D history ranges", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "MSFT", results: [] }), { status: 200 }));
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await provider.getHistory({ symbol: "msft", range: "5D" });
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requestedUrl.pathname).toMatch(/^\/v2\/aggs\/ticker\/MSFT\/range\/5\/minute\//);
+  });
+
+  it("caches snapshots by the normalized symbol set", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          tickers: [
+            { ticker: "AAPL", day: { c: 190, v: 10 } },
+            { ticker: "NVDA", day: { c: 950, v: 20 } },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await provider.getSnapshots(["nvda", "AAPL", "nvda"]);
+    await provider.getSnapshots(["aapl", "NVDA"]);
+
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(new URL(String(fetcher.mock.calls[0][0])).searchParams.get("tickers")).toBe("AAPL,NVDA");
+  });
+});
