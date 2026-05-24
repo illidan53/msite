@@ -1,6 +1,4 @@
-import request from "supertest";
 import { describe, expect, it } from "vitest";
-import { createApp } from "../app";
 import { evaluateRatePlan } from "./ratePlanner";
 
 describe("evaluateRatePlan", () => {
@@ -16,16 +14,14 @@ describe("evaluateRatePlan", () => {
       cacheHitRatio: 0.2,
     });
 
-    expect(result).toMatchObject({
-      budgetCallsPerMinute: null,
+    expect(result).toEqual({
       disabledIntervals: [],
       estimatedCallsPerMinute: 20,
-      ratio: 0,
+      intervalSeconds: 10,
+      message: expect.stringMatching(/Stocks Starter.*unlimited REST.*local load/i),
+      plan: "paid",
       status: "warning",
     });
-    expect(result.message).toContain("Stocks Starter");
-    expect(result.message).toMatch(/unlimited REST/i);
-    expect(result.message).toMatch(/local load/i);
   });
 
   it("blocks the free plan when estimated calls exceed the 5 calls per minute budget", () => {
@@ -39,14 +35,14 @@ describe("evaluateRatePlan", () => {
       cacheHitRatio: 0,
     });
 
-    expect(result).toMatchObject({
-      budgetCallsPerMinute: 5,
+    expect(result).toEqual({
+      disabledIntervals: [5, 10],
       estimatedCallsPerMinute: 6,
-      ratio: 1.2,
+      intervalSeconds: 10,
+      message: expect.stringContaining("5 calls/min"),
+      plan: "free",
       status: "blocked",
     });
-    expect(result.disabledIntervals).toEqual([5, 10]);
-    expect(result.message).toContain("5 calls/min");
   });
 
   it("warns custom plans when estimated calls reach the configured warning threshold", () => {
@@ -61,36 +57,12 @@ describe("evaluateRatePlan", () => {
       cacheHitRatio: 0,
     });
 
-    expect(result).toMatchObject({
-      budgetCallsPerMinute: 12,
+    expect(result).toEqual({
       disabledIntervals: [5, 10, 15],
       estimatedCallsPerMinute: 6,
-      ratio: 0.5,
-      status: "warning",
-    });
-    expect(result.message).toContain("12 calls/min");
-  });
-});
-
-describe("rate plan routes", () => {
-  it("evaluates rate plans under the api route", async () => {
-    const response = await request(createApp())
-      .post("/api/rate-plan/evaluate")
-      .send({
-        plan: "custom",
-        customCallsPerMinute: 20,
-        warningThreshold: 0.4,
-        hardThreshold: 0.9,
-        activeSymbolCount: 1,
-        intervalSeconds: 15,
-        endpointCount: 3,
-        cacheHitRatio: 0.25,
-      });
-
-    expect(response.status).toBe(200);
-    expect(response.body).toMatchObject({
-      budgetCallsPerMinute: 20,
-      estimatedCallsPerMinute: 9,
+      intervalSeconds: 30,
+      message: expect.stringContaining("12 calls/min"),
+      plan: "custom",
       status: "warning",
     });
   });

@@ -1,5 +1,6 @@
-export type RatePlan = "free" | "paid" | "custom";
-export type RatePlanStatus = "ok" | "warning" | "blocked";
+import type { PolygonPlan, RatePlanEvaluation } from "../../shared/types";
+
+type RatePlanStatus = RatePlanEvaluation["status"];
 
 export interface RatePlanInput {
   activeSymbolCount: number;
@@ -9,17 +10,8 @@ export interface RatePlanInput {
   hardThreshold: number;
   intervalSeconds: number;
   paidPlanName?: string;
-  plan: RatePlan;
+  plan: PolygonPlan;
   warningThreshold: number;
-}
-
-export interface RatePlanEvaluation {
-  budgetCallsPerMinute: number | null;
-  disabledIntervals: number[];
-  estimatedCallsPerMinute: number;
-  message: string;
-  ratio: number;
-  status: RatePlanStatus;
 }
 
 const FREE_CALLS_PER_MINUTE = 5;
@@ -41,10 +33,10 @@ export function evaluateRatePlan(input: RatePlanInput): RatePlanEvaluation {
   });
 
   return {
-    budgetCallsPerMinute,
     disabledIntervals:
       budgetCallsPerMinute === null ? [] : disabledIntervals(input, budgetCallsPerMinute),
     estimatedCallsPerMinute,
+    intervalSeconds: input.intervalSeconds,
     message: messageForEvaluation(input, {
       budgetCallsPerMinute,
       estimatedCallsPerMinute,
@@ -52,7 +44,7 @@ export function evaluateRatePlan(input: RatePlanInput): RatePlanEvaluation {
       ratio,
       status,
     }),
-    ratio,
+    plan: input.plan,
     status,
   };
 }
