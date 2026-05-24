@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import YAML from "yaml";
@@ -42,10 +43,7 @@ export class ConfigRepository {
   async writeWatchlists(input: unknown): Promise<WatchlistsConfig> {
     const watchlists = parseWatchlistsConfig(input);
     const yaml = YAML.stringify(watchlists);
-    const tempPath = path.join(
-      this.paths.configDir,
-      `.watchlists.yaml.${process.pid}.${Date.now()}.tmp`,
-    );
+    const tempPath = path.join(this.paths.configDir, `.watchlists.yaml.${randomUUID()}.tmp`);
 
     await mkdir(this.paths.configDir, { recursive: true });
 

@@ -13,8 +13,9 @@ export interface CreateAppOptions {
 export function createApp(options: CreateAppOptions = {}): Express {
   const app = express();
   const configDir = options.configDir ?? process.env.CONFIG_DIR ?? defaultConfigDir();
-  const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? "development";
-  const adminToken = options.adminToken ?? process.env.ADMIN_TOKEN;
+  const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
+  const adminToken =
+    options.adminToken ?? process.env.APP_ADMIN_TOKEN ?? process.env.ADMIN_TOKEN;
 
   app.use(express.json());
 
