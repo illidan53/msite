@@ -199,8 +199,10 @@ function createApi({
 
       return configPromise ?? config;
     }),
+    saveWatchlists: vi.fn(async (watchlists) => watchlists),
     fetchSnapshots,
     getHistory: vi.fn(async (symbol, range) => ({ symbol, range, bars: [] })),
     evaluateRatePlan,
+    recommendWatchlist: vi.fn(async () => []),
   };
 }
