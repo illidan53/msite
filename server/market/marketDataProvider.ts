@@ -1,4 +1,5 @@
 import type { MarketSnapshot, PriceSeries } from "../../shared/types";
+import { ApiError } from "../http/apiError";
 import { MemoryCache } from "./memoryCache";
 import type { PolygonClient } from "./polygonClient";
 
@@ -66,7 +67,7 @@ export class MarketDataProvider {
   }
 
   async getHistory(input: { range: HistoryRange; symbol: string }): Promise<PriceSeries> {
-    const symbol = input.symbol.trim().toUpperCase();
+    const symbol = normalizeHistorySymbol(input.symbol);
     const cacheKey = `history:${symbol}:${input.range}`;
     const cached = this.historyCache.get(cacheKey);
     if (cached !== undefined) {
@@ -74,8 +75,9 @@ export class MarketDataProvider {
     }
 
     const aggregateRange = rangeToAggregates(input.range);
+    const encodedSymbol = encodeURIComponent(symbol);
     const response = await this.client.getJson<PolygonAggsResponse>(
-      `/v2/aggs/ticker/${symbol}/range/${aggregateRange.multiplier}/${aggregateRange.timespan}/${aggregateRange.from}/${aggregateRange.to}`,
+      `/v2/aggs/ticker/${encodedSymbol}/range/${aggregateRange.multiplier}/${aggregateRange.timespan}/${aggregateRange.from}/${aggregateRange.to}`,
       { adjusted: true, limit: 50_000, sort: "asc" },
     );
     const series: PriceSeries = {
@@ -93,6 +95,15 @@ function normalizeSymbols(symbols: string[]): string[] {
   return [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))].sort();
 }
 
+function normalizeHistorySymbol(symbol: string): string {
+  const normalized = symbol.trim().toUpperCase();
+  if (!/^[A-Z0-9.-]+$/.test(normalized)) {
+    throw new ApiError(400, "INVALID_MARKET_SYMBOL", "Invalid market symbol", { source: "polygon" });
+  }
+
+  return normalized;
+}
+
 function mapSnapshot(ticker: PolygonSnapshotTicker): MarketSnapshot {
   return {
     change: ticker.todaysChange ?? null,
@@ -101,9 +112,23 @@ function mapSnapshot(ticker: PolygonSnapshotTicker): MarketSnapshot {
     price: ticker.day?.c ?? null,
     symbol: ticker.ticker?.toUpperCase() ?? "",
     timeframe: "DELAYED",
-    updatedAt: ticker.updated === undefined ? null : new Date(ticker.updated).toISOString(),
+    updatedAt: timestampNsToIso(ticker.updated),
     volume: ticker.day?.v ?? null,
   };
+}
+
+function timestampNsToIso(timestampNs: number | undefined): string | null {
+  if (timestampNs === undefined || !Number.isFinite(timestampNs)) {
+    return null;
+  }
+
+  const milliseconds = Math.trunc(timestampNs / 1_000_000);
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return date.toISOString();
 }
 
 function mapPriceBar(bar: PolygonAggBar) {
@@ -123,10 +148,10 @@ function rangeToAggregates(range: HistoryRange): { from: string; multiplier: num
 
   switch (range) {
     case "1D":
-      from.setDate(to.getDate() - 1);
+      from.setDate(to.getDate() - 3);
       break;
     case "5D":
-      from.setDate(to.getDate() - 5);
+      from.setDate(to.getDate() - 10);
       break;
     case "1M":
       from.setMonth(to.getMonth() - 1);
@@ -141,6 +166,7 @@ function rangeToAggregates(range: HistoryRange): { from: string; multiplier: num
 
   const intraday = range === "1D" || range === "5D";
 
+  // Intraday ranges intentionally request extra calendar days so weekends and market holidays do not under-fetch bars.
   return {
     from: formatDate(from),
     multiplier: intraday ? 5 : 1,
