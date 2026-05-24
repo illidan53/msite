@@ -52,7 +52,7 @@ export interface PriceBar {
 
 export interface PriceSeries {
   symbol: string;
-  range: "1D" | "5D" | "1M" | "3M" | "1Y";
+  range: "1h" | "3h" | "6h" | "1d" | "5d" | "30d" | "2month" | "3month" | "6month" | "1y" | "5y";
   bars: PriceBar[];
 }
 

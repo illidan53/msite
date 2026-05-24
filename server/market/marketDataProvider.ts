@@ -216,7 +216,7 @@ function mapPriceBar(bar: PolygonAggBar): PriceBar {
 }
 
 function trimBarsForRange(range: HistoryRange, bars: PriceBar[]): PriceBar[] {
-  if (range !== "1D" || bars.length === 0) {
+  if (range !== "1d" || bars.length === 0) {
     return bars;
   }
 
@@ -239,32 +239,57 @@ function formatMarketDate(timestamp: string): string {
 function rangeToAggregates(range: HistoryRange): { from: string; multiplier: number; timespan: "day" | "minute"; to: string } {
   const to = new Date();
   const from = new Date(to);
+  let multiplier = 1;
+  let timespan: "day" | "minute" = "day";
 
   switch (range) {
-    case "1D":
+    case "1h":
+      from.setHours(to.getHours() - 1);
+      timespan = "minute";
+      break;
+    case "3h":
+      from.setHours(to.getHours() - 3);
+      timespan = "minute";
+      break;
+    case "6h":
+      from.setHours(to.getHours() - 6);
+      timespan = "minute";
+      break;
+    case "1d":
       from.setDate(to.getDate() - 7);
+      multiplier = 5;
+      timespan = "minute";
       break;
-    case "5D":
+    case "5d":
       from.setDate(to.getDate() - 10);
+      multiplier = 5;
+      timespan = "minute";
       break;
-    case "1M":
+    case "30d":
       from.setMonth(to.getMonth() - 1);
       break;
-    case "3M":
+    case "2month":
+      from.setMonth(to.getMonth() - 2);
+      break;
+    case "3month":
       from.setMonth(to.getMonth() - 3);
       break;
-    case "1Y":
+    case "6month":
+      from.setMonth(to.getMonth() - 6);
+      break;
+    case "1y":
       from.setFullYear(to.getFullYear() - 1);
       break;
+    case "5y":
+      from.setFullYear(to.getFullYear() - 5);
+      break;
   }
-
-  const intraday = range === "1D" || range === "5D";
 
   // Intraday ranges intentionally request extra calendar days so weekends and market holidays do not under-fetch bars.
   return {
     from: formatDate(from),
-    multiplier: intraday ? 5 : 1,
-    timespan: intraday ? "minute" : "day",
+    multiplier,
+    timespan,
     to: formatDate(to),
   };
 }

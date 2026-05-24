@@ -17,7 +17,19 @@ const safeTickerSymbolSchema = z
     message: "Invalid ticker symbol",
   });
 
-const historyRangeSchema = z.enum(["1D", "5D", "1M", "3M", "1Y"]);
+const historyRangeSchema = z.enum([
+  "1h",
+  "3h",
+  "6h",
+  "1d",
+  "5d",
+  "30d",
+  "2month",
+  "3month",
+  "6month",
+  "1y",
+  "5y",
+]);
 
 const snapshotsRequestSchema = z.object({
   symbols: z.array(safeTickerSymbolSchema).min(1).max(250),

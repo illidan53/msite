@@ -107,7 +107,7 @@ describe("market routes", () => {
   it("returns history from the provider for a validated query", async () => {
     const series: PriceSeries = {
       symbol: "AAPL",
-      range: "1M",
+      range: "30d",
       bars: [
         {
           timestamp: "2024-05-22T17:46:40.000Z",
@@ -123,12 +123,24 @@ describe("market routes", () => {
 
     const response = await request(createMarketTestApp(provider)).get("/api/market/history").query({
       symbol: " aapl ",
-      range: "1M",
+      range: "30d",
     });
 
     expect(response.status).toBe(200);
-    expect(provider.getHistory).toHaveBeenCalledWith({ symbol: "AAPL", range: "1M" });
+    expect(provider.getHistory).toHaveBeenCalledWith({ symbol: "AAPL", range: "30d" });
     expect(response.body).toEqual(series);
+  });
+
+  it("accepts expanded history ranges for validated symbols", async () => {
+    const provider = createFakeProvider();
+
+    const response = await request(createMarketTestApp(provider)).get("/api/market/history").query({
+      symbol: "nvda",
+      range: "2month",
+    });
+
+    expect(response.status).toBe(200);
+    expect(provider.getHistory).toHaveBeenCalledWith({ symbol: "NVDA", range: "2month" });
   });
 });
 
@@ -141,7 +153,7 @@ function createMarketTestApp(provider: MarketRouteProvider) {
 }
 
 function createFakeProvider(output: { series?: PriceSeries; snapshots?: MarketSnapshot[] } = {}): MarketRouteProvider {
-  const defaultSeries: PriceSeries = { symbol: "AAPL", range: "1D", bars: [] };
+  const defaultSeries: PriceSeries = { symbol: "AAPL", range: "1d", bars: [] };
 
   return {
     getHistory: vi.fn(async () => output.series ?? defaultSeries),

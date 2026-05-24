@@ -143,7 +143,7 @@ describe("MarketDataProvider", () => {
     );
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    const series = await provider.getHistory({ symbol: "aapl", range: "1M" });
+    const series = await provider.getHistory({ symbol: "aapl", range: "30d" });
 
     const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
     expect(requestedUrl.pathname).toMatch(/^\/v2\/aggs\/ticker\/AAPL\/range\/1\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$/);
@@ -152,7 +152,7 @@ describe("MarketDataProvider", () => {
     expect(requestedUrl.searchParams.get("limit")).toBe("50000");
     expect(series).toEqual({
       symbol: "AAPL",
-      range: "1M",
+      range: "30d",
       bars: [
         {
           timestamp: "2024-05-22T17:46:40.000Z",
@@ -166,11 +166,11 @@ describe("MarketDataProvider", () => {
     });
   });
 
-  it("uses 5 minute aggregates for 1D and 5D history ranges", async () => {
+  it("uses 5 minute aggregates for 1d and 5d history ranges", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "MSFT", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await provider.getHistory({ symbol: "msft", range: "5D" });
+    await provider.getHistory({ symbol: "msft", range: "5d" });
 
     const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
     expect(requestedUrl.pathname).toMatch(/^\/v2\/aggs\/ticker\/MSFT\/range\/5\/minute\//);
@@ -182,14 +182,39 @@ describe("MarketDataProvider", () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "MSFT", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await provider.getHistory({ symbol: "msft", range: "1D" });
-    await provider.getHistory({ symbol: "msft", range: "5D" });
+    await provider.getHistory({ symbol: "msft", range: "1d" });
+    await provider.getHistory({ symbol: "msft", range: "5d" });
 
     expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-19/2026-05-26");
     expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/5/minute/2026-05-16/2026-05-26");
   });
 
-  it("trims 1D history to the latest returned trading date", async () => {
+  it("uses minute aggregates for hourly history ranges", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-26T15:30:00.000Z"));
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "NVDA", results: [] }), { status: 200 }));
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await provider.getHistory({ symbol: "nvda", range: "3h" });
+
+    const requestedUrl = new URL(String(fetcher.mock.calls[0][0]));
+    expect(requestedUrl.pathname).toBe("/v2/aggs/ticker/NVDA/range/1/minute/2026-05-26/2026-05-26");
+  });
+
+  it("maps expanded daily history ranges to the correct calendar window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-26T15:30:00.000Z"));
+    const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "MSFT", results: [] }), { status: 200 }));
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    await provider.getHistory({ symbol: "msft", range: "2month" });
+    await provider.getHistory({ symbol: "msft", range: "5y" });
+
+    expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/1/day/2026-03-26/2026-05-26");
+    expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe("/v2/aggs/ticker/MSFT/range/1/day/2021-05-26/2026-05-26");
+  });
+
+  it("trims 1d history to the latest returned trading date", async () => {
     const fetcher = vi.fn<typeof fetch>(async () =>
       new Response(
         JSON.stringify({
@@ -205,12 +230,12 @@ describe("MarketDataProvider", () => {
     );
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    const series = await provider.getHistory({ symbol: "msft", range: "1D" });
+    const series = await provider.getHistory({ symbol: "msft", range: "1d" });
 
     expect(series.bars.map((bar) => bar.timestamp)).toEqual(["2026-05-26T14:00:00.000Z", "2026-05-26T15:00:00.000Z"]);
   });
 
-  it("trims 1D history by New York market date when after-hours bars cross UTC midnight", async () => {
+  it("trims 1d history by New York market date when after-hours bars cross UTC midnight", async () => {
     const fetcher = vi.fn<typeof fetch>(async () =>
       new Response(
         JSON.stringify({
@@ -226,7 +251,7 @@ describe("MarketDataProvider", () => {
     );
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    const series = await provider.getHistory({ symbol: "msft", range: "1D" });
+    const series = await provider.getHistory({ symbol: "msft", range: "1d" });
 
     expect(series.bars.map((bar) => bar.timestamp)).toEqual(["2026-01-05T20:00:00.000Z", "2026-01-06T00:30:00.000Z"]);
   });
@@ -235,7 +260,7 @@ describe("MarketDataProvider", () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "AAPL", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await expect(provider.getHistory({ symbol: "AAPL/../../MSFT?x#y", range: "1M" })).rejects.toMatchObject({
+    await expect(provider.getHistory({ symbol: "AAPL/../../MSFT?x#y", range: "30d" })).rejects.toMatchObject({
       code: "INVALID_MARKET_SYMBOL",
       source: "polygon",
       status: 400,
@@ -247,7 +272,7 @@ describe("MarketDataProvider", () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "AAPL", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await expect(provider.getHistory({ symbol, range: "1M" })).rejects.toMatchObject({
+    await expect(provider.getHistory({ symbol, range: "30d" })).rejects.toMatchObject({
       code: "INVALID_MARKET_SYMBOL",
       source: "polygon",
       status: 400,
@@ -259,7 +284,7 @@ describe("MarketDataProvider", () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "BRK.B-A", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
 
-    await provider.getHistory({ symbol: " brk.b-a ", range: "1M" });
+    await provider.getHistory({ symbol: " brk.b-a ", range: "30d" });
 
     expect(new URL(String(fetcher.mock.calls[0][0])).pathname).toMatch(/^\/v2\/aggs\/ticker\/BRK\.B-A\/range\/1\/day\//);
   });
