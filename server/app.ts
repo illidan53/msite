@@ -1,5 +1,7 @@
 import express from "express";
 import type { Express } from "express";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { defaultConfigDir } from "./config/configPaths";
 import { apiErrorHandler } from "./http/apiError";
 import { MarketDataProvider } from "./market/marketDataProvider";
@@ -15,6 +17,7 @@ export interface CreateAppOptions {
   configDir?: string;
   nodeEnv?: string;
   polygonApiKey?: string;
+  staticDir?: string;
 }
 
 export function createApp(options: CreateAppOptions = {}): Express {
@@ -23,8 +26,10 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? "production";
   const adminToken = options.adminToken ?? process.env.APP_ADMIN_TOKEN;
   const polygonApiKey = options.polygonApiKey ?? process.env.POLYGON_API_KEY;
+  const staticDir = options.staticDir ?? process.env.STATIC_DIR ?? resolve(process.cwd(), "dist");
   const marketDataProvider = new MarketDataProvider(new PolygonClient(polygonApiKey));
   const recommendationService = new RecommendationService(marketDataProvider);
+  const indexHtml = resolve(staticDir, "index.html");
 
   app.use(express.json());
 
@@ -46,6 +51,14 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use("/api", createRateRoutes());
   app.use("/api", createMarketRoutes(marketDataProvider));
   app.use("/api", createRecommendationRoutes(recommendationService));
+
+  if (nodeEnv === "production" && existsSync(indexHtml)) {
+    app.use(express.static(staticDir, { index: false }));
+    app.get(/^(?!\/api(?:\/|$)).*/, (_request, response) => {
+      response.sendFile(indexHtml);
+    });
+  }
+
   app.use(apiErrorHandler);
 
   return app;

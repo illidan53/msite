@@ -34,4 +34,21 @@ npm run build
 
 Playwright and unit tests mock Polygon-facing flows and should not consume real API capacity.
 
-Wave-theory analysis and deployment follow-up remain documented in the MVP spec and are not implemented in this MVP.
+To verify a deployed public instance without starting the local dev server:
+
+```bash
+MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e/public-smoke.spec.ts
+```
+
+## Deployment
+
+`finance.nphunter.net` is deployed on AWS EC2 in `us-east-1`.
+
+- EC2 instance: tagged `Project=msite`, `App=msite-finance`, `Name=msite-finance-web`
+- Public entry: Elastic IP routed by Route53 `finance.nphunter.net`
+- Process manager: systemd `msite.service`
+- Public proxy/TLS: Caddy on ports `80` and `443`
+- Runtime secrets: SSM SecureString parameters under `/msite/finance/`
+- Release artifact: private S3 bucket `msite-finance-deploy-612153676415-us-east-1`
+
+Wave-theory analysis remains documented in the MVP spec and is not implemented in this MVP.

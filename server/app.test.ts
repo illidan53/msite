@@ -1,4 +1,7 @@
 import request from "supertest";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { createApp } from "./app";
 
@@ -12,5 +15,21 @@ describe("createApp", () => {
       service: "stock-workbench-api",
     });
     expect(JSON.stringify(response.body)).not.toContain("POLYGON_API_KEY");
+  });
+
+  it("serves the production frontend shell and static assets", async () => {
+    const staticDir = await mkdtemp(join(tmpdir(), "msite-static-"));
+    await writeFile(join(staticDir, "index.html"), "<!doctype html><title>Stock Workbench</title><div id=\"root\"></div>");
+    await writeFile(join(staticDir, "asset.txt"), "asset body");
+
+    const app = createApp({ nodeEnv: "production", staticDir });
+
+    const shellResponse = await request(app).get("/");
+    expect(shellResponse.status).toBe(200);
+    expect(shellResponse.text).toContain("Stock Workbench");
+
+    const assetResponse = await request(app).get("/asset.txt");
+    expect(assetResponse.status).toBe(200);
+    expect(assetResponse.text).toBe("asset body");
   });
 });
