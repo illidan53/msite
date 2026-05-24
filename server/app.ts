@@ -3,6 +3,7 @@ import type { Express } from "express";
 import { defaultConfigDir } from "./config/configPaths";
 import { apiErrorHandler } from "./http/apiError";
 import { createConfigRoutes } from "./routes/configRoutes";
+import { createRateRoutes } from "./routes/rateRoutes";
 
 export interface CreateAppOptions {
   adminToken?: string;
@@ -33,6 +34,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
       nodeEnv,
     }),
   );
+  app.use("/api", createRateRoutes());
   app.use(apiErrorHandler);
 
   return app;
