@@ -11,17 +11,19 @@ describe("RefreshControls", () => {
   it("disables blocked intervals and labels warning state", () => {
     render(
       <RefreshControls
-        intervalSeconds={30}
-        disabledIntervals={[5, 10]}
+        intervalSeconds={3_600}
+        disabledIntervals={[3_600, 10_800]}
         status="warning"
         message="Stocks Starter has unlimited REST calls, but this interval is aggressive."
         onChange={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "5s" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "10s" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "30s" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "1h" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "1h" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "3h" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "2month" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "5y" })).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveClass("warning");
     expect(screen.getByRole("status")).toHaveTextContent("aggressive");
   });
@@ -32,16 +34,16 @@ describe("RefreshControls", () => {
 
     render(
       <RefreshControls
-        intervalSeconds={30}
-        disabledIntervals={[5]}
+        intervalSeconds={3_600}
+        disabledIntervals={[3_600]}
         status="ok"
         message="Refresh interval is within budget."
         onChange={onChange}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "1m" }));
+    await user.click(screen.getByRole("button", { name: "3h" }));
 
-    expect(onChange).toHaveBeenCalledWith(60);
+    expect(onChange).toHaveBeenCalledWith(10_800);
   });
 });

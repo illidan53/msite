@@ -9,18 +9,18 @@ describe("evaluateRatePlan", () => {
       warningThreshold: 0.5,
       hardThreshold: 0.9,
       activeSymbolCount: 50,
-      intervalSeconds: 10,
+      intervalSeconds: 3_600,
       endpointCount: 4,
       cacheHitRatio: 0.2,
     });
 
     expect(result).toEqual({
       disabledIntervals: [],
-      estimatedCallsPerMinute: 960,
-      intervalSeconds: 10,
-      message: expect.stringMatching(/Stocks Starter.*unlimited REST.*local load/i),
+      estimatedCallsPerMinute: 3,
+      intervalSeconds: 3_600,
+      message: expect.stringMatching(/Stocks Starter.*unlimited REST/i),
       plan: "paid",
-      status: "warning",
+      status: "ok",
     });
   });
 
@@ -29,16 +29,16 @@ describe("evaluateRatePlan", () => {
       plan: "free",
       warningThreshold: 0.5,
       hardThreshold: 1,
-      activeSymbolCount: 2,
-      intervalSeconds: 30,
-      endpointCount: 2,
+      activeSymbolCount: 1_000,
+      intervalSeconds: 3_600,
+      endpointCount: 1,
       cacheHitRatio: 0,
     });
 
     expect(result).toEqual({
-      disabledIntervals: [5, 10, 15, 30],
-      estimatedCallsPerMinute: 8,
-      intervalSeconds: 30,
+      disabledIntervals: [3_600, 10_800],
+      estimatedCallsPerMinute: 17,
+      intervalSeconds: 3_600,
       message: expect.stringContaining("5 calls/min"),
       plan: "free",
       status: "blocked",
@@ -51,16 +51,16 @@ describe("evaluateRatePlan", () => {
       customCallsPerMinute: 12,
       warningThreshold: 0.5,
       hardThreshold: 0.9,
-      activeSymbolCount: 1,
-      intervalSeconds: 30,
-      endpointCount: 3,
+      activeSymbolCount: 400,
+      intervalSeconds: 3_600,
+      endpointCount: 1,
       cacheHitRatio: 0,
     });
 
     expect(result).toEqual({
-      disabledIntervals: [5, 10, 15],
-      estimatedCallsPerMinute: 6,
-      intervalSeconds: 30,
+      disabledIntervals: [],
+      estimatedCallsPerMinute: 7,
+      intervalSeconds: 3_600,
       message: expect.stringContaining("12 calls/min"),
       plan: "custom",
       status: "warning",
@@ -73,19 +73,19 @@ describe("evaluateRatePlan", () => {
       customCallsPerMinute: 60,
       warningThreshold: 0.75,
       hardThreshold: 1.1,
-      activeSymbolCount: 20,
-      intervalSeconds: 30,
+      activeSymbolCount: 1_500,
+      intervalSeconds: 3_600,
       endpointCount: 2,
       cacheHitRatio: 0.25,
     });
 
     expect(result).toEqual({
-      disabledIntervals: [5, 10, 15],
-      estimatedCallsPerMinute: 60,
-      intervalSeconds: 30,
+      disabledIntervals: [],
+      estimatedCallsPerMinute: 38,
+      intervalSeconds: 3_600,
       message: expect.stringContaining("60 calls/min"),
       plan: "custom",
-      status: "warning",
+      status: "ok",
     });
   });
 
@@ -96,7 +96,7 @@ describe("evaluateRatePlan", () => {
       warningThreshold: 0.5,
       hardThreshold: 0.9,
       activeSymbolCount: 0,
-      intervalSeconds: 5,
+      intervalSeconds: 3_600,
       endpointCount: 2,
       cacheHitRatio: 0,
     });
@@ -104,7 +104,7 @@ describe("evaluateRatePlan", () => {
     expect(result).toEqual({
       disabledIntervals: [],
       estimatedCallsPerMinute: 0,
-      intervalSeconds: 5,
+      intervalSeconds: 3_600,
       message: expect.stringContaining("0 calls/min"),
       plan: "custom",
       status: "ok",

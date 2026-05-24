@@ -1,6 +1,18 @@
 import clsx from "clsx";
 
-const INTERVALS = [5, 10, 15, 30, 60, 120, 300];
+const INTERVALS = [
+  { label: "1h", seconds: 3_600 },
+  { label: "3h", seconds: 10_800 },
+  { label: "6h", seconds: 21_600 },
+  { label: "1d", seconds: 86_400 },
+  { label: "5d", seconds: 432_000 },
+  { label: "30d", seconds: 2_592_000 },
+  { label: "2month", seconds: 5_184_000 },
+  { label: "3month", seconds: 7_776_000 },
+  { label: "6month", seconds: 15_552_000 },
+  { label: "1y", seconds: 31_536_000 },
+  { label: "5y", seconds: 157_680_000 },
+];
 
 export interface RefreshControlsProps {
   intervalSeconds: number;
@@ -22,14 +34,14 @@ export function RefreshControls({
       <div className="segmented-control">
         {INTERVALS.map((interval) => (
           <button
-            key={interval}
+            key={interval.seconds}
             type="button"
-            aria-pressed={intervalSeconds === interval}
-            className={clsx("segment", intervalSeconds === interval && "selected")}
-            disabled={disabledIntervals.includes(interval)}
-            onClick={() => onChange(interval)}
+            aria-pressed={intervalSeconds === interval.seconds}
+            className={clsx("segment", intervalSeconds === interval.seconds && "selected")}
+            disabled={disabledIntervals.includes(interval.seconds)}
+            onClick={() => onChange(interval.seconds)}
           >
-            {formatInterval(interval)}
+            {interval.label}
           </button>
         ))}
       </div>
@@ -38,8 +50,4 @@ export function RefreshControls({
       </p>
     </section>
   );
-}
-
-function formatInterval(intervalSeconds: number): string {
-  return intervalSeconds < 60 ? `${intervalSeconds}s` : `${intervalSeconds / 60}m`;
 }
