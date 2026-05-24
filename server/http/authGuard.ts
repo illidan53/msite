@@ -8,9 +8,8 @@ export interface AuthGuardOptions {
 }
 
 export function requireAdminToken(options: AuthGuardOptions = {}): RequestHandler {
-  const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
-  const adminToken =
-    options.adminToken ?? process.env.APP_ADMIN_TOKEN ?? process.env.ADMIN_TOKEN;
+  const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? "development";
+  const adminToken = options.adminToken ?? process.env.APP_ADMIN_TOKEN;
 
   return (request, _response, next) => {
     if (nodeEnv === "development" || nodeEnv === "test") {

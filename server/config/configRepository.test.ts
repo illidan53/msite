@@ -30,7 +30,10 @@ async function writeConfigFiles(configDir: string, watchlists = watchlistsYaml) 
   await writeFile(join(configDir, "settings.yaml"), settingsYaml, "utf8");
 }
 
-function restoreProcessEnv(name: "ADMIN_TOKEN" | "APP_ADMIN_TOKEN", value: string | undefined) {
+function restoreProcessEnv(
+  name: "ADMIN_TOKEN" | "APP_ADMIN_TOKEN" | "NODE_ENV",
+  value: string | undefined,
+) {
   if (value === undefined) {
     delete process.env[name];
     return;
@@ -168,10 +171,12 @@ describe("config routes", () => {
   let configDir: string;
   let originalAdminToken: string | undefined;
   let originalAppAdminToken: string | undefined;
+  let originalNodeEnv: string | undefined;
 
   beforeEach(async () => {
     originalAdminToken = process.env.ADMIN_TOKEN;
     originalAppAdminToken = process.env.APP_ADMIN_TOKEN;
+    originalNodeEnv = process.env.NODE_ENV;
     delete process.env.ADMIN_TOKEN;
     delete process.env.APP_ADMIN_TOKEN;
     configDir = await mkdtemp(join(tmpdir(), "stock-routes-"));
@@ -181,6 +186,7 @@ describe("config routes", () => {
   afterEach(async () => {
     restoreProcessEnv("ADMIN_TOKEN", originalAdminToken);
     restoreProcessEnv("APP_ADMIN_TOKEN", originalAppAdminToken);
+    restoreProcessEnv("NODE_ENV", originalNodeEnv);
     await rm(configDir, { recursive: true, force: true });
   });
 
@@ -199,6 +205,26 @@ describe("config routes", () => {
 
   it("allows development watchlist writes without an admin token", async () => {
     const app = createApp({ configDir, nodeEnv: "development" });
+
+    const response = await request(app)
+      .put("/api/config/watchlists")
+      .send({
+        watchlists: [
+          {
+            id: "ai",
+            name: "AI",
+            rows: [{ id: "leaders", name: "Leaders", symbols: ["nvda"] }],
+          },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.watchlists[0].rows[0].symbols).toEqual(["NVDA"]);
+  });
+
+  it("defaults to local development writes when NODE_ENV and nodeEnv are not set", async () => {
+    delete process.env.NODE_ENV;
+    const app = createApp({ configDir });
 
     const response = await request(app)
       .put("/api/config/watchlists")
@@ -286,6 +312,30 @@ describe("config routes", () => {
     });
     expect(appTokenResponse.status).toBe(200);
     expect(appTokenResponse.body.watchlists[0].rows[0].symbols).toEqual(["NVDA"]);
+  });
+
+  it("does not authorize production writes from ADMIN_TOKEN alone", async () => {
+    process.env.ADMIN_TOKEN = "legacy-token";
+    const app = createApp({ configDir, nodeEnv: "production" });
+
+    const response = await request(app)
+      .put("/api/config/watchlists")
+      .set("x-admin-token", "legacy-token")
+      .send({
+        watchlists: [
+          {
+            id: "ai",
+            name: "AI",
+            rows: [{ id: "leaders", name: "Leaders", symbols: ["nvda"] }],
+          },
+        ],
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toMatchObject({
+      code: "ADMIN_TOKEN_MISSING",
+      source: "config",
+    });
   });
 
   it("fails closed when production admin token is not configured", async () => {
