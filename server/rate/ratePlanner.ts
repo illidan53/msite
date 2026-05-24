@@ -70,10 +70,17 @@ function disabledIntervals(input: RatePlanInput, budgetCallsPerMinute: number): 
 }
 
 function estimateCallsPerMinute(input: RatePlanInput): number {
+  const activeSymbolCount = Math.max(0, input.activeSymbolCount);
   const endpointCount = Math.max(1, input.endpointCount);
   const cacheHitRatio = boundCacheHitRatio(input.cacheHitRatio);
 
-  return Math.ceil(endpointCount * (60 / input.intervalSeconds) * (1 - cacheHitRatio));
+  if (activeSymbolCount === 0) {
+    return 0;
+  }
+
+  return Math.ceil(
+    activeSymbolCount * endpointCount * (60 / input.intervalSeconds) * (1 - cacheHitRatio),
+  );
 }
 
 function boundCacheHitRatio(cacheHitRatio: number): number {
