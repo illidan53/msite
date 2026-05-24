@@ -20,7 +20,7 @@ describe("SymbolChart", () => {
   it("renders symbol and switches to Candles aria-pressed true", async () => {
     const user = userEvent.setup();
 
-    render(<SymbolChart symbol="NVDA" series={priceSeries} range="1M" onRangeChange={() => undefined} />);
+    render(<SymbolChart symbol="NVDA" series={priceSeries} range="30d" onRangeChange={() => undefined} />);
 
     expect(screen.getByLabelText("NVDA chart")).toBeInTheDocument();
     expect(screen.getByText("NVDA")).toBeInTheDocument();
@@ -49,15 +49,17 @@ describe("SymbolChart", () => {
     const user = userEvent.setup();
     const onRangeChange = vi.fn();
 
-    render(<SymbolChart symbol="NVDA" series={priceSeries} range="1M" onRangeChange={onRangeChange} />);
+    render(<SymbolChart symbol="NVDA" series={priceSeries} range="1h" onRangeChange={onRangeChange} />);
 
-    await user.click(screen.getByRole("button", { name: "5D" }));
+    expect(screen.getByRole("button", { name: "1h" })).toHaveAttribute("aria-pressed", "true");
 
-    expect(onRangeChange).toHaveBeenCalledWith("5D");
+    await user.click(screen.getByRole("button", { name: "5y" }));
+
+    expect(onRangeChange).toHaveBeenCalledWith("5y");
   });
 
-  it("preserves distinct intraday timestamps for 1D bars on the same date", () => {
-    render(<SymbolChart symbol="NVDA" series={intradaySeries} range="1D" onRangeChange={() => undefined} />);
+  it("preserves distinct intraday timestamps for 1d bars on the same date", () => {
+    render(<SymbolChart symbol="NVDA" series={intradaySeries} range="1d" onRangeChange={() => undefined} />);
 
     const lineSeries = getCreatedCharts()[0].addLineSeries.mock.results[0].value;
 
@@ -71,20 +73,20 @@ describe("SymbolChart", () => {
     render(
       <SymbolChart
         symbol="AMD"
-        series={{ symbol: "AMD", range: "1D", bars: [] }}
-        range="1D"
+        series={{ symbol: "AMD", range: "1h", bars: [] }}
+        range="1h"
         onRangeChange={() => undefined}
       />,
     );
 
     expect(screen.getByLabelText("AMD chart")).toBeInTheDocument();
     expect(screen.getByTestId("symbol-chart-container")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1D" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "1h" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("removes the chart on unmount", () => {
     const { unmount } = render(
-      <SymbolChart symbol="NVDA" series={priceSeries} range="1M" onRangeChange={() => undefined} />,
+      <SymbolChart symbol="NVDA" series={priceSeries} range="30d" onRangeChange={() => undefined} />,
     );
 
     const chart = getCreatedCharts()[0];
@@ -95,7 +97,7 @@ describe("SymbolChart", () => {
   });
 
   it("resizes the chart when the container size changes", () => {
-    render(<SymbolChart symbol="NVDA" series={priceSeries} range="1M" onRangeChange={() => undefined} />);
+    render(<SymbolChart symbol="NVDA" series={priceSeries} range="30d" onRangeChange={() => undefined} />);
 
     const chart = getCreatedCharts()[0];
 
@@ -107,7 +109,7 @@ describe("SymbolChart", () => {
 
 const priceSeries: PriceSeries = {
   symbol: "NVDA",
-  range: "1M",
+  range: "30d",
   bars: [
     {
       timestamp: "2026-05-22T13:30:00.000Z",
@@ -130,7 +132,7 @@ const priceSeries: PriceSeries = {
 
 const intradaySeries: PriceSeries = {
   symbol: "NVDA",
-  range: "1D",
+  range: "1d",
   bars: [
     {
       timestamp: "2026-05-29T13:30:00.000Z",

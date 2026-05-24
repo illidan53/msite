@@ -27,7 +27,19 @@ export interface SymbolChartProps {
   onRangeChange(range: PriceSeries["range"]): void;
 }
 
-const RANGES: PriceSeries["range"][] = ["1D", "5D", "1M", "3M", "1Y"];
+const RANGES: PriceSeries["range"][] = [
+  "1h",
+  "3h",
+  "6h",
+  "1d",
+  "5d",
+  "30d",
+  "2month",
+  "3month",
+  "6month",
+  "1y",
+  "5y",
+];
 const CHART_HEIGHT = 300;
 
 export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChartProps) {
@@ -138,7 +150,7 @@ function toCandlePoint(bar: PriceBar, range: PriceSeries["range"]) {
 }
 
 function toChartTime(timestamp: string, range: PriceSeries["range"]) {
-  if (range === "1D" || range === "5D") {
+  if (range === "1h" || range === "3h" || range === "6h" || range === "1d" || range === "5d") {
     return Math.floor(Date.parse(timestamp) / 1000);
   }
 
