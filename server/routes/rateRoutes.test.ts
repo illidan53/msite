@@ -11,17 +11,17 @@ describe("rate plan routes", () => {
         customCallsPerMinute: 20,
         warningThreshold: 0.4,
         hardThreshold: 0.9,
-        activeSymbolCount: 1,
-        intervalSeconds: 15,
-        endpointCount: 3,
+        activeSymbolCount: 700,
+        intervalSeconds: 3_600,
+        endpointCount: 1,
         cacheHitRatio: 0.25,
       });
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
-      disabledIntervals: [5],
+      disabledIntervals: [],
       estimatedCallsPerMinute: 9,
-      intervalSeconds: 15,
+      intervalSeconds: 3_600,
       message: expect.stringContaining("20 calls/min"),
       plan: "custom",
       status: "warning",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketSnapshot, PriceSeries, Watchlist } from "../../../shared/types";
+import type { MarketSnapshot, PriceSeries, RatePlanEvaluation, Watchlist } from "../../../shared/types";
 import { SymbolChart } from "../charts/SymbolChart";
 import { RefreshControls } from "../settings/RefreshControls";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
@@ -38,7 +38,7 @@ export function Workbench({ api }: WorkbenchProps) {
   const [sortMode, setSortMode] = useState<SortMode>("config");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [ratePlan, setRatePlan] = useState({
+  const [ratePlan, setRatePlan] = useState<RatePlanEvaluation>({
     status: "ok" as const,
     plan: "paid" as const,
     intervalSeconds: DEFAULT_INTERVAL_SECONDS,

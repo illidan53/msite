@@ -253,7 +253,7 @@ button:disabled {
 
 .quote-table {
   width: 100%;
-  min-width: 1100px;
+  min-width: 1280px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 0.88rem;
@@ -284,7 +284,7 @@ button:disabled {
 
 .quote-table th:nth-child(2),
 .quote-table td:nth-child(2) {
-  width: 220px;
+  width: 240px;
   overflow: hidden;
   text-align: left;
   text-overflow: ellipsis;
@@ -297,12 +297,18 @@ button:disabled {
 .quote-table th:nth-child(5),
 .quote-table td:nth-child(5),
 .quote-table th:nth-child(6),
-.quote-table td:nth-child(6),
+.quote-table td:nth-child(6) {
+  width: 110px;
+}
+
 .quote-table th:nth-child(7),
-.quote-table td:nth-child(7),
+.quote-table td:nth-child(7) {
+  width: 150px;
+}
+
 .quote-table th:nth-child(8),
 .quote-table td:nth-child(8) {
-  width: 96px;
+  width: 120px;
 }
 
 .quote-table th:nth-child(9),
@@ -628,7 +634,7 @@ button:disabled {
   }
 
   .quote-table {
-    min-width: 1100px;
+    min-width: 1280px;
   }
 
   .table-toolbar,
