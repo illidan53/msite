@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { MarketSnapshot, PriceSeries, RecommendationCandidate, WatchlistsConfig } from "../../shared/types";
+import type {
+  MarketSnapshot,
+  PriceSeries,
+  RatePlanEvaluation,
+  RecommendationCandidate,
+  SettingsConfig,
+  WatchlistsConfig,
+} from "../../shared/types";
 
 test("covers the stock workbench flow without live market calls", async ({ page }) => {
   const apiMocks = await mockWorkbenchApis(page);
@@ -71,15 +78,71 @@ test("covers the stock workbench flow without live market calls", async ({ page 
       }),
     ]),
   );
+  expect(apiMocks.configRequests).toEqual(expect.arrayContaining(["GET /api/config"]));
+  expect(apiMocks.configRequests.every((request) => request === "GET /api/config")).toBe(true);
+  expect(apiMocks.ratePlanRequests).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        activeSymbolCount: 3,
+        intervalSeconds: 30,
+        paidPlanName: "stocks-starter",
+        plan: "paid",
+      }),
+    ]),
+  );
+  expect(apiMocks.unexpectedApiRequests).toEqual([]);
 });
 
 async function mockWorkbenchApis(page: Page) {
+  const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];
   const historyRequests: Array<{ range: PriceSeries["range"]; symbol: string }> = [];
+  const ratePlanRequests: unknown[] = [];
   const recommendationRequests: unknown[] = [];
   const savedWatchlists: WatchlistsConfig[] = [];
+  const unexpectedApiRequests: string[] = [];
+
+  await page.route("**/api/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const label = `${request.method()} ${url.pathname}${url.search}`;
+
+    if (isMockedApiRequest(request.method(), url)) {
+      await route.fallback();
+      return;
+    }
+
+    unexpectedApiRequests.push(label);
+
+    await route.fulfill({
+      status: 599,
+      json: {
+        error: `Unexpected API call in workbench E2E: ${label}`,
+      },
+    });
+  });
+
+  await page.route("**/api/config", async (route) => {
+    const request = route.request();
+
+    if (request.method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    configRequests.push("GET /api/config");
+
+    await route.fulfill({
+      json: workbenchConfig,
+    });
+  });
 
   await page.route("**/api/market/snapshots", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+
     const payload = route.request().postDataJSON() as { symbols?: string[] };
     const symbols = (payload.symbols ?? []).map((symbol) => symbol.toUpperCase());
 
@@ -91,6 +154,11 @@ async function mockWorkbenchApis(page: Page) {
   });
 
   await page.route("**/api/market/history?**", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
     const url = new URL(route.request().url());
     const symbol = (url.searchParams.get("symbol") ?? "NVDA").toUpperCase();
     const range = (url.searchParams.get("range") ?? "1M") as PriceSeries["range"];
@@ -102,7 +170,25 @@ async function mockWorkbenchApis(page: Page) {
     });
   });
 
+  await page.route("**/api/rate-plan/evaluate", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+
+    ratePlanRequests.push(route.request().postDataJSON());
+
+    await route.fulfill({
+      json: ratePlanEvaluation,
+    });
+  });
+
   await page.route("**/api/watchlists/recommendations", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+
     recommendationRequests.push(route.request().postDataJSON());
 
     await route.fulfill({
@@ -111,6 +197,11 @@ async function mockWorkbenchApis(page: Page) {
   });
 
   await page.route("**/api/config/watchlists", async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.fallback();
+      return;
+    }
+
     const payload = route.request().postDataJSON() as WatchlistsConfig;
 
     savedWatchlists.push(payload);
@@ -121,12 +212,71 @@ async function mockWorkbenchApis(page: Page) {
   });
 
   return {
+    configRequests,
     historyRequests,
+    ratePlanRequests,
     recommendationRequests,
     savedWatchlists,
     snapshotRequests,
+    unexpectedApiRequests,
   };
 }
+
+function isMockedApiRequest(method: string, url: URL) {
+  return (
+    (method === "POST" && url.pathname === "/api/market/snapshots") ||
+    (method === "GET" && url.pathname === "/api/market/history") ||
+    (method === "POST" && url.pathname === "/api/rate-plan/evaluate") ||
+    (method === "POST" && url.pathname === "/api/watchlists/recommendations") ||
+    (method === "GET" && url.pathname === "/api/config") ||
+    (method === "PUT" && url.pathname === "/api/config/watchlists")
+  );
+}
+
+const workbenchConfig: { settings: SettingsConfig; watchlists: WatchlistsConfig } = {
+  settings: {
+    polygon: {
+      plan: "paid",
+      paidPlanName: "stocks-starter",
+      warningThreshold: 0.75,
+      hardThreshold: 0.95,
+    },
+  },
+  watchlists: {
+    watchlists: [
+      {
+        id: "semiconductors",
+        name: "Semiconductors",
+        description: "Large semiconductor names and user focus list",
+        theme: "semiconductors",
+        pinnedSymbols: ["NVDA", "AMD"],
+        rows: [
+          {
+            id: "leaders",
+            name: "Leaders",
+            expandedByDefault: true,
+            symbols: ["NVDA", "AMD", "AVGO"],
+          },
+          {
+            id: "equipment",
+            name: "Equipment",
+            expandedByDefault: false,
+            symbols: ["ASML", "AMAT", "LRCX"],
+          },
+        ],
+      },
+    ],
+  },
+};
+
+const ratePlanEvaluation: RatePlanEvaluation = {
+  status: "ok",
+  plan: "paid",
+  intervalSeconds: 30,
+  estimatedCallsPerMinute: 2,
+  message: "Refresh interval is within the configured budget.",
+  disabledIntervals: [],
+};
 
 function snapshotFor(symbol: string): MarketSnapshot {
   const snapshots: Record<string, MarketSnapshot> = {
