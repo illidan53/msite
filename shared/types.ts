@@ -64,11 +64,3 @@ export interface RatePlanEvaluation {
   message: string;
   disabledIntervals: number[];
 }
-
-export interface RecommendationCandidate {
-  symbol: string;
-  name?: string;
-  score: number;
-  reasons: string[];
-  source: "related" | "reference" | "pinned";
-}

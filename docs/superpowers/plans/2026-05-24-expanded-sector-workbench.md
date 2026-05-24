@@ -4,7 +4,7 @@
 
 **Goal:** Convert Stock Workbench into a file-generated sector dashboard with expanded sector watchlists, long shared time ranges, sortable paginated tables, API usage stats, and off-canvas symbol details.
 
-**Architecture:** Keep the existing React/Express boundary. The backend expands accepted history ranges and Polygon aggregate mapping; the frontend flattens file-backed watchlists into sector tables, polls the selected sector, and overlays chart detail in an off-canvas panel. Watchlist write/recommendation backend routes remain available but are removed from the main UI.
+**Architecture:** Keep the existing React/Express boundary. The backend expands accepted history ranges and Polygon aggregate mapping; the frontend flattens file-backed watchlists into sector tables, polls the selected sector, and overlays chart detail in an off-canvas panel. Watchlist write/recommendation backend routes are removed so watchlists are read only from file-backed configuration.
 
 **Tech Stack:** Vite, React 19, TypeScript, Express, Zod, Vitest, Testing Library, Playwright, lightweight-charts, YAML.
 

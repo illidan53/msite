@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MarketSnapshot, PriceSeries, RecommendationCandidate } from "../../../shared/types";
+import type { MarketSnapshot, PriceSeries } from "../../../shared/types";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
 import { Workbench } from "./Workbench";
 
@@ -207,8 +207,6 @@ function createApi({
   fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor)),
   getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range)),
   evaluateRatePlan = vi.fn(async () => ratePlanEvaluation),
-  recommendWatchlist = vi.fn(async () => []),
-  saveWatchlists = vi.fn(async (watchlists) => watchlists),
 }: {
   config?: WorkbenchConfig;
   configError?: Error;
@@ -216,8 +214,6 @@ function createApi({
   fetchSnapshots?: WorkbenchApi["fetchSnapshots"];
   getHistory?: WorkbenchApi["getHistory"];
   evaluateRatePlan?: WorkbenchApi["evaluateRatePlan"];
-  recommendWatchlist?: WorkbenchApi["recommendWatchlist"];
-  saveWatchlists?: WorkbenchApi["saveWatchlists"];
 } = {}): WorkbenchApi {
   return {
     getConfig: vi.fn(async () => {
@@ -227,11 +223,9 @@ function createApi({
 
       return configPromise ?? config;
     }),
-    saveWatchlists,
     fetchSnapshots,
     getHistory,
     evaluateRatePlan,
-    recommendWatchlist,
   };
 }
 

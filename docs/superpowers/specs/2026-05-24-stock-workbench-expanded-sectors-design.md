@@ -57,7 +57,7 @@ The frontend will keep loading watchlists from `GET /api/config`. It will no lon
 - Client-side calls to `POST /api/watchlists/recommendations`.
 - Client-side calls to `PUT /api/config/watchlists`.
 
-Backend write and recommendation routes may remain for future admin tooling, but they will not be reachable from the workbench surface.
+Backend write and recommendation routes are removed so the product surface and API both treat watchlists as file-backed configuration.
 
 ## Layout
 

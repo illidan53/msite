@@ -32,4 +32,15 @@ describe("createApp", () => {
     expect(assetResponse.status).toBe(200);
     expect(assetResponse.text).toBe("asset body");
   });
+
+  it("does not mount dynamic watchlist recommendation routes", async () => {
+    const response = await request(createApp()).post("/api/watchlists/recommendations").send({
+      excludedSymbols: [],
+      limit: 5,
+      pinnedSymbols: ["NVDA"],
+      theme: "semiconductors",
+    });
+
+    expect(response.status).toBe(404);
+  });
 });

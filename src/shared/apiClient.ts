@@ -2,7 +2,6 @@ import type {
   MarketSnapshot,
   PriceSeries,
   RatePlanEvaluation,
-  RecommendationCandidate,
   SettingsConfig,
   WatchlistsConfig,
 } from "../../shared/types";
@@ -12,20 +11,11 @@ export interface WorkbenchConfig {
   watchlists: WatchlistsConfig;
 }
 
-export interface RecommendWatchlistInput {
-  theme: string;
-  pinnedSymbols: string[];
-  excludedSymbols: string[];
-  limit: number;
-}
-
 export interface WorkbenchApi {
   getConfig(): Promise<WorkbenchConfig>;
-  saveWatchlists(watchlists: WatchlistsConfig): Promise<WatchlistsConfig>;
   fetchSnapshots(symbols: string[]): Promise<MarketSnapshot[]>;
   getHistory(symbol: string, range: PriceSeries["range"]): Promise<PriceSeries>;
   evaluateRatePlan(input: unknown): Promise<RatePlanEvaluation>;
-  recommendWatchlist(input: RecommendWatchlistInput): Promise<RecommendationCandidate[]>;
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -61,11 +51,6 @@ function safeEndpointLabel(url: string): string {
 
 export const apiClient: WorkbenchApi = {
   getConfig: () => requestJson<WorkbenchConfig>("/api/config"),
-  saveWatchlists: (watchlists) =>
-    requestJson<WatchlistsConfig>("/api/config/watchlists", {
-      method: "PUT",
-      body: JSON.stringify(watchlists),
-    }),
   fetchSnapshots: (symbols) =>
     requestJson<MarketSnapshot[]>("/api/market/snapshots", {
       method: "POST",
@@ -77,11 +62,6 @@ export const apiClient: WorkbenchApi = {
     ),
   evaluateRatePlan: (input) =>
     requestJson<RatePlanEvaluation>("/api/rate-plan/evaluate", {
-      method: "POST",
-      body: JSON.stringify(input),
-    }),
-  recommendWatchlist: (input) =>
-    requestJson<RecommendationCandidate[]>("/api/watchlists/recommendations", {
       method: "POST",
       body: JSON.stringify(input),
     }),

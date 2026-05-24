@@ -1,6 +1,6 @@
 # Stock Workbench
 
-Stock Workbench is a local Vite React and Express app for watching stock lists from YAML config, pausing collapsed rows, viewing quote tables and charts, and creating watchlists from recommended candidates.
+Stock Workbench is a local Vite React and Express app for watching file-backed sector stock lists from YAML config, viewing quote tables and charts, and comparing market data across popular sectors.
 
 ## Setup
 
@@ -21,7 +21,7 @@ Open the app at `http://127.0.0.1:5173`.
 
 The default settings use the paid `stocks-starter` plan. Market data can still be delayed depending on Polygon plan behavior, symbol coverage, and exchange entitlements; the UI labels snapshot timeframe values returned by the API.
 
-In production, set `APP_ADMIN_TOKEN`. Config write routes require the `x-admin-token` header outside development and test.
+Watchlists are loaded from `config/watchlists.yaml`; the app does not expose watchlist creation or write APIs.
 
 ## Verification
 
