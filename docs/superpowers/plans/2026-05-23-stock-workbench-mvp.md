@@ -2993,3 +2993,7 @@ git commit -m "test: add workbench e2e coverage"
 - Spec coverage: the tasks cover React/Express scaffolding, YAML config, Polygon proxy, row collapse polling, table/chart UI, recommendation service, paid Starter defaults, secure writes, structured errors, and Playwright testing.
 - Intentional exclusions: deployment, `finance.nphunter.net`, `nphunter-site`, WebSocket streaming, durable persistence, and wave-theory implementation stay out of the MVP.
 - Type consistency: shared DTOs are introduced before server and client modules consume them; route names match the approved design.
+
+## Execution Note
+
+- Task 13 adds mocked Playwright workbench coverage and README setup documentation on `feature/stock-workbench-mvp`; wave-theory analysis and deployment remain follow-up work documented in the spec.
