@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { RecommendationCandidate, Watchlist } from "../../../shared/types";
 import type { RecommendWatchlistInput } from "../../shared/apiClient";
 
@@ -17,6 +17,11 @@ export function WatchlistEditor({ open, onClose, onSave, recommend }: WatchlistE
   const [selectedSymbols, setSelectedSymbols] = useState<string[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isRecommending, setIsRecommending] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const recommendationRequestIdRef = useRef(0);
+  const saveRequestIdRef = useRef(0);
 
   const pinnedSymbols = useMemo(() => normalizeSymbols(pinnedSymbolText), [pinnedSymbolText]);
   const selectedCandidateSymbols = useMemo(
@@ -26,13 +31,42 @@ export function WatchlistEditor({ open, onClose, onSave, recommend }: WatchlistE
       ),
     [candidates, selectedSymbols],
   );
-  const canSave = name.trim().length > 0 && (selectedCandidateSymbols.length > 0 || pinnedSymbols.length > 0);
+  const canRecommend = theme.trim().length > 0 && !isRecommending;
+  const canSave =
+    name.trim().length > 0 && (selectedCandidateSymbols.length > 0 || pinnedSymbols.length > 0) && !isSaving;
+
+  useEffect(() => {
+    if (!open) {
+      cancelPendingRequests();
+      resetEditorState();
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+      return;
+    }
+
+    const activeElement = document.activeElement;
+    previousFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+    nameInputRef.current?.focus();
+  }, [open]);
+
+  useEffect(
+    () => () => {
+      cancelPendingRequests();
+    },
+    [],
+  );
 
   if (!open) {
     return null;
   }
 
   async function handleRecommend() {
+    if (!canRecommend) {
+      return;
+    }
+
+    const requestId = recommendationRequestIdRef.current + 1;
+    recommendationRequestIdRef.current = requestId;
     setIsRecommending(true);
     setErrorMessage(null);
 
@@ -44,14 +78,24 @@ export function WatchlistEditor({ open, onClose, onSave, recommend }: WatchlistE
         limit: 8,
       });
 
+      if (requestId !== recommendationRequestIdRef.current) {
+        return;
+      }
+
       setCandidates(nextCandidates);
       setSelectedSymbols(nextCandidates.flatMap((candidate) => (candidate.source === "pinned" ? [candidate.symbol] : [])));
     } catch (error: unknown) {
+      if (requestId !== recommendationRequestIdRef.current) {
+        return;
+      }
+
       setCandidates([]);
       setSelectedSymbols([]);
       setErrorMessage(formatErrorMessage(error, "Unable to load recommendations."));
     } finally {
-      setIsRecommending(false);
+      if (requestId === recommendationRequestIdRef.current) {
+        setIsRecommending(false);
+      }
     }
   }
 
@@ -72,28 +116,73 @@ export function WatchlistEditor({ open, onClose, onSave, recommend }: WatchlistE
 
     const normalizedName = name.trim();
     const symbols = selectedCandidateSymbols.length > 0 ? selectedCandidateSymbols : pinnedSymbols;
+    const requestId = saveRequestIdRef.current + 1;
+    saveRequestIdRef.current = requestId;
 
-    await onSave({
-      id: slugify(normalizedName),
-      name: normalizedName,
-      theme: theme.trim(),
-      pinnedSymbols,
-      rows: [
-        {
-          id: "recommended",
-          name: "Recommended",
-          expandedByDefault: true,
-          symbols,
-        },
-      ],
-    });
+    setIsSaving(true);
+    setErrorMessage(null);
+
+    try {
+      await onSave({
+        id: slugify(normalizedName),
+        name: normalizedName,
+        theme: theme.trim(),
+        pinnedSymbols,
+        rows: [
+          {
+            id: "recommended",
+            name: "Recommended",
+            expandedByDefault: true,
+            symbols,
+          },
+        ],
+      });
+    } catch (error: unknown) {
+      if (requestId !== saveRequestIdRef.current) {
+        return;
+      }
+
+      setErrorMessage(formatErrorMessage(error, "Unable to save watchlist."));
+    } finally {
+      if (requestId === saveRequestIdRef.current) {
+        setIsSaving(false);
+      }
+    }
+  }
+
+  function handleClose() {
+    cancelPendingRequests();
+    onClose();
+  }
+
+  function handleDialogKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      handleClose();
+    }
+  }
+
+  function cancelPendingRequests() {
+    recommendationRequestIdRef.current += 1;
+    saveRequestIdRef.current += 1;
+  }
+
+  function resetEditorState() {
+    setName("");
+    setTheme("");
+    setPinnedSymbolText("");
+    setCandidates([]);
+    setSelectedSymbols([]);
+    setErrorMessage(null);
+    setIsRecommending(false);
+    setIsSaving(false);
   }
 
   return (
-    <div role="dialog" aria-label="Watchlist editor" aria-modal="true" className="watchlist-editor">
+    <div role="dialog" aria-label="Watchlist editor" className="watchlist-editor" onKeyDown={handleDialogKeyDown}>
       <div className="watchlist-editor-header">
         <h2>Watchlist editor</h2>
-        <button type="button" onClick={onClose}>
+        <button type="button" onClick={handleClose}>
           Close
         </button>
       </div>
@@ -106,7 +195,12 @@ export function WatchlistEditor({ open, onClose, onSave, recommend }: WatchlistE
 
       <div className="watchlist-editor-fields">
         <label htmlFor="watchlist-editor-name">Name</label>
-        <input id="watchlist-editor-name" value={name} onChange={(event) => setName(event.target.value)} />
+        <input
+          id="watchlist-editor-name"
+          ref={nameInputRef}
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+        />
 
         <label htmlFor="watchlist-editor-theme">Theme</label>
         <input id="watchlist-editor-theme" value={theme} onChange={(event) => setTheme(event.target.value)} />
@@ -120,7 +214,7 @@ export function WatchlistEditor({ open, onClose, onSave, recommend }: WatchlistE
       </div>
 
       <div className="watchlist-editor-actions">
-        <button type="button" onClick={handleRecommend} disabled={isRecommending}>
+        <button type="button" onClick={handleRecommend} disabled={!canRecommend}>
           Recommend
         </button>
         <button type="button" onClick={handleSave} disabled={!canSave}>
