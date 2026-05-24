@@ -7,7 +7,7 @@ Status: Approved design, pending implementation plan
 
 The current Stock Workbench loads watchlists from `config/watchlists.yaml`, lets the user create new watchlists through the frontend, polls expanded rows, and reserves a fixed right-side symbol detail panel. The next iteration changes the product shape from editable watchlists to a file-driven sector dashboard.
 
-Follow-up refinement: refresh cadence and chart time span are separate controls. Refresh cadence controls polling; time span controls the history window used when opening symbol detail.
+Follow-up refinement: refresh cadence and chart time span are separate controls. Refresh cadence controls polling; time span controls the history window used when opening symbol detail. API usage stats use visible session request counters rather than symbol-refresh estimates so batched quote requests are not inflated by the number of symbols.
 
 ## Goals
 
@@ -19,7 +19,7 @@ Follow-up refinement: refresh cadence and chart time span are separate controls.
 6. Replace the fixed right detail column with a right-side off-canvas detail panel opened by clicking a symbol.
 7. Let the main dashboard use the available width when the detail panel is closed.
 8. Keep refresh choices compact and separate from chart time span.
-9. Add a compact workbench stats table before sector selection showing estimated today's API calls, total tracked symbols, and estimated historical API calls.
+9. Add a compact workbench stats table before sector selection showing quote requests this session, total tracked symbols, history requests this session, and a session REST request total.
 10. Add useful quote table columns beyond price, change, and volume.
 
 ## Non-Goals
@@ -146,11 +146,12 @@ The current `MarketSnapshot` type already contains name, price, change, change p
 
 The left rail includes a compact stats table before sector buttons:
 
-- `Today's API calls`: estimated from current active symbol count, selected refresh cadence, and elapsed time since local midnight.
+- `Quote requests this session`: actual browser-to-workbench snapshot refresh requests made since this page session loaded. Each snapshot refresh is counted once because symbols are batched.
 - `Tracked symbols`: unique symbols across all configured watchlists.
-- `Historical API calls`: estimated as the number of symbol history requests made in this session, plus the active selected symbol request when present.
+- `History requests this session`: actual browser-to-workbench history requests made for span metrics and the active symbol chart.
+- `REST requests this session`: quote requests plus history requests for a clear local session total.
 
-This is a dashboard estimate, not billing-grade telemetry. It is intended to make API usage visible without adding persistent storage.
+This is visible workbench-session telemetry, not billing-grade Polygon telemetry. It is intended to make frontend request behavior understandable without adding persistent storage.
 
 ## Data Flow
 

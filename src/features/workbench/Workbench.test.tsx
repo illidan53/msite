@@ -23,6 +23,10 @@ describe("Workbench", () => {
     expect(screen.getByRole("table", { name: "API usage summary" })).toBeInTheDocument();
     expect(screen.getByText("Tracked symbols")).toBeInTheDocument();
     expect(screen.getByText("23")).toBeInTheDocument();
+    expect(screen.getByText("Quote requests this session")).toBeInTheDocument();
+    expect(screen.getByText("History requests this session")).toBeInTheDocument();
+    expect(screen.queryByText("Today's API calls")).not.toBeInTheDocument();
+    expect(screen.queryByText("Historical API calls")).not.toBeInTheDocument();
     expect(screen.getByText("stocks-starter has unlimited REST calls for this planner.")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Session Chg" })).toBeInTheDocument();
@@ -33,6 +37,19 @@ describe("Workbench", () => {
     expect(screen.getByRole("columnheader", { name: "Timeframe" })).toBeInTheDocument();
     expect(await screen.findByText("$39.1B")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  });
+
+  it("counts quote refreshes as batched workbench requests instead of symbol refresh units", async () => {
+    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    const usageTable = await screen.findByRole("table", { name: "API usage summary" });
+
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledTimes(1));
+    expect(within(usageTable).getByRole("row", { name: "Quote requests this session 1" })).toBeInTheDocument();
+    expect(within(usageTable).getByRole("row", { name: "REST requests this session 21" })).toBeInTheDocument();
+    expect(within(usageTable).queryByText("41,510")).not.toBeInTheDocument();
   });
 
   it("renders one toolbar with time span, refresh interval, sort, and rows controls", async () => {
@@ -109,6 +126,12 @@ describe("Workbench", () => {
 
     expect(await screen.findByRole("dialog", { name: "NVDA details" })).toBeInTheDocument();
     expect(await screen.findByLabelText("NVDA chart")).toBeInTheDocument();
+    const detailSummary = await screen.findByRole("table", { name: "NVDA detail summary" });
+    expect(within(detailSummary).getByRole("row", { name: "Name NVIDIA Corporation" })).toBeInTheDocument();
+    expect(within(detailSummary).getByRole("row", { name: "Price $927.75" })).toBeInTheDocument();
+    expect(within(detailSummary).getByRole("row", { name: "Span Chg +3.00" })).toBeInTheDocument();
+    expect(within(detailSummary).getByRole("row", { name: "Range High $15.00" })).toBeInTheDocument();
+    expect(within(detailSummary).getByRole("row", { name: "Range Volume 300" })).toBeInTheDocument();
     expect(getHistory).toHaveBeenCalledWith("NVDA", "1h");
 
     await user.click(screen.getByRole("button", { name: "Close details" }));

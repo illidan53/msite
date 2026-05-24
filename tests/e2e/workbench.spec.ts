@@ -10,7 +10,11 @@ test("covers the stock workbench sector dashboard without live market calls", as
   await expect(page.getByRole("heading", { name: "Stock Workbench" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Semiconductors" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "New Watchlist" })).toHaveCount(0);
-  await expect(page.getByRole("table", { name: "API usage summary" })).toBeVisible();
+  const usageTable = page.getByRole("table", { name: "API usage summary" });
+  await expect(usageTable).toBeVisible();
+  await expect(usageTable.getByRole("row", { name: "Quote requests this session 1" })).toBeVisible();
+  await expect(usageTable.getByRole("row", { name: "REST requests this session 21" })).toBeVisible();
+  await expect(page.getByText("Today's API calls")).toHaveCount(0);
 
   const quoteTable = page.getByRole("table", { name: "Semiconductors quotes" });
 
@@ -33,6 +37,9 @@ test("covers the stock workbench sector dashboard without live market calls", as
 
   await expect(detailPanel).toBeVisible();
   await expect(detailPanel.getByLabel("NVDA chart")).toBeVisible();
+  await expect(detailPanel.getByRole("table", { name: "NVDA detail summary" })).toBeVisible();
+  await expect(detailPanel.getByRole("row", { name: "Name NVIDIA" })).toBeVisible();
+  await expect(detailPanel.getByRole("row", { name: "Range High $126.00" })).toBeVisible();
   await expect.poll(() => apiMocks.historyRequests.some((request) => request.symbol === "NVDA" && request.range === "1h")).toBe(true);
 
   await detailPanel.getByRole("button", { name: "5y" }).click();

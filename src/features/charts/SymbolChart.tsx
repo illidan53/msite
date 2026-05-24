@@ -36,7 +36,7 @@ const RANGES: Array<{ label: string; value: PriceSeries["range"] }> = [
   { label: "1y", value: "1y" },
   { label: "5y", value: "5y" },
 ];
-const CHART_HEIGHT = 300;
+const CHART_HEIGHT = 380;
 
 export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChartProps) {
   const [mode, setMode] = useState<ChartMode>("trend");

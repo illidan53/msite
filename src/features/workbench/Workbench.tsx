@@ -14,6 +14,12 @@ interface SpanMetric {
   changePercent: number | null;
 }
 
+interface DetailRow {
+  label: string;
+  value: string;
+  className?: string;
+}
+
 const DEFAULT_INTERVAL_SECONDS = 60;
 const DEFAULT_RANGE: PriceSeries["range"] = "1h";
 const DEFAULT_PAGE_SIZE = 20;
@@ -46,6 +52,7 @@ export function Workbench({ api }: WorkbenchProps) {
   const [selectedRange, setSelectedRange] = useState<PriceSeries["range"]>(DEFAULT_RANGE);
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
   const [historyRequestCount, setHistoryRequestCount] = useState(0);
+  const [quoteRequestCount, setQuoteRequestCount] = useState(0);
   const [snapshotsBySymbol, setSnapshotsBySymbol] = useState<Record<string, MarketSnapshot>>({});
   const [spanMetricsByKey, setSpanMetricsByKey] = useState<Record<string, SpanMetric>>({});
   const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_INTERVAL_SECONDS);
@@ -90,7 +97,19 @@ export function Workbench({ api }: WorkbenchProps) {
     [activeSymbols, pageSymbols, sortMode],
   );
   const spanSymbolsForHistoryKey = spanSymbolsForHistory.join("|");
-  const todayApiCalls = estimateTodayApiCalls(activeSymbols.length, intervalSeconds);
+  const totalWorkbenchRequestCount = quoteRequestCount + historyRequestCount;
+  const selectedSnapshot = selectedSymbol ? snapshotsBySymbol[selectedSymbol] : undefined;
+  const selectedSpanMetric = useMemo(() => {
+    if (!selectedSymbol) {
+      return undefined;
+    }
+
+    return spanMetricsBySymbol[selectedSymbol] ?? (historySeries ? spanMetricFromSeries(historySeries) : undefined);
+  }, [historySeries, selectedSymbol, spanMetricsBySymbol]);
+  const selectedDetailRows = useMemo(
+    () => buildSymbolDetailRows(selectedSymbol, selectedSnapshot, selectedSpanMetric, historySeries, selectedRange),
+    [historySeries, selectedRange, selectedSnapshot, selectedSpanMetric, selectedSymbol],
+  );
 
   useEffect(() => {
     configRef.current = config;
@@ -104,6 +123,8 @@ export function Workbench({ api }: WorkbenchProps) {
     setErrorMessage(null);
     setSnapshotsBySymbol({});
     setSpanMetricsByKey({});
+    setQuoteRequestCount(0);
+    setHistoryRequestCount(0);
     setSelectedWatchlistId(null);
     setSelectedSymbol(null);
     setHistorySeries(null);
@@ -157,6 +178,7 @@ export function Workbench({ api }: WorkbenchProps) {
 
     function refreshSnapshots() {
       setErrorMessage(null);
+      setQuoteRequestCount((current) => current + 1);
 
       void api
         .fetchSnapshots(pollingSymbols)
@@ -396,16 +418,20 @@ export function Workbench({ api }: WorkbenchProps) {
         <table className="usage-table" aria-label="API usage summary">
           <tbody>
             <tr>
-              <th scope="row">Today's API calls</th>
-              <td>{formatInteger(todayApiCalls)}</td>
+              <th scope="row">Quote requests this session</th>
+              <td>{formatInteger(quoteRequestCount)}</td>
             </tr>
             <tr>
               <th scope="row">Tracked symbols</th>
               <td>{formatInteger(allTrackedSymbols.length)}</td>
             </tr>
             <tr>
-              <th scope="row">Historical API calls</th>
+              <th scope="row">History requests this session</th>
               <td>{formatInteger(historyRequestCount)}</td>
+            </tr>
+            <tr>
+              <th scope="row">REST requests this session</th>
+              <td>{formatInteger(totalWorkbenchRequestCount)}</td>
             </tr>
           </tbody>
         </table>
@@ -528,6 +554,21 @@ export function Workbench({ api }: WorkbenchProps) {
               />
             ) : null}
             {!historySeries && !historyErrorMessage ? <p className="loading-copy">Loading chart...</p> : null}
+            {selectedDetailRows.length > 0 ? (
+              <section className="symbol-detail-summary" aria-label={`${selectedSymbol} summary`}>
+                <h3>Details</h3>
+                <table className="detail-summary-table" aria-label={`${selectedSymbol} detail summary`}>
+                  <tbody>
+                    {selectedDetailRows.map((row) => (
+                      <tr key={row.label}>
+                        <th scope="row">{row.label}</th>
+                        <td className={row.className}>{row.value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            ) : null}
           </aside>
         </div>
       ) : null}
@@ -652,21 +693,6 @@ function dollarVolume(snapshot: MarketSnapshot | undefined): number | null {
   return snapshot.price * snapshot.volume;
 }
 
-function estimateTodayApiCalls(activeSymbolCount: number, intervalSeconds: number): number {
-  if (activeSymbolCount === 0) {
-    return 0;
-  }
-
-  const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-  const elapsedMilliseconds = Math.max(0, now.getTime() - startOfDay.getTime());
-  const intervalMilliseconds = intervalSeconds * 1000;
-  const refreshes = Math.max(1, Math.ceil(elapsedMilliseconds / intervalMilliseconds));
-
-  return refreshes * activeSymbolCount;
-}
-
 function ErrorAlert({ message }: { message: string }) {
   return (
     <section className="workbench-error" role="alert">
@@ -721,6 +747,84 @@ function formatDollarVolume(snapshot: MarketSnapshot | undefined): string {
   }
 
   return `$${formatCompactNumber(value)}`;
+}
+
+function buildSymbolDetailRows(
+  selectedSymbol: string | null,
+  snapshot: MarketSnapshot | undefined,
+  spanMetric: SpanMetric | undefined,
+  historySeries: PriceSeries | null,
+  selectedRange: PriceSeries["range"],
+): DetailRow[] {
+  if (!selectedSymbol) {
+    return [];
+  }
+
+  const sessionChange = snapshot?.sessionChange ?? snapshot?.change;
+  const sessionChangePercent = snapshot?.sessionChangePercent ?? snapshot?.changePercent;
+  const rows: DetailRow[] = [
+    { label: "Symbol", value: selectedSymbol },
+    { label: "Name", value: snapshot?.name ?? "--" },
+    { label: "Price", value: formatPrice(snapshot?.price) },
+    { label: "Session Chg", value: formatChange(sessionChange), className: formatChangeClass(sessionChange) },
+    {
+      label: "Session Chg %",
+      value: formatChangePercent(sessionChangePercent),
+      className: formatChangeClass(sessionChangePercent),
+    },
+    { label: "Span Chg", value: formatChange(spanMetric?.change), className: formatChangeClass(spanMetric?.change) },
+    {
+      label: "Span Chg %",
+      value: formatChangePercent(spanMetric?.changePercent),
+      className: formatChangeClass(spanMetric?.changePercent),
+    },
+    { label: "Volume", value: formatVolume(snapshot?.volume) },
+    { label: "Dollar Volume", value: formatDollarVolume(snapshot) },
+    { label: "Timeframe", value: snapshot?.timeframe ?? "--" },
+    { label: "Updated", value: formatUpdatedAt(snapshot?.updatedAt) },
+    { label: "Time Span", value: formatRangeLabel(selectedRange) },
+  ];
+
+  const seriesSummary = summarizeSeries(historySeries);
+  if (!seriesSummary) {
+    return rows;
+  }
+
+  return [
+    ...rows,
+    { label: "Range Open", value: formatPrice(seriesSummary.open) },
+    { label: "Range High", value: formatPrice(seriesSummary.high) },
+    { label: "Range Low", value: formatPrice(seriesSummary.low) },
+    { label: "Range Close", value: formatPrice(seriesSummary.close) },
+    { label: "Range Volume", value: formatVolume(seriesSummary.volume) },
+    { label: "Bars", value: formatInteger(seriesSummary.bars) },
+    { label: "First Bar", value: formatUpdatedAt(seriesSummary.firstTimestamp) },
+    { label: "Last Bar", value: formatUpdatedAt(seriesSummary.lastTimestamp) },
+  ];
+}
+
+function summarizeSeries(series: PriceSeries | null) {
+  if (!series || series.bars.length === 0) {
+    return null;
+  }
+
+  const firstBar = series.bars[0];
+  const lastBar = series.bars[series.bars.length - 1];
+
+  return {
+    open: firstBar.open,
+    high: Math.max(...series.bars.map((bar) => bar.high)),
+    low: Math.min(...series.bars.map((bar) => bar.low)),
+    close: lastBar.close,
+    volume: series.bars.reduce((total, bar) => total + bar.volume, 0),
+    bars: series.bars.length,
+    firstTimestamp: firstBar.timestamp,
+    lastTimestamp: lastBar.timestamp,
+  };
+}
+
+function formatRangeLabel(range: PriceSeries["range"]): string {
+  return TIME_SPAN_OPTIONS.find((option) => option.value === range)?.label ?? range;
 }
 
 function formatCompactNumber(value: number): string {
