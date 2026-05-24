@@ -1,6 +1,12 @@
 import { defineConfig } from "vitest/config";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "lightweight-charts": fileURLToPath(new URL("./src/test/lightweightChartsMock.ts", import.meta.url)),
+    },
+  },
   test: {
     projects: [
       {
