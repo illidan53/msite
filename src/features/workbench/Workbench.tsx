@@ -1,41 +1,70 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketSnapshot, PriceSeries, RatePlanEvaluation, Watchlist } from "../../../shared/types";
+import type { MarketSnapshot, PriceSeries, Watchlist } from "../../../shared/types";
 import { SymbolChart } from "../charts/SymbolChart";
 import { RefreshControls } from "../settings/RefreshControls";
-import { WatchlistEditor } from "../watchlists/WatchlistEditor";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
 
 interface WorkbenchProps {
   api: WorkbenchApi;
 }
 
+type SortMode = "config" | "size" | "heat" | "volume" | "changePercent" | "price" | "updated";
+
+const DEFAULT_INTERVAL_SECONDS = 3_600;
+const DEFAULT_RANGE: PriceSeries["range"] = "1h";
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
+  { id: "config", label: "Config order" },
+  { id: "size", label: "Size" },
+  { id: "heat", label: "Heat" },
+  { id: "volume", label: "Volume" },
+  { id: "changePercent", label: "Change %" },
+  { id: "price", label: "Price" },
+  { id: "updated", label: "Updated" },
+];
+
 export function Workbench({ api }: WorkbenchProps) {
   const [config, setConfig] = useState<WorkbenchConfig | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
-  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [selectedRange, setSelectedRange] = useState<PriceSeries["range"]>("1M");
+  const [selectedRange, setSelectedRange] = useState<PriceSeries["range"]>(DEFAULT_RANGE);
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
+  const [historyRequestCount, setHistoryRequestCount] = useState(0);
   const [snapshotsBySymbol, setSnapshotsBySymbol] = useState<Record<string, MarketSnapshot>>({});
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [intervalSeconds, setIntervalSeconds] = useState(30);
-  const [ratePlan, setRatePlan] = useState<RatePlanEvaluation>({
-    status: "ok",
-    plan: "paid",
-    intervalSeconds: 30,
+  const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_INTERVAL_SECONDS);
+  const [sortMode, setSortMode] = useState<SortMode>("config");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [ratePlan, setRatePlan] = useState({
+    status: "ok" as const,
+    plan: "paid" as const,
+    intervalSeconds: DEFAULT_INTERVAL_SECONDS,
     estimatedCallsPerMinute: 0,
     message: "Refresh interval is within the configured budget.",
-    disabledIntervals: [],
+    disabledIntervals: [] as number[],
   });
   const configRef = useRef<WorkbenchConfig | null>(null);
-  const editorSessionIdRef = useRef(0);
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const watchlists = config?.watchlists.watchlists ?? [];
   const watchlist: Watchlist | undefined =
     watchlists.find((candidate) => candidate.id === selectedWatchlistId) ?? watchlists[0];
+
+  const activeSymbols = useMemo(() => (watchlist ? flattenWatchlistSymbols(watchlist) : []), [watchlist]);
+  const allTrackedSymbols = useMemo(
+    () => uniqueUppercaseSymbols(watchlists.flatMap((item) => item.rows.flatMap((row) => row.symbols))),
+    [watchlists],
+  );
+  const sortedSymbols = useMemo(
+    () => sortSymbols(activeSymbols, snapshotsBySymbol, sortMode),
+    [activeSymbols, snapshotsBySymbol, sortMode],
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedSymbols.length / pageSize));
+  const boundedPage = Math.min(currentPage, totalPages);
+  const pageSymbols = sortedSymbols.slice((boundedPage - 1) * pageSize, boundedPage * pageSize);
+  const todayApiCalls = estimateTodayApiCalls(activeSymbols.length, intervalSeconds);
 
   useEffect(() => {
     configRef.current = config;
@@ -47,7 +76,6 @@ export function Workbench({ api }: WorkbenchProps) {
     setConfig(null);
     configRef.current = null;
     setErrorMessage(null);
-    setExpandedRows({});
     setSnapshotsBySymbol({});
     setSelectedWatchlistId(null);
     setSelectedSymbol(null);
@@ -64,7 +92,6 @@ export function Workbench({ api }: WorkbenchProps) {
         setConfig(loadedConfig);
         configRef.current = loadedConfig;
         setErrorMessage(null);
-        setExpandedRows(initialExpandedRows(loadedConfig.watchlists.watchlists));
         setSelectedWatchlistId(loadedConfig.watchlists.watchlists[0]?.id ?? null);
       })
       .catch((error: unknown) => {
@@ -74,7 +101,6 @@ export function Workbench({ api }: WorkbenchProps) {
 
         setConfig(null);
         configRef.current = null;
-        setExpandedRows({});
         setSelectedWatchlistId(null);
         setErrorMessage(formatErrorMessage(error, "Unable to load workbench configuration."));
       });
@@ -84,17 +110,15 @@ export function Workbench({ api }: WorkbenchProps) {
     };
   }, [api]);
 
-  const activeSymbols = useMemo(() => {
-    if (!watchlist) {
-      return [];
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize, selectedWatchlistId, sortMode]);
+
+  useEffect(() => {
+    if (currentPage !== boundedPage) {
+      setCurrentPage(boundedPage);
     }
-
-    const symbols = watchlist.rows
-      .filter((row) => expandedRows[rowExpansionKey(watchlist.id, row.id)])
-      .flatMap((row) => row.symbols);
-
-    return uniqueUppercaseSymbols(symbols);
-  }, [expandedRows, watchlist]);
+  }, [boundedPage, currentPage]);
 
   useEffect(() => {
     if (activeSymbols.length === 0) {
@@ -149,6 +173,7 @@ export function Workbench({ api }: WorkbenchProps) {
 
     setHistorySeries(null);
     setHistoryErrorMessage(null);
+    setHistoryRequestCount((current) => current + 1);
 
     void api
       .getHistory(selectedSymbol, selectedRange)
@@ -221,56 +246,14 @@ export function Workbench({ api }: WorkbenchProps) {
 
   function handleSymbolSelect(symbol: string) {
     setSelectedSymbol(symbol.toUpperCase());
+    setHistorySeries(null);
+    setHistoryErrorMessage(null);
   }
 
-  function handleEditorOpen() {
-    editorSessionIdRef.current += 1;
-    setIsEditorOpen(true);
-  }
-
-  function handleEditorClose() {
-    editorSessionIdRef.current += 1;
-    setIsEditorOpen(false);
-  }
-
-  function handleSaveWatchlist(savedWatchlist: Watchlist) {
-    const saveSessionId = editorSessionIdRef.current;
-
-    const savePromise = saveQueueRef.current.then(async () => {
-      const currentConfig = configRef.current;
-
-      if (!currentConfig) {
-        throw new Error("Workbench configuration is not loaded.");
-      }
-
-      const existingWatchlists = currentConfig.watchlists.watchlists;
-      const nextWatchlists = existingWatchlists.some((watchlistItem) => watchlistItem.id === savedWatchlist.id)
-        ? existingWatchlists.map((watchlistItem) =>
-            watchlistItem.id === savedWatchlist.id ? savedWatchlist : watchlistItem,
-          )
-        : [...existingWatchlists, savedWatchlist];
-      const savedWatchlists = await api.saveWatchlists({
-        ...currentConfig.watchlists,
-        watchlists: nextWatchlists,
-      });
-      const nextConfig = { ...currentConfig, watchlists: savedWatchlists };
-
-      configRef.current = nextConfig;
-      setConfig(nextConfig);
-      setExpandedRows(initialExpandedRows(savedWatchlists.watchlists));
-      setSelectedWatchlistId(savedWatchlist.id);
-      setSelectedSymbol(null);
-      setHistorySeries(null);
-      setHistoryErrorMessage(null);
-
-      if (editorSessionIdRef.current === saveSessionId) {
-        setIsEditorOpen(false);
-      }
-    });
-
-    saveQueueRef.current = savePromise.catch(() => undefined);
-
-    return savePromise;
+  function handleCloseDetails() {
+    setSelectedSymbol(null);
+    setHistorySeries(null);
+    setHistoryErrorMessage(null);
   }
 
   if (errorMessage && !config) {
@@ -309,6 +292,22 @@ export function Workbench({ api }: WorkbenchProps) {
 
       <aside className="watchlist-rail" aria-label="Watchlists">
         <h1>Stock Workbench</h1>
+        <table className="usage-table" aria-label="API usage summary">
+          <tbody>
+            <tr>
+              <th scope="row">Today's API calls</th>
+              <td>{formatInteger(todayApiCalls)}</td>
+            </tr>
+            <tr>
+              <th scope="row">Tracked symbols</th>
+              <td>{formatInteger(allTrackedSymbols.length)}</td>
+            </tr>
+            <tr>
+              <th scope="row">Historical API calls</th>
+              <td>{formatInteger(historyRequestCount)}</td>
+            </tr>
+          </tbody>
+        </table>
         <div className="watchlist-buttons">
           {watchlists.map((watchlistOption) => (
             <button
@@ -322,128 +321,224 @@ export function Workbench({ api }: WorkbenchProps) {
             </button>
           ))}
         </div>
-        <button type="button" className="new-watchlist-button" onClick={handleEditorOpen}>
-          New Watchlist
-        </button>
       </aside>
 
-      <section className="watchlist-main" aria-label={`${watchlist.name} rows`}>
-        {watchlist.rows.map((row) => {
-          const rowKey = rowExpansionKey(watchlist.id, row.id);
-          const isExpanded = expandedRows[rowKey] ?? false;
-          const rowSymbols = uniqueUppercaseSymbols(row.symbols);
+      <section className="watchlist-main" aria-label={`${watchlist.name} dashboard`}>
+        <div className="table-toolbar">
+          <label htmlFor="sort-mode">Sort by</label>
+          <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
 
-          return (
-            <section className="watchlist-row" key={row.id}>
-              <header className="watchlist-row-header">
-                <button
-                  type="button"
-                  aria-expanded={isExpanded}
-                  onClick={() =>
-                    setExpandedRows((current) => ({
-                      ...current,
-                      [rowKey]: !(current[rowKey] ?? false),
-                    }))
-                  }
-                >
-                  {row.name}
-                </button>
-                <span>{rowSymbols.length} symbols</span>
-              </header>
+          <label htmlFor="page-size">Rows</label>
+          <select
+            id="page-size"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {PAGE_SIZE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
 
-              {isExpanded ? (
-                <table className="quote-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Symbol</th>
-                      <th scope="col">Price</th>
-                      <th scope="col">Change %</th>
-                      <th scope="col">Volume</th>
-                      <th scope="col">Updated</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rowSymbols.map((symbol) => {
-                      const snapshot = snapshotsBySymbol[symbol];
+        <section className="watchlist-row sector-table-panel">
+          <table className="quote-table sector-table" aria-label={`${watchlist.name} quotes`}>
+            <thead>
+              <tr>
+                <th scope="col">Symbol</th>
+                <th scope="col">Name</th>
+                <th scope="col">Price</th>
+                <th scope="col">Change</th>
+                <th scope="col">Change %</th>
+                <th scope="col">Volume</th>
+                <th scope="col">Dollar Volume</th>
+                <th scope="col">Timeframe</th>
+                <th scope="col">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageSymbols.map((symbol) => {
+                const snapshot = snapshotsBySymbol[symbol];
 
-                      return (
-                        <tr key={symbol}>
-                          <td>
-                            <button
-                              type="button"
-                              className="symbol-button"
-                              aria-pressed={selectedSymbol === symbol}
-                              onClick={() => handleSymbolSelect(symbol)}
-                            >
-                              {symbol}
-                            </button>
-                          </td>
-                          <td>{formatPrice(snapshot?.price)}</td>
-                          <td className={formatChangeClass(snapshot?.changePercent)}>
-                            {formatChangePercent(snapshot?.changePercent)}
-                          </td>
-                          <td>{formatVolume(snapshot?.volume)}</td>
-                          <td>{formatUpdatedAt(snapshot?.updatedAt)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="row-paused-state">
-                  <span>Sync paused</span>
-                  <span>Stale until expanded</span>
-                </p>
-              )}
-            </section>
-          );
-        })}
+                return (
+                  <tr key={symbol}>
+                    <td>
+                      <button
+                        type="button"
+                        className="symbol-button"
+                        aria-pressed={selectedSymbol === symbol}
+                        onClick={() => handleSymbolSelect(symbol)}
+                      >
+                        {symbol}
+                      </button>
+                    </td>
+                    <td>{snapshot?.name ?? "--"}</td>
+                    <td>{formatPrice(snapshot?.price)}</td>
+                    <td className={formatChangeClass(snapshot?.change)}>{formatChange(snapshot?.change)}</td>
+                    <td className={formatChangeClass(snapshot?.changePercent)}>
+                      {formatChangePercent(snapshot?.changePercent)}
+                    </td>
+                    <td>{formatVolume(snapshot?.volume)}</td>
+                    <td>{formatDollarVolume(snapshot)}</td>
+                    <td>{snapshot?.timeframe ?? "--"}</td>
+                    <td>{formatUpdatedAt(snapshot?.updatedAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+
+        <nav className="pagination-controls" aria-label="Table pagination">
+          <button type="button" disabled={boundedPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+            Previous page
+          </button>
+          <span>{`Page ${boundedPage} of ${totalPages}`}</span>
+          <button
+            type="button"
+            disabled={boundedPage >= totalPages}
+            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+          >
+            Next page
+          </button>
+        </nav>
       </section>
 
-      <section className="symbol-detail" aria-label="Symbol detail">
-        <header className="symbol-detail-header">
-          <h2>{selectedSymbol ?? "No symbol selected"}</h2>
-          {selectedSymbol ? <span>{selectedRange}</span> : null}
-        </header>
+      {selectedSymbol ? (
+        <div className="detail-overlay" onClick={handleCloseDetails}>
+          <aside
+            role="dialog"
+            aria-label={`${selectedSymbol} details`}
+            className="symbol-detail-drawer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="symbol-detail-header">
+              <div>
+                <h2>{selectedSymbol}</h2>
+                <span>{selectedRange}</span>
+              </div>
+              <button type="button" onClick={handleCloseDetails}>
+                Close details
+              </button>
+            </header>
 
-        {historyErrorMessage ? <ErrorAlert message={historyErrorMessage} /> : null}
-        {selectedSymbol && historySeries ? (
-          <SymbolChart
-            symbol={selectedSymbol}
-            series={historySeries}
-            range={selectedRange}
-            onRangeChange={setSelectedRange}
-          />
-        ) : null}
-        {selectedSymbol && !historySeries && !historyErrorMessage ? (
-          <p className="loading-copy">Loading chart...</p>
-        ) : null}
-      </section>
-
-      <WatchlistEditor
-        open={isEditorOpen}
-        onClose={handleEditorClose}
-        onSave={handleSaveWatchlist}
-        recommend={api.recommendWatchlist}
-      />
+            {historyErrorMessage ? <ErrorAlert message={historyErrorMessage} /> : null}
+            {historySeries ? (
+              <SymbolChart
+                symbol={selectedSymbol}
+                series={historySeries}
+                range={selectedRange}
+                onRangeChange={setSelectedRange}
+              />
+            ) : null}
+            {!historySeries && !historyErrorMessage ? <p className="loading-copy">Loading chart...</p> : null}
+          </aside>
+        </div>
+      ) : null}
     </main>
   );
 }
 
-function initialExpandedRows(watchlists: Watchlist[] = []): Record<string, boolean> {
-  return Object.fromEntries(
-    watchlists.flatMap((watchlist) =>
-      watchlist.rows.map((row) => [rowExpansionKey(watchlist.id, row.id), row.expandedByDefault]),
-    ),
-  );
-}
-
-function rowExpansionKey(watchlistId: string, rowId: string): string {
-  return `${watchlistId}:${rowId}`;
+function flattenWatchlistSymbols(watchlist: Watchlist): string[] {
+  return uniqueUppercaseSymbols(watchlist.rows.flatMap((row) => row.symbols));
 }
 
 function uniqueUppercaseSymbols(symbols: string[]): string[] {
   return [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
+}
+
+function sortSymbols(
+  symbols: string[],
+  snapshotsBySymbol: Record<string, MarketSnapshot>,
+  sortMode: SortMode,
+): string[] {
+  if (sortMode === "config") {
+    return symbols;
+  }
+
+  return [...symbols].sort((left, right) => {
+    const leftSnapshot = snapshotsBySymbol[left];
+    const rightSnapshot = snapshotsBySymbol[right];
+    const leftValue = sortValue(leftSnapshot, sortMode);
+    const rightValue = sortValue(rightSnapshot, sortMode);
+
+    if (leftValue === null && rightValue === null) {
+      return symbols.indexOf(left) - symbols.indexOf(right);
+    }
+
+    if (leftValue === null) {
+      return 1;
+    }
+
+    if (rightValue === null) {
+      return -1;
+    }
+
+    if (rightValue === leftValue) {
+      return symbols.indexOf(left) - symbols.indexOf(right);
+    }
+
+    return rightValue - leftValue;
+  });
+}
+
+function sortValue(snapshot: MarketSnapshot | undefined, sortMode: SortMode): number | null {
+  if (!snapshot) {
+    return null;
+  }
+
+  switch (sortMode) {
+    case "size":
+      return dollarVolume(snapshot) ?? snapshot.volume;
+    case "heat":
+      return snapshot.changePercent === null ? null : Math.abs(snapshot.changePercent);
+    case "volume":
+      return snapshot.volume;
+    case "changePercent":
+      return snapshot.changePercent;
+    case "price":
+      return snapshot.price;
+    case "updated": {
+      if (!snapshot.updatedAt) {
+        return null;
+      }
+
+      const timestamp = Date.parse(snapshot.updatedAt);
+      return Number.isNaN(timestamp) ? null : timestamp;
+    }
+    case "config":
+      return null;
+  }
+}
+
+function dollarVolume(snapshot: MarketSnapshot | undefined): number | null {
+  if (!snapshot || snapshot.price === null || snapshot.volume === null) {
+    return null;
+  }
+
+  return snapshot.price * snapshot.volume;
+}
+
+function estimateTodayApiCalls(activeSymbolCount: number, intervalSeconds: number): number {
+  if (activeSymbolCount === 0) {
+    return 0;
+  }
+
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+  const elapsedMilliseconds = Math.max(0, now.getTime() - startOfDay.getTime());
+  const intervalMilliseconds = intervalSeconds * 1000;
+  const refreshes = Math.max(1, Math.ceil(elapsedMilliseconds / intervalMilliseconds));
+
+  return refreshes * activeSymbolCount;
 }
 
 function ErrorAlert({ message }: { message: string }) {
@@ -466,6 +561,15 @@ function formatPrice(price: MarketSnapshot["price"] | undefined): string {
   return `$${price.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 }
 
+function formatChange(change: MarketSnapshot["change"] | undefined): string {
+  if (change === undefined || change === null) {
+    return "--";
+  }
+
+  const sign = change > 0 ? "+" : "";
+  return `${sign}${change.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
+}
+
 function formatChangePercent(changePercent: MarketSnapshot["changePercent"] | undefined): string {
   if (changePercent === undefined || changePercent === null) {
     return "--";
@@ -480,23 +584,41 @@ function formatVolume(volume: MarketSnapshot["volume"] | undefined): string {
     return "--";
   }
 
-  if (volume >= 1_000_000_000) {
-    return `${formatCompactNumber(volume / 1_000_000_000)}B`;
+  return formatCompactNumber(volume);
+}
+
+function formatDollarVolume(snapshot: MarketSnapshot | undefined): string {
+  const value = dollarVolume(snapshot);
+
+  if (value === null) {
+    return "--";
   }
 
-  if (volume >= 1_000_000) {
-    return `${formatCompactNumber(volume / 1_000_000)}M`;
-  }
-
-  if (volume >= 1_000) {
-    return `${formatCompactNumber(volume / 1_000)}K`;
-  }
-
-  return volume.toLocaleString("en-US");
+  return `$${formatCompactNumber(value)}`;
 }
 
 function formatCompactNumber(value: number): string {
+  if (value >= 1_000_000_000) {
+    return `${formatCompactDecimal(value / 1_000_000_000)}B`;
+  }
+
+  if (value >= 1_000_000) {
+    return `${formatCompactDecimal(value / 1_000_000)}M`;
+  }
+
+  if (value >= 1_000) {
+    return `${formatCompactDecimal(value / 1_000)}K`;
+  }
+
+  return value.toLocaleString("en-US");
+}
+
+function formatCompactDecimal(value: number): string {
   return value.toLocaleString("en-US", { maximumFractionDigits: 1, minimumFractionDigits: value < 10 ? 1 : 0 });
+}
+
+function formatInteger(value: number): string {
+  return value.toLocaleString("en-US");
 }
 
 function formatUpdatedAt(updatedAt: MarketSnapshot["updatedAt"] | undefined): string {
@@ -519,10 +641,10 @@ function padTime(value: number): string {
   return value.toString().padStart(2, "0");
 }
 
-function formatChangeClass(changePercent: MarketSnapshot["changePercent"] | undefined): string | undefined {
-  if (changePercent === undefined || changePercent === null || changePercent === 0) {
+function formatChangeClass(value: number | null | undefined): string | undefined {
+  if (value === undefined || value === null || value === 0) {
     return undefined;
   }
 
-  return changePercent > 0 ? "positive-change" : "negative-change";
+  return value > 0 ? "positive-change" : "negative-change";
 }

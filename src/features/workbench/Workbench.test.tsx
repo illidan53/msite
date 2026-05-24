@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSnapshot, PriceSeries, RecommendationCandidate } from "../../../shared/types";
@@ -11,293 +11,99 @@ afterEach(() => {
 });
 
 describe("Workbench", () => {
-  it("initially polls only expanded row symbols", async () => {
-    const fetchSnapshots = vi.fn(async () => []);
+  it("renders a file-backed sector table with API stats and no watchlist creation", async () => {
+    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]));
-    expect(fetchSnapshots).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "Leaders" })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: "Equipment" })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("Sync paused")).toBeInTheDocument();
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols));
+
+    expect(screen.queryByRole("button", { name: "New Watchlist" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "API usage summary" })).toBeInTheDocument();
+    expect(screen.getByText("Tracked symbols")).toBeInTheDocument();
+    expect(screen.getByText("23")).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Change" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Dollar Volume" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Timeframe" })).toBeInTheDocument();
+    expect(await screen.findByText("$39.1B")).toBeInTheDocument();
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
   });
 
-  it("shows collapsed row paused state and renders detail when a symbol is selected", async () => {
+  it("sorts by heat and paginates the selected sector", async () => {
+    const user = userEvent.setup();
+    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+
+    await user.selectOptions(screen.getByLabelText("Sort by"), "heat");
+
+    expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent("NVDA");
+    expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+
+    expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
+    expect(within(quoteTable).getByRole("button", { name: "GE" })).toBeInTheDocument();
+  });
+
+  it("opens symbol history in an off-canvas detail panel and closes it", async () => {
     const user = userEvent.setup();
     const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
 
     render(<Workbench api={createApi({ getHistory })} />);
 
-    expect(await screen.findByText("Sync paused")).toBeInTheDocument();
-    expect(screen.queryByLabelText("NVDA chart")).not.toBeInTheDocument();
+    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
 
-    await user.click(screen.getByRole("button", { name: "NVDA" }));
-
+    expect(await screen.findByRole("dialog", { name: "NVDA details" })).toBeInTheDocument();
     expect(await screen.findByLabelText("NVDA chart")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1M" })).toHaveAttribute("aria-pressed", "true");
-    expect(getHistory).toHaveBeenCalledWith("NVDA", "1M");
+    expect(getHistory).toHaveBeenCalledWith("NVDA", "1h");
+
+    await user.click(screen.getByRole("button", { name: "Close details" }));
+
+    expect(screen.queryByRole("dialog", { name: "NVDA details" })).not.toBeInTheDocument();
   });
 
-  it("renders snapshot values in the quote table after refresh", async () => {
-    render(<Workbench api={createApi({ fetchSnapshots: vi.fn(async () => marketSnapshots) })} />);
-
-    expect(await screen.findByText("$927.75")).toBeInTheDocument();
-    expect(screen.getByText("+2.45%")).toBeInTheDocument();
-    expect(screen.getByText("42.1M")).toBeInTheDocument();
-    expect(screen.getByText("2026-05-23 14:30 UTC")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Symbol" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Price" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Change %" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Volume" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Updated" })).toBeInTheDocument();
-  });
-
-  it("polls snapshots repeatedly and removes collapsed symbols from the active interval", async () => {
-    vi.useFakeTimers();
-    const fetchSnapshots = vi.fn(async () => []);
-
-    render(<Workbench api={createApi({ fetchSnapshots })} />);
-
-    await flushPromises();
-    expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]);
-    expect(fetchSnapshots).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
-    });
-
-    expect(fetchSnapshots).toHaveBeenCalledTimes(2);
-    expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD"]);
-
-    fireEvent.click(screen.getByRole("button", { name: "Equipment" }));
-    await flushPromises();
-    expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]);
-
-    fireEvent.click(screen.getByRole("button", { name: "Leaders" }));
-    await flushPromises();
-    expect(fetchSnapshots).toHaveBeenLastCalledWith(["ASML"]);
-
-    const callsAfterCollapse = fetchSnapshots.mock.calls.length;
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
-    });
-
-    expect(fetchSnapshots).toHaveBeenCalledTimes(callsAfterCollapse + 1);
-    expect(fetchSnapshots).toHaveBeenLastCalledWith(["ASML"]);
-  });
-
-  it("ignores snapshot results from a stale polling cycle", async () => {
-    const user = userEvent.setup();
-    const staleSnapshots = createDeferred<MarketSnapshot[]>();
-    const currentSnapshots = createDeferred<MarketSnapshot[]>();
-    const fetchSnapshots = vi
-      .fn<WorkbenchApi["fetchSnapshots"]>()
-      .mockReturnValueOnce(staleSnapshots.promise)
-      .mockReturnValueOnce(currentSnapshots.promise);
-
-    render(<Workbench api={createApi({ fetchSnapshots })} />);
-
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]));
-
-    await user.click(screen.getByRole("button", { name: "Equipment" }));
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]));
-
-    await act(async () => {
-      staleSnapshots.resolve([
-        {
-          ...marketSnapshots[0],
-          price: 999,
-          changePercent: 9.99,
-        },
-      ]);
-      await staleSnapshots.promise;
-    });
-
-    expect(screen.queryByText("$999.00")).not.toBeInTheDocument();
-
-    await act(async () => {
-      currentSnapshots.resolve(marketSnapshots);
-      await currentSnapshots.promise;
-    });
-
-    expect(await screen.findByText("$927.75")).toBeInTheDocument();
-  });
-
-  it("fetches history for the selected symbol and selected chart range", async () => {
+  it("requests new history when the off-canvas chart range changes", async () => {
     const user = userEvent.setup();
     const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
 
     render(<Workbench api={createApi({ getHistory })} />);
 
-    await user.click(await screen.findByRole("button", { name: "AMD" }));
-    await waitFor(() => expect(getHistory).toHaveBeenCalledWith("AMD", "1M"));
+    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
+    const detailPanel = await screen.findByRole("dialog", { name: "NVDA details" });
+    await user.click(within(detailPanel).getByRole("button", { name: "5y" }));
 
-    await user.click(screen.getByRole("button", { name: "5D" }));
-
-    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("AMD", "5D"));
+    await waitFor(() => expect(getHistory).toHaveBeenLastCalledWith("NVDA", "5y"));
   });
 
-  it("saves a recommended watchlist and adds it to the rail", async () => {
+  it("polls the newly selected sector as one flattened symbol list", async () => {
     const user = userEvent.setup();
-    const saveWatchlists = vi.fn(async (watchlists) => watchlists);
-    const recommendWatchlist = vi.fn(async () => recommendationCandidates);
-
-    render(<Workbench api={createApi({ recommendWatchlist, saveWatchlists })} />);
-
-    await user.click(await screen.findByRole("button", { name: "New Watchlist" }));
-    await user.type(screen.getByLabelText("Name"), "AI Leaders");
-    await user.type(screen.getByLabelText("Theme"), "AI chips");
-    await user.type(screen.getByLabelText("Pinned symbols"), "nvda");
-    await user.click(screen.getByRole("button", { name: "Recommend" }));
-    await user.click(await screen.findByRole("checkbox", { name: /TSM/i }));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    await waitFor(() =>
-      expect(saveWatchlists).toHaveBeenCalledWith({
-        watchlists: [
-          baseWatchlist,
-          {
-            id: "ai-leaders",
-            name: "AI Leaders",
-            theme: "AI chips",
-            pinnedSymbols: ["NVDA"],
-            rows: [
-              {
-                id: "recommended",
-                name: "Recommended",
-                expandedByDefault: true,
-                symbols: ["NVDA", "TSM"],
-              },
-            ],
-          },
-        ],
-      }),
-    );
-    expect(screen.queryByRole("dialog", { name: "Watchlist editor" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "AI Leaders" })).toBeInTheDocument();
-  });
-
-  it("serializes deferred watchlist saves so an earlier completion cannot overwrite a newer watchlist", async () => {
-    const user = userEvent.setup();
-    const firstSave = createDeferred<Awaited<ReturnType<WorkbenchApi["saveWatchlists"]>>>();
-    const secondSave = createDeferred<Awaited<ReturnType<WorkbenchApi["saveWatchlists"]>>>();
-    const saveWatchlists = vi
-      .fn<WorkbenchApi["saveWatchlists"]>()
-      .mockReturnValueOnce(firstSave.promise)
-      .mockReturnValueOnce(secondSave.promise);
-
-    render(<Workbench api={createApi({ saveWatchlists })} />);
-
-    await user.click(await screen.findByRole("button", { name: "New Watchlist" }));
-    await user.type(screen.getByLabelText("Name"), "First Save");
-    await user.type(screen.getByLabelText("Pinned symbols"), "aapl");
-    await user.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(saveWatchlists).toHaveBeenCalledTimes(1));
-
-    await user.click(screen.getByRole("button", { name: "Close" }));
-    await user.click(screen.getByRole("button", { name: "New Watchlist" }));
-    await user.type(screen.getByLabelText("Name"), "Second Save");
-    await user.type(screen.getByLabelText("Pinned symbols"), "msft");
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(saveWatchlists).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      firstSave.resolve(saveWatchlists.mock.calls[0][0]);
-      await firstSave.promise;
-    });
-
-    await waitFor(() => expect(saveWatchlists).toHaveBeenCalledTimes(2));
-    expect(saveWatchlists.mock.calls[1][0]).toEqual({
-      watchlists: [baseWatchlist, firstSavedWatchlist, secondSavedWatchlist],
-    });
-
-    await act(async () => {
-      secondSave.resolve(saveWatchlists.mock.calls[1][0]);
-      await secondSave.promise;
-    });
-
-    expect(await screen.findByRole("button", { name: "First Save" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Second Save" })).toBeInTheDocument();
-  });
-
-  it("keeps the watchlist editor open and shows an alert when save fails", async () => {
-    const user = userEvent.setup();
-    const saveWatchlists = vi.fn(async () => {
-      throw new Error("Config save failed");
-    });
-
-    render(<Workbench api={createApi({ saveWatchlists })} />);
-
-    await user.click(await screen.findByRole("button", { name: "New Watchlist" }));
-    await user.type(screen.getByLabelText("Name"), "Compounders");
-    await user.type(screen.getByLabelText("Pinned symbols"), "cost");
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Config save failed");
-    expect(screen.getByRole("dialog", { name: "Watchlist editor" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Compounders" })).not.toBeInTheDocument();
-  });
-
-  it("adds collapsed row symbols to polling when the row is expanded", async () => {
-    const user = userEvent.setup();
-    const fetchSnapshots = vi.fn(async () => []);
+    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]));
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols));
 
-    await user.click(screen.getByRole("button", { name: "Equipment" }));
+    await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
 
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]));
-    expect(fetchSnapshots).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["COST", "WMT", "PG", "KO"]));
+    expect(screen.getByRole("table", { name: "Consumer Staples quotes" })).toBeInTheDocument();
   });
 
-  it("removes collapsed row symbols from the next snapshot request", async () => {
-    const user = userEvent.setup();
-    const fetchSnapshots = vi.fn(async () => []);
-
-    render(<Workbench api={createApi({ fetchSnapshots })} />);
-
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(["NVDA", "AMD"]));
-
-    await user.click(screen.getByRole("button", { name: "Equipment" }));
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["NVDA", "AMD", "ASML"]));
-
-    await user.click(screen.getByRole("button", { name: "Leaders" }));
-
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["ASML"]));
-    expect(fetchSnapshots).toHaveBeenCalledTimes(3);
-  });
-
-  it("does not fetch snapshots when no configured rows are expanded", async () => {
-    const fetchSnapshots = vi.fn(async () => []);
-
-    render(<Workbench api={createApi({ config: noExpandedConfig, fetchSnapshots })} />);
-
-    await screen.findByRole("heading", { name: "Stock Workbench" });
-
-    expect(fetchSnapshots).not.toHaveBeenCalled();
-    expect(screen.getAllByText("Sync paused")).toHaveLength(2);
-  });
-
-  it("shows a loading state while config is unresolved", () => {
-    const api = createApi({ configPromise: new Promise(() => undefined) });
-
-    render(<Workbench api={api} />);
+  it("shows loading and config errors accessibly", async () => {
+    const { unmount } = render(<Workbench api={createApi({ configPromise: new Promise(() => undefined) })} />);
 
     expect(screen.getByText("Loading watchlists...")).toBeInTheDocument();
-  });
+    unmount();
 
-  it("renders an accessible error when config loading fails", async () => {
-    const api = createApi({ configError: new Error("Config unavailable") });
-
-    render(<Workbench api={api} />);
+    render(<Workbench api={createApi({ configError: new Error("Config unavailable") })} />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Config unavailable");
-    expect(screen.queryByText("Loading watchlists...")).not.toBeInTheDocument();
   });
 
   it("renders an accessible error when snapshot fetching fails", async () => {
@@ -310,7 +116,7 @@ describe("Workbench", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Snapshots unavailable");
   });
 
-  it("evaluates the refresh budget with active symbol count after config loads", async () => {
+  it("evaluates the refresh budget with selected sector symbol count and long interval", async () => {
     const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
 
     render(<Workbench api={createApi({ evaluateRatePlan })} />);
@@ -318,35 +124,40 @@ describe("Workbench", () => {
     await waitFor(() =>
       expect(evaluateRatePlan).toHaveBeenCalledWith({
         ...baseConfig.settings.polygon,
-        activeSymbolCount: 2,
+        activeSymbolCount: sectorSymbols.length,
         cacheHitRatio: 0.3,
         endpointCount: 1,
-        intervalSeconds: 30,
-      }),
-    );
-  });
-
-  it("re-evaluates the refresh budget when the interval changes", async () => {
-    const user = userEvent.setup();
-    const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
-
-    render(<Workbench api={createApi({ evaluateRatePlan })} />);
-
-    await waitFor(() => expect(evaluateRatePlan).toHaveBeenCalledTimes(1));
-
-    await user.click(screen.getByRole("button", { name: "1m" }));
-
-    await waitFor(() =>
-      expect(evaluateRatePlan).toHaveBeenLastCalledWith({
-        ...baseConfig.settings.polygon,
-        activeSymbolCount: 2,
-        cacheHitRatio: 0.3,
-        endpointCount: 1,
-        intervalSeconds: 60,
+        intervalSeconds: 3_600,
       }),
     );
   });
 });
+
+const sectorSymbols = [
+  "NVDA",
+  "AMD",
+  "ASML",
+  "AAPL",
+  "MSFT",
+  "GOOGL",
+  "AMZN",
+  "META",
+  "TSLA",
+  "COST",
+  "WMT",
+  "PG",
+  "KO",
+  "PEP",
+  "JPM",
+  "BAC",
+  "XOM",
+  "CVX",
+  "UNH",
+  "LLY",
+  "GE",
+  "CAT",
+  "RTX",
+];
 
 const baseConfig: WorkbenchConfig = {
   settings: {
@@ -364,26 +175,17 @@ const baseConfig: WorkbenchConfig = {
         name: "Semiconductors",
         pinnedSymbols: ["NVDA"],
         rows: [
-          { id: "leaders", name: "Leaders", expandedByDefault: true, symbols: ["nvda", "AMD", "nvda"] },
-          { id: "equipment", name: "Equipment", expandedByDefault: false, symbols: ["asml"] },
+          { id: "leaders", name: "Leaders", expandedByDefault: true, symbols: ["nvda", "AMD", "ASML", "NVDA"] },
+          { id: "market", name: "Market", expandedByDefault: true, symbols: sectorSymbols.slice(3) },
         ],
       },
-    ],
-  },
-};
-
-const baseWatchlist = baseConfig.watchlists.watchlists[0];
-
-const noExpandedConfig: WorkbenchConfig = {
-  ...baseConfig,
-  watchlists: {
-    watchlists: [
       {
-        ...baseWatchlist,
-        rows: baseWatchlist.rows.map((row) => ({
-          ...row,
-          expandedByDefault: false,
-        })),
+        id: "consumer-staples",
+        name: "Consumer Staples",
+        pinnedSymbols: ["COST"],
+        rows: [
+          { id: "staples", name: "Staples", expandedByDefault: true, symbols: ["COST", "WMT", "PG", "KO"] },
+        ],
       },
     ],
   },
@@ -392,47 +194,17 @@ const noExpandedConfig: WorkbenchConfig = {
 const ratePlanEvaluation: Awaited<ReturnType<WorkbenchApi["evaluateRatePlan"]>> = {
   status: "ok",
   plan: "paid",
-  intervalSeconds: 30,
-  estimatedCallsPerMinute: 2,
+  intervalSeconds: 3_600,
+  estimatedCallsPerMinute: 1,
   message: "ok",
   disabledIntervals: [],
-};
-
-const firstSavedWatchlist = {
-  id: "first-save",
-  name: "First Save",
-  theme: "",
-  pinnedSymbols: ["AAPL"],
-  rows: [
-    {
-      id: "recommended",
-      name: "Recommended",
-      expandedByDefault: true,
-      symbols: ["AAPL"],
-    },
-  ],
-};
-
-const secondSavedWatchlist = {
-  id: "second-save",
-  name: "Second Save",
-  theme: "",
-  pinnedSymbols: ["MSFT"],
-  rows: [
-    {
-      id: "recommended",
-      name: "Recommended",
-      expandedByDefault: true,
-      symbols: ["MSFT"],
-    },
-  ],
 };
 
 function createApi({
   config = baseConfig,
   configError,
   configPromise,
-  fetchSnapshots = vi.fn(async () => []),
+  fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor)),
   getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range)),
   evaluateRatePlan = vi.fn(async () => ratePlanEvaluation),
   recommendWatchlist = vi.fn(async () => []),
@@ -463,45 +235,44 @@ function createApi({
   };
 }
 
-const marketSnapshots: MarketSnapshot[] = [
-  {
-    symbol: "NVDA",
-    name: "Nvidia",
-    price: 927.75,
-    change: 22.18,
-    changePercent: 2.45,
-    volume: 42_100_000,
+function snapshotFor(symbol: string): MarketSnapshot {
+  const overrides: Record<string, Partial<MarketSnapshot>> = {
+    NVDA: {
+      name: "NVIDIA Corporation",
+      price: 927.75,
+      change: 22.18,
+      changePercent: 2.45,
+      volume: 42_100_000,
+    },
+    AMD: {
+      name: "Advanced Micro Devices",
+      price: 164.1,
+      change: -1.31,
+      changePercent: -0.8,
+      volume: 35_000_000,
+    },
+    ASML: {
+      name: "ASML Holding",
+      price: 956.24,
+      change: 12.91,
+      changePercent: 1.35,
+      volume: 1_200_000,
+    },
+  };
+  const index = sectorSymbols.indexOf(symbol);
+  const fallbackPrice = 100 + Math.max(index, 0);
+
+  return {
+    symbol,
+    name: overrides[symbol]?.name ?? `${symbol} Inc.`,
+    price: overrides[symbol]?.price ?? fallbackPrice,
+    change: overrides[symbol]?.change ?? 0.5,
+    changePercent: overrides[symbol]?.changePercent ?? 0.5,
+    volume: overrides[symbol]?.volume ?? 1_000_000 + Math.max(index, 0) * 1_000,
     updatedAt: "2026-05-23T14:30:00.000Z",
     timeframe: "DELAYED",
-  },
-  {
-    symbol: "AMD",
-    name: "Advanced Micro Devices",
-    price: null,
-    change: null,
-    changePercent: null,
-    volume: null,
-    updatedAt: null,
-    timeframe: "UNKNOWN",
-  },
-];
-
-const recommendationCandidates: RecommendationCandidate[] = [
-  {
-    symbol: "NVDA",
-    name: "Nvidia",
-    source: "pinned",
-    score: 100,
-    reasons: ["user pinned"],
-  },
-  {
-    symbol: "TSM",
-    name: "Taiwan Semiconductor",
-    source: "related",
-    score: 80,
-    reasons: ["related candidate"],
-  },
-];
+  };
+}
 
 function priceSeries(symbol: string, range: PriceSeries["range"]): PriceSeries {
   return {
@@ -526,22 +297,4 @@ function priceSeries(symbol: string, range: PriceSeries["range"]): PriceSeries {
       },
     ],
   };
-}
-
-async function flushPromises() {
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-  });
-}
-
-function createDeferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((nextResolve, nextReject) => {
-    resolve = nextResolve;
-    reject = nextReject;
-  });
-
-  return { promise, resolve, reject };
 }
