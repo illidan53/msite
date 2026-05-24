@@ -5,6 +5,12 @@ import type { PolygonClient } from "./polygonClient";
 
 const SNAPSHOT_TTL_MS = 15_000;
 const HISTORY_TTL_MS = 60_000;
+const marketDateFormatter = new Intl.DateTimeFormat("en-US", {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: "America/New_York",
+  year: "numeric",
+});
 
 interface PolygonSnapshotResponse {
   tickers?: PolygonSnapshotTicker[];
@@ -147,9 +153,20 @@ function trimBarsForRange(range: HistoryRange, bars: PriceBar[]): PriceBar[] {
     return bars;
   }
 
-  const latestTimestamp = bars.reduce((latest, bar) => (bar.timestamp > latest ? bar.timestamp : latest), bars[0].timestamp);
-  const latestDate = latestTimestamp.slice(0, 10);
-  return bars.filter((bar) => bar.timestamp.slice(0, 10) === latestDate);
+  const latestMarketDate = bars.reduce((latest, bar) => {
+    const marketDate = formatMarketDate(bar.timestamp);
+    return marketDate > latest ? marketDate : latest;
+  }, formatMarketDate(bars[0].timestamp));
+  return bars.filter((bar) => formatMarketDate(bar.timestamp) === latestMarketDate);
+}
+
+function formatMarketDate(timestamp: string): string {
+  const parts = marketDateFormatter.formatToParts(new Date(timestamp));
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return `${year}-${month}-${day}`;
 }
 
 function rangeToAggregates(range: HistoryRange): { from: string; multiplier: number; timespan: "day" | "minute"; to: string } {

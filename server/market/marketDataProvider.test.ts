@@ -210,6 +210,27 @@ describe("MarketDataProvider", () => {
     expect(series.bars.map((bar) => bar.timestamp)).toEqual(["2026-05-26T14:00:00.000Z", "2026-05-26T15:00:00.000Z"]);
   });
 
+  it("trims 1D history by New York market date when after-hours bars cross UTC midnight", async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      new Response(
+        JSON.stringify({
+          ticker: "MSFT",
+          results: [
+            { t: Date.parse("2026-01-02T20:00:00.000Z"), o: 1, h: 2, l: 1, c: 2, v: 100 },
+            { t: Date.parse("2026-01-05T20:00:00.000Z"), o: 3, h: 4, l: 3, c: 4, v: 200 },
+            { t: Date.parse("2026-01-06T00:30:00.000Z"), o: 5, h: 6, l: 5, c: 6, v: 300 },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+    const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
+
+    const series = await provider.getHistory({ symbol: "msft", range: "1D" });
+
+    expect(series.bars.map((bar) => bar.timestamp)).toEqual(["2026-01-05T20:00:00.000Z", "2026-01-06T00:30:00.000Z"]);
+  });
+
   it("rejects path-breaking history symbols with a structured error", async () => {
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({ ticker: "AAPL", results: [] }), { status: 200 }));
     const provider = new MarketDataProvider(new PolygonClient("test-key", fetcher));
