@@ -108,6 +108,16 @@ describe("ConfigRepository", () => {
     });
   });
 
+  it("loads the default expanded sector watchlists from project config", async () => {
+    const repository = new ConfigRepository();
+
+    const watchlists = await repository.readWatchlists();
+    const symbols = new Set(watchlists.watchlists.flatMap((watchlist) => watchlist.rows.flatMap((row) => row.symbols)));
+
+    expect(watchlists.watchlists).toHaveLength(11);
+    expect(symbols.size).toBeGreaterThan(200);
+  });
+
   it("writes validated watchlists through a temp file, renames them, and backs up the previous YAML", async () => {
     await writeConfigFiles(configDir);
     const repository = new ConfigRepository({ configDir });

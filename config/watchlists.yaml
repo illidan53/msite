@@ -1,23 +1,475 @@
 watchlists:
   - id: semiconductors
     name: Semiconductors
-    description: Large semiconductor names and user focus list
+    description: Large semiconductor designers, foundries, memory, equipment, and materials names
     theme: semiconductors
     pinnedSymbols:
       - NVDA
       - AMD
     rows:
-      - id: leaders
-        name: Leaders
+      - id: core
+        name: Core
         expandedByDefault: true
         symbols:
           - NVDA
           - AMD
           - AVGO
-      - id: equipment
-        name: Equipment
-        expandedByDefault: false
-        symbols:
+          - TSM
           - ASML
           - AMAT
           - LRCX
+          - KLAC
+          - MU
+          - QCOM
+          - TXN
+          - INTC
+          - MRVL
+          - ADI
+          - MCHP
+          - ON
+          - NXPI
+          - MPWR
+          - ARM
+          - GFS
+          - WOLF
+          - QRVO
+          - SWKS
+          - LSCC
+          - ALGM
+          - TER
+          - COHR
+          - ACLS
+          - CAMT
+          - UMC
+          - STM
+          - DIOD
+          - SMTC
+          - FORM
+          - RMBS
+
+  - id: consumer-staples
+    name: Consumer Staples
+    description: Food, beverages, household products, retail staples, and tobacco names
+    theme: consumer staples
+    pinnedSymbols:
+      - COST
+      - WMT
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - WMT
+          - COST
+          - PG
+          - KO
+          - PEP
+          - PM
+          - MO
+          - MDLZ
+          - CL
+          - KMB
+          - GIS
+          - KHC
+          - HSY
+          - KDP
+          - MNST
+          - SJM
+          - CPB
+          - CAG
+          - TAP
+          - STZ
+          - EL
+          - CLX
+          - CHD
+          - HRL
+          - TSN
+          - KR
+          - SYY
+          - ADM
+          - BG
+          - CELH
+
+  - id: mega-cap-tech
+    name: Mega-Cap Tech
+    description: Large technology and platform companies with heavy market attention
+    theme: mega-cap technology
+    pinnedSymbols:
+      - AAPL
+      - MSFT
+      - NVDA
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - AAPL
+          - MSFT
+          - NVDA
+          - GOOGL
+          - GOOG
+          - AMZN
+          - META
+          - TSLA
+          - AVGO
+          - ORCL
+          - CRM
+          - NFLX
+          - ADBE
+          - AMD
+          - CSCO
+          - IBM
+          - INTU
+          - NOW
+          - PANW
+          - SHOP
+          - UBER
+          - ABNB
+          - PYPL
+          - SNOW
+          - PLTR
+
+  - id: ai-cloud-infrastructure
+    name: AI Cloud & Infrastructure
+    description: Cloud platforms, data centers, AI servers, power, networking, and storage infrastructure
+    theme: ai cloud infrastructure
+    pinnedSymbols:
+      - MSFT
+      - AMZN
+      - GOOGL
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - MSFT
+          - AMZN
+          - GOOGL
+          - META
+          - ORCL
+          - IBM
+          - DELL
+          - HPE
+          - SMCI
+          - ANET
+          - NTAP
+          - WDC
+          - STX
+          - PSTG
+          - VRT
+          - ETN
+          - PWR
+          - GEV
+          - CEG
+          - VST
+          - NRG
+          - EQIX
+          - DLR
+          - AMT
+          - CCI
+          - INTC
+          - AMD
+          - NVDA
+          - AVGO
+
+  - id: healthcare-biotech
+    name: Healthcare & Biotech
+    description: Large healthcare, managed care, medtech, pharma, and biotech names
+    theme: healthcare biotech
+    pinnedSymbols:
+      - LLY
+      - UNH
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - LLY
+          - UNH
+          - JNJ
+          - ABBV
+          - MRK
+          - TMO
+          - ABT
+          - ISRG
+          - AMGN
+          - PFE
+          - GILD
+          - BMY
+          - REGN
+          - VRTX
+          - MRNA
+          - BIIB
+          - CVS
+          - CI
+          - HUM
+          - HCA
+          - SYK
+          - BSX
+          - MDT
+          - ZTS
+          - ELV
+          - EW
+          - DXCM
+          - IDXX
+          - MCK
+          - COR
+
+  - id: financials
+    name: Financials
+    description: Banks, card networks, exchanges, asset managers, insurers, and brokers
+    theme: financials
+    pinnedSymbols:
+      - JPM
+      - BRK.B
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - JPM
+          - BAC
+          - WFC
+          - C
+          - GS
+          - MS
+          - BLK
+          - BX
+          - SCHW
+          - AXP
+          - COF
+          - USB
+          - PNC
+          - TFC
+          - BK
+          - STT
+          - SPGI
+          - MCO
+          - CME
+          - ICE
+          - CB
+          - MMC
+          - AON
+          - AJG
+          - TRV
+          - ALL
+          - AFL
+          - MET
+          - PRU
+          - BRK.B
+
+  - id: energy
+    name: Energy
+    description: Integrated energy, exploration, oilfield services, midstream, and global majors
+    theme: energy
+    pinnedSymbols:
+      - XOM
+      - CVX
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - XOM
+          - CVX
+          - COP
+          - EOG
+          - SLB
+          - MPC
+          - PSX
+          - VLO
+          - OXY
+          - HES
+          - HAL
+          - BKR
+          - KMI
+          - WMB
+          - LNG
+          - FANG
+          - DVN
+          - MRO
+          - APA
+          - EQT
+          - CTRA
+          - TRGP
+          - OKE
+          - ENB
+          - SU
+          - CNQ
+          - BP
+          - SHEL
+          - TTE
+          - PBR
+
+  - id: consumer-discretionary
+    name: Consumer Discretionary
+    description: E-commerce, autos, restaurants, lodging, apparel, home improvement, and homebuilders
+    theme: consumer discretionary
+    pinnedSymbols:
+      - AMZN
+      - TSLA
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - AMZN
+          - TSLA
+          - HD
+          - MCD
+          - NKE
+          - SBUX
+          - LOW
+          - BKNG
+          - TJX
+          - CMG
+          - ORLY
+          - AZO
+          - ROST
+          - MAR
+          - HLT
+          - GM
+          - F
+          - RIVN
+          - LCID
+          - DHI
+          - LEN
+          - PHM
+          - TOL
+          - YUM
+          - DPZ
+          - LULU
+          - ULTA
+          - DECK
+          - BURL
+
+  - id: communication-media
+    name: Communication & Media
+    description: Social platforms, telecom, streaming, entertainment, gaming, and advertising names
+    theme: communication media
+    pinnedSymbols:
+      - META
+      - GOOGL
+      - NFLX
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - META
+          - GOOGL
+          - GOOG
+          - NFLX
+          - DIS
+          - CMCSA
+          - TMUS
+          - VZ
+          - T
+          - TKO
+          - WBD
+          - PARA
+          - FOXA
+          - NWSA
+          - SPOT
+          - ROKU
+          - PINS
+          - SNAP
+          - MTCH
+          - EA
+          - TTWO
+          - RBLX
+          - LYV
+          - CHTR
+          - SIRI
+          - IPG
+          - OMC
+
+  - id: industrials-defense
+    name: Industrials & Defense
+    description: Aerospace, defense, machinery, transport, industrial tech, and infrastructure services
+    theme: industrials defense
+    pinnedSymbols:
+      - GE
+      - CAT
+      - RTX
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - GE
+          - CAT
+          - RTX
+          - BA
+          - HON
+          - UNP
+          - UPS
+          - DE
+          - LMT
+          - NOC
+          - GD
+          - ETN
+          - EMR
+          - MMM
+          - ITW
+          - PH
+          - CSX
+          - NSC
+          - WM
+          - RSG
+          - TDG
+          - CARR
+          - OTIS
+          - JCI
+          - PCAR
+          - CMI
+          - URI
+          - PWR
+          - IR
+          - AXON
+          - TXT
+
+  - id: utilities-power
+    name: Utilities & Power
+    description: Regulated utilities, independent power producers, grid exposure, and water utilities
+    theme: utilities power
+    pinnedSymbols:
+      - NEE
+      - CEG
+      - VST
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - NEE
+          - SO
+          - DUK
+          - AEP
+          - SRE
+          - D
+          - EXC
+          - XEL
+          - PEG
+          - ED
+          - WEC
+          - ETR
+          - DTE
+          - FE
+          - ES
+          - EIX
+          - PPL
+          - CMS
+          - CNP
+          - NI
+          - AWK
+          - CEG
+          - VST
+          - NRG
+          - GEV
+          - AES
+          - PCG
+          - BEP
+          - BEPC
+          - CWEN
+          - ORA
