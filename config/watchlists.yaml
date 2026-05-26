@@ -473,3 +473,20 @@ watchlists:
           - BEPC
           - CWEN
           - ORA
+
+  - id: close-watch
+    name: close watch
+    description: User-defined close watch symbols
+    theme: close watch
+    pinnedSymbols: []
+    rows:
+      - id: core
+        name: Core
+        expandedByDefault: true
+        symbols:
+          - POWL
+          - XYL
+          - CCJ
+          - FLNC
+          - FORM
+          - SMR

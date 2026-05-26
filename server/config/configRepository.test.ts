@@ -80,9 +80,21 @@ describe("ConfigRepository", () => {
 
     const watchlists = await repository.readWatchlists();
     const symbols = new Set(watchlists.watchlists.flatMap((watchlist) => watchlist.rows.flatMap((row) => row.symbols)));
+    const closeWatch = watchlists.watchlists.find((watchlist) => watchlist.id === "close-watch");
 
-    expect(watchlists.watchlists).toHaveLength(11);
+    expect(watchlists.watchlists).toHaveLength(12);
     expect(symbols.size).toBeGreaterThan(200);
+    expect(closeWatch).toMatchObject({
+      name: "close watch",
+      rows: [
+        {
+          id: "core",
+          name: "Core",
+          expandedByDefault: true,
+          symbols: ["POWL", "XYL", "CCJ", "FLNC", "FORM", "SMR"],
+        },
+      ],
+    });
   });
 });
 
