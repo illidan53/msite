@@ -1,0 +1,16 @@
+{
+  "name": "msite-finance-infra",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "pulumi preview",
+    "up": "pulumi up"
+  },
+  "dependencies": {
+    "@pulumi/aws": "^7.13.0",
+    "@pulumi/pulumi": "^3.228.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0"
+  }
+}

@@ -86,12 +86,20 @@ describe("ConfigRepository", () => {
     expect(symbols.size).toBeGreaterThan(200);
     expect(closeWatch).toMatchObject({
       name: "close watch",
+      symbolDescriptions: {
+        CLS: "AI hardware manufacturing services",
+        EQPT: "construction equipment rental tech",
+        EXE: "U.S. natural gas production",
+        SMR: "small modular nuclear reactors",
+        TECK: "copper and zinc mining",
+        XYL: "water technology and pumps",
+      },
       rows: [
         {
           id: "core",
           name: "Core",
           expandedByDefault: true,
-          symbols: ["POWL", "XYL", "CCJ", "FLNC", "FORM", "SMR"],
+          symbols: ["POWL", "XYL", "CCJ", "FLNC", "FORM", "SMR", "TECK", "EQPT", "EXE", "CLS"],
         },
       ],
     });

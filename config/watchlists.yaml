@@ -478,6 +478,17 @@ watchlists:
     name: close watch
     description: User-defined close watch symbols
     theme: close watch
+    symbolDescriptions:
+      POWL: electrical power distribution equipment
+      XYL: water technology and pumps
+      CCJ: uranium mining and nuclear fuel
+      FLNC: grid-scale battery storage systems
+      FORM: semiconductor test probe cards
+      SMR: small modular nuclear reactors
+      TECK: copper and zinc mining
+      EQPT: construction equipment rental tech
+      EXE: U.S. natural gas production
+      CLS: AI hardware manufacturing services
     pinnedSymbols: []
     rows:
       - id: core
@@ -490,3 +501,7 @@ watchlists:
           - FLNC
           - FORM
           - SMR
+          - TECK
+          - EQPT
+          - EXE
+          - CLS

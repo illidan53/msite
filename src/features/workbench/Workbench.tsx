@@ -53,6 +53,7 @@ export function Workbench({ api }: WorkbenchProps) {
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
   const [historyRequestCount, setHistoryRequestCount] = useState(0);
   const [quoteRequestCount, setQuoteRequestCount] = useState(0);
+  const [lastQuoteRefreshAt, setLastQuoteRefreshAt] = useState<string | null>(null);
   const [snapshotsBySymbol, setSnapshotsBySymbol] = useState<Record<string, MarketSnapshot>>({});
   const [spanMetricsByKey, setSpanMetricsByKey] = useState<Record<string, SpanMetric>>({});
   const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_INTERVAL_SECONDS);
@@ -72,6 +73,7 @@ export function Workbench({ api }: WorkbenchProps) {
   const watchlists = config?.watchlists.watchlists ?? [];
   const watchlist: Watchlist | undefined =
     watchlists.find((candidate) => candidate.id === selectedWatchlistId) ?? watchlists[0];
+  const symbolDescriptions = watchlist?.symbolDescriptions ?? {};
 
   const activeSymbols = useMemo(() => (watchlist ? flattenWatchlistSymbols(watchlist) : []), [watchlist]);
   const allTrackedSymbols = useMemo(
@@ -99,6 +101,7 @@ export function Workbench({ api }: WorkbenchProps) {
   const spanSymbolsForHistoryKey = spanSymbolsForHistory.join("|");
   const totalWorkbenchRequestCount = quoteRequestCount + historyRequestCount;
   const selectedSnapshot = selectedSymbol ? snapshotsBySymbol[selectedSymbol] : undefined;
+  const selectedBusinessDescription = selectedSymbol ? symbolDescriptions[selectedSymbol] : undefined;
   const selectedSpanMetric = useMemo(() => {
     if (!selectedSymbol) {
       return undefined;
@@ -107,8 +110,16 @@ export function Workbench({ api }: WorkbenchProps) {
     return spanMetricsBySymbol[selectedSymbol] ?? (historySeries ? spanMetricFromSeries(historySeries) : undefined);
   }, [historySeries, selectedSymbol, spanMetricsBySymbol]);
   const selectedDetailRows = useMemo(
-    () => buildSymbolDetailRows(selectedSymbol, selectedSnapshot, selectedSpanMetric, historySeries, selectedRange),
-    [historySeries, selectedRange, selectedSnapshot, selectedSpanMetric, selectedSymbol],
+    () =>
+      buildSymbolDetailRows(
+        selectedSymbol,
+        selectedSnapshot,
+        selectedBusinessDescription,
+        selectedSpanMetric,
+        historySeries,
+        selectedRange,
+      ),
+    [historySeries, selectedBusinessDescription, selectedRange, selectedSnapshot, selectedSpanMetric, selectedSymbol],
   );
 
   useEffect(() => {
@@ -122,6 +133,7 @@ export function Workbench({ api }: WorkbenchProps) {
     configRef.current = null;
     setErrorMessage(null);
     setSnapshotsBySymbol({});
+    setLastQuoteRefreshAt(null);
     setSpanMetricsByKey({});
     setQuoteRequestCount(0);
     setHistoryRequestCount(0);
@@ -191,6 +203,7 @@ export function Workbench({ api }: WorkbenchProps) {
             ...current,
             ...Object.fromEntries(snapshots.map((snapshot) => [snapshot.symbol.toUpperCase(), snapshot])),
           }));
+          setLastQuoteRefreshAt(new Date().toISOString());
         })
         .catch((error: unknown) => {
           if (isStale) {
@@ -371,6 +384,10 @@ export function Workbench({ api }: WorkbenchProps) {
       {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
 
       <header className="workbench-topbar" role="toolbar" aria-label="Table controls">
+        <span className="quote-refresh-status" aria-live="polite">
+          {lastQuoteRefreshAt ? `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}` : "Refresh pending"}
+        </span>
+
         <label htmlFor="time-span">Time span</label>
         <select
           id="time-span"
@@ -460,6 +477,7 @@ export function Workbench({ api }: WorkbenchProps) {
               <tr>
                 <th scope="col">Symbol</th>
                 <th scope="col">Name</th>
+                <th scope="col">Business</th>
                 <th scope="col">Price</th>
                 <th scope="col">Session Chg</th>
                 <th scope="col">Session Chg %</th>
@@ -491,6 +509,7 @@ export function Workbench({ api }: WorkbenchProps) {
                       </button>
                     </td>
                     <td>{snapshot?.name ?? "--"}</td>
+                    <td>{symbolDescriptions[symbol] ?? "--"}</td>
                     <td>{formatPrice(snapshot?.price)}</td>
                     <td className={formatChangeClass(sessionChange)}>{formatChange(sessionChange)}</td>
                     <td className={formatChangeClass(sessionChangePercent)}>
@@ -752,6 +771,7 @@ function formatDollarVolume(snapshot: MarketSnapshot | undefined): string {
 function buildSymbolDetailRows(
   selectedSymbol: string | null,
   snapshot: MarketSnapshot | undefined,
+  businessDescription: string | undefined,
   spanMetric: SpanMetric | undefined,
   historySeries: PriceSeries | null,
   selectedRange: PriceSeries["range"],
@@ -765,6 +785,7 @@ function buildSymbolDetailRows(
   const rows: DetailRow[] = [
     { label: "Symbol", value: selectedSymbol },
     { label: "Name", value: snapshot?.name ?? "--" },
+    { label: "Business", value: businessDescription ?? "--" },
     { label: "Price", value: formatPrice(snapshot?.price) },
     { label: "Session Chg", value: formatChange(sessionChange), className: formatChangeClass(sessionChange) },
     {

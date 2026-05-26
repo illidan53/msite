@@ -1,0 +1,6 @@
+name: msite-finance-infra
+description: AWS infrastructure for the msite finance workbench deployment
+runtime:
+  name: nodejs
+  options:
+    packagemanager: npm

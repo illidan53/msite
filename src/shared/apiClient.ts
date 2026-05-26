@@ -25,7 +25,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     headers.set("content-type", "application/json");
   }
 
-  const response = await fetch(url, { ...init, headers });
+  const response = await fetch(url, { ...init, cache: init?.cache ?? "no-store", headers });
 
   if (!response.ok) {
     throw new Error(formatRequestError(url, init?.method ?? "GET", response));

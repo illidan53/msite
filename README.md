@@ -46,9 +46,33 @@ MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e
 
 - EC2 instance: tagged `Project=msite`, `App=msite-finance`, `Name=msite-finance-web`
 - Public entry: Elastic IP routed by Route53 `finance.nphunter.net`
-- Runtime: Node.js 22 with systemd `msite.service`
+- Runtime: Docker container managed by systemd `msite.service`
 - Public proxy/TLS: Caddy on ports `80` and `443`
 - Runtime secrets: SSM SecureString parameters under `/msite/finance/`
-- Release artifact: private S3 bucket `msite-finance-deploy-612153676415-us-east-1`
+- Container registry: ECR repository `msite-finance`
+
+Production infrastructure lives in `infra/` as Pulumi code. The Pulumi stack
+creates the ECR repository, the GitHub Actions OIDC deploy role, and the EC2
+role policy that allows the instance to pull from ECR.
+
+Deployments are automated by `.github/workflows/deploy.yml`. Every push to
+`main` runs verification, builds a Docker image, pushes both the commit SHA tag
+and `latest` to ECR, sends an SSM command to the finance EC2 instance, and
+updates `msite.service` to run the pulled image.
+
+Infrastructure setup:
+
+```bash
+cd infra
+npm install
+pulumi stack select prod
+pulumi up
+```
+
+After a deployment workflow completes, verify the public deployment:
+
+```bash
+MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e/public-smoke.spec.ts
+```
 
 Wave-theory analysis remains documented in the MVP spec and is not implemented in this MVP.

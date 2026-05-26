@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSnapshot, PriceSeries } from "../../../shared/types";
@@ -29,6 +29,8 @@ describe("Workbench", () => {
     expect(screen.queryByText("Historical API calls")).not.toBeInTheDocument();
     expect(screen.getByText("stocks-starter has unlimited REST calls for this planner.")).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Business" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "AI GPU platforms" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Session Chg" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Session Chg %" })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: "Span Chg" })).toBeInTheDocument();
@@ -37,6 +39,32 @@ describe("Workbench", () => {
     expect(screen.getByRole("columnheader", { name: "Timeframe" })).toBeInTheDocument();
     expect(await screen.findByText("$39.1B")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
+  });
+
+  it("polls snapshots every minute and reports the browser refresh time when market timestamps stay unchanged", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-26T15:00:00.000Z"));
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map((symbol) => ({
+        ...snapshotFor(symbol),
+        updatedAt: "2026-05-26T14:53:00.000Z",
+      })),
+    );
+
+    render(<Workbench api={createApi({ fetchSnapshots })} />);
+
+    await flushEffects();
+    expect(fetchSnapshots).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Last refreshed 2026-05-26 15:00 UTC")).toBeInTheDocument();
+    expect(screen.getAllByText("2026-05-26 14:53 UTC").length).toBeGreaterThan(0);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(fetchSnapshots).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Last refreshed 2026-05-26 15:01 UTC")).toBeInTheDocument();
+    expect(screen.getAllByText("2026-05-26 14:53 UTC").length).toBeGreaterThan(0);
   });
 
   it("counts quote refreshes as batched workbench requests instead of symbol refresh units", async () => {
@@ -264,6 +292,10 @@ const baseConfig: WorkbenchConfig = {
         id: "semis",
         name: "Semiconductors",
         pinnedSymbols: ["NVDA"],
+        symbolDescriptions: {
+          NVDA: "AI GPU platforms",
+          AMD: "AI accelerator chips",
+        },
         rows: [
           { id: "leaders", name: "Leaders", expandedByDefault: true, symbols: ["nvda", "AMD", "ASML", "NVDA"] },
           { id: "market", name: "Market", expandedByDefault: true, symbols: sectorSymbols.slice(3) },
@@ -317,6 +349,14 @@ function createApi({
     getHistory,
     evaluateRatePlan,
   };
+}
+
+async function flushEffects() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 }
 
 function snapshotFor(symbol: string): MarketSnapshot {

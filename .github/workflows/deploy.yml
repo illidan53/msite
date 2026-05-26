@@ -1,0 +1,190 @@
+name: Deploy Finance Workbench
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: finance-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build image and deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: us-east-1
+      AWS_DEPLOY_ROLE_ARN: arn:aws:iam::612153676415:role/msite-finance-github-deploy
+      ECR_REPOSITORY: msite-finance
+      PUBLIC_BASE_URL: https://finance.nphunter.net
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build app
+        run: npm run build
+
+      - name: Local browser smoke
+        run: npm run test:e2e
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN || env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push Docker image
+        id: image
+        run: |
+          set -euo pipefail
+          image_uri="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}:${GITHUB_SHA}"
+          latest_uri="${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}:latest"
+
+          docker build \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            -t "$image_uri" \
+            -t "$latest_uri" \
+            .
+          docker push "$image_uri"
+          docker push "$latest_uri"
+
+          echo "image_uri=$image_uri" >> "$GITHUB_OUTPUT"
+
+      - name: Locate production instance
+        id: instance
+        run: |
+          set -euo pipefail
+          instance_id="$(aws ec2 describe-instances \
+            --region "$AWS_REGION" \
+            --filters \
+              Name=tag:Project,Values=msite \
+              Name=tag:App,Values=msite-finance \
+              Name=instance-state-name,Values=running \
+            --query 'Reservations[].Instances[].InstanceId' \
+            --output text)"
+
+          count="$(wc -w <<< "$instance_id" | tr -d ' ')"
+          if [ "$count" != "1" ]; then
+            echo "Expected exactly one running finance instance, found: $instance_id" >&2
+            exit 1
+          fi
+
+          echo "instance_id=$instance_id" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy image on EC2 through SSM
+        run: |
+          set -euo pipefail
+          image_uri="${{ steps.image.outputs.image_uri }}"
+          registry="${{ steps.ecr.outputs.registry }}"
+
+          cat > remote-deploy.sh <<'REMOTE_DEPLOY'
+          set -euo pipefail
+
+          image_uri="$1"
+          registry="$2"
+          region="$3"
+
+          if ! command -v docker >/dev/null 2>&1; then
+            dnf install -y docker
+          fi
+
+          systemctl enable --now docker
+          aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry"
+          docker pull "$image_uri"
+
+          cat > /etc/systemd/system/msite.service <<SERVICE
+          [Unit]
+          Description=Stock Workbench
+          After=network-online.target docker.service
+          Wants=network-online.target docker.service
+
+          [Service]
+          Type=simple
+          Restart=always
+          RestartSec=5
+          ExecStartPre=-/usr/bin/docker rm -f msite-finance
+          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -p 127.0.0.1:8787:8787 $image_uri
+          ExecStop=/usr/bin/docker stop msite-finance
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICE
+
+          systemctl daemon-reload
+          systemctl restart msite.service
+          systemctl is-active --quiet msite.service
+          docker image prune -f --filter "until=168h"
+          REMOTE_DEPLOY
+
+          script_b64="$(base64 -w0 remote-deploy.sh)"
+          cat > ssm-parameters.json <<EOF
+          {
+            "commands": [
+              "set -euo pipefail",
+              "echo '${script_b64}' | base64 -d >/tmp/msite-ecr-deploy.sh",
+              "bash /tmp/msite-ecr-deploy.sh '${image_uri}' '${registry}' '${AWS_REGION}'",
+              "rm -f /tmp/msite-ecr-deploy.sh"
+            ]
+          }
+          EOF
+
+          command_id="$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "${{ steps.instance.outputs.instance_id }}" \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy ${image_uri}" \
+            --parameters file://ssm-parameters.json \
+            --query 'Command.CommandId' \
+            --output text)"
+
+          aws ssm wait command-executed \
+            --region "$AWS_REGION" \
+            --command-id "$command_id" \
+            --instance-id "${{ steps.instance.outputs.instance_id }}"
+
+          aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$command_id" \
+            --instance-id "${{ steps.instance.outputs.instance_id }}" \
+            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json
+
+          status="$(aws ssm get-command-invocation \
+            --region "$AWS_REGION" \
+            --command-id "$command_id" \
+            --instance-id "${{ steps.instance.outputs.instance_id }}" \
+            --query 'Status' \
+            --output text)"
+
+          test "$status" = "Success"
+
+      - name: Public smoke test
+        run: MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e/public-smoke.spec.ts

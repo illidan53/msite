@@ -1,0 +1,8 @@
+config:
+  aws:region: us-east-1
+  msite-finance-infra:accountId: "612153676415"
+  msite-finance-infra:ecrRepositoryName: msite-finance
+  msite-finance-infra:ec2InstanceId: i-0fa217e019960b606
+  msite-finance-infra:ec2RoleName: msite-finance-ec2-role
+  msite-finance-infra:githubOwner: illidan53
+  msite-finance-infra:githubRepo: msite

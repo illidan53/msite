@@ -23,6 +23,7 @@ export interface Watchlist {
   description?: string;
   theme?: string;
   pinnedSymbols: string[];
+  symbolDescriptions?: Record<string, string>;
   rows: WatchlistRow[];
 }
 

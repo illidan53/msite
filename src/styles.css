@@ -70,6 +70,14 @@ button:disabled {
   padding: 12px 16px;
 }
 
+.quote-refresh-status {
+  margin-right: auto;
+  color: #607077;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .loading-copy,
 .rate-status,
 .row-paused-state,
@@ -239,7 +247,7 @@ button:disabled {
 
 .quote-table {
   width: 100%;
-  min-width: 1580px;
+  min-width: 1760px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 0.88rem;
@@ -278,28 +286,31 @@ button:disabled {
 
 .quote-table th:nth-child(3),
 .quote-table td:nth-child(3) {
-  width: 120px;
+  width: 210px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
 }
 
 .quote-table th:nth-child(4),
-.quote-table td:nth-child(4),
+.quote-table td:nth-child(4) {
+  width: 120px;
+}
+
 .quote-table th:nth-child(5),
 .quote-table td:nth-child(5),
 .quote-table th:nth-child(6),
 .quote-table td:nth-child(6),
 .quote-table th:nth-child(7),
-.quote-table td:nth-child(7) {
-  width: 126px;
-}
-
+.quote-table td:nth-child(7),
 .quote-table th:nth-child(8),
 .quote-table td:nth-child(8) {
-  width: 120px;
+  width: 126px;
 }
 
 .quote-table th:nth-child(9),
 .quote-table td:nth-child(9) {
-  width: 150px;
+  width: 120px;
 }
 
 .quote-table th:nth-child(10),
@@ -309,6 +320,11 @@ button:disabled {
 
 .quote-table th:nth-child(11),
 .quote-table td:nth-child(11) {
+  width: 150px;
+}
+
+.quote-table th:nth-child(12),
+.quote-table td:nth-child(12) {
   width: 168px;
 }
 
@@ -659,7 +675,7 @@ button:disabled {
   }
 
   .quote-table {
-    min-width: 1580px;
+    min-width: 1760px;
   }
 
   .table-toolbar,

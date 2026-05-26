@@ -14,12 +14,24 @@ const watchlistRowSchema = z.object({
   symbols: z.array(symbolSchema).min(1),
 });
 
+const symbolDescriptionsSchema = z.record(z.string()).transform((descriptions) =>
+  Object.fromEntries(
+    Object.entries(descriptions).flatMap(([rawSymbol, rawDescription]) => {
+      const symbol = rawSymbol.trim().toUpperCase();
+      const description = rawDescription.trim();
+
+      return symbol && description ? [[symbol, description]] : [];
+    }),
+  ),
+);
+
 const watchlistSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),
   theme: z.string().optional(),
   pinnedSymbols: z.array(symbolSchema).default([]),
+  symbolDescriptions: symbolDescriptionsSchema.optional(),
   rows: z.array(watchlistRowSchema).min(1),
 });
 
