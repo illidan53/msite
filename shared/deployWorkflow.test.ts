@@ -37,6 +37,9 @@ describe("container deployment assets", () => {
     expect(stepText).toContain("docker build");
     expect(stepText).toContain("docker push");
     expect(stepText).toContain("aws ssm send-command");
+    expect(stepText).toContain('deploy_comment="Deploy msite-finance ${GITHUB_SHA:0:12}"');
+    expect(stepText).toContain('--comment "$deploy_comment"');
+    expect(stepText).not.toContain('--comment "Deploy ${image_uri}"');
     expect(stepText).toContain("docker pull");
     expect(stepText).toContain("docker run");
     expect(stepText).toContain("systemctl restart msite.service");
