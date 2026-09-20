@@ -1,12 +1,25 @@
 watchlists:
   - id: semiconductors
     name: Semiconductors
-    description: Large semiconductor designers, foundries, memory, equipment, and materials names
+    description: Semiconductor supply chain plus photonics, optical networking, and AI interconnect; includes adjacent businesses
     theme: semiconductors
     pinnedSymbols:
       - NVDA
       - AMD
+    symbolDescriptions:
+      LITE: Photonics, lasers, and optical modules for cloud and AI networks
+      NOK: Optical networking and data-center interconnect; a diversified network equipment business
+      CRDO: High-speed connectivity, active electrical cables, SerDes, and optical DSPs
+      ALAB: PCIe, CXL, and Ethernet connectivity for AI and cloud infrastructure
     rows:
+      - id: ai-interconnect
+        name: Photonics & AI Interconnect
+        expandedByDefault: true
+        symbols:
+          - LITE
+          - NOK
+          - CRDO
+          - ALAB
       - id: core
         name: Core
         expandedByDefault: true

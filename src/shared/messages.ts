@@ -88,6 +88,17 @@ export const chineseMessages: Record<string, string> = {
   "5m": "5 分钟",
   "30m": "30 分钟",
   Semiconductors: "半导体",
+  "Semiconductor supply chain plus photonics, optical networking, and AI interconnect; includes adjacent businesses":
+    "半导体产业链，以及光子技术、光网络与 AI 互连相关企业；包含邻近业务标的",
+  "Photonics, lasers, and optical modules for cloud and AI networks":
+    "面向云与 AI 网络的光子技术、激光器和光模块",
+  "Optical networking and data-center interconnect; a diversified network equipment business":
+    "光网络与数据中心互连；业务多元的网络设备公司",
+  "High-speed connectivity, active electrical cables, SerDes, and optical DSPs":
+    "高速互连、有源电缆（AEC）、SerDes 与光通信 DSP",
+  "PCIe, CXL, and Ethernet connectivity for AI and cloud infrastructure":
+    "面向 AI 与云基础设施的 PCIe、CXL 和以太网互连",
+
   "Consumer Staples": "必需消费",
   "Mega-Cap Tech": "科技巨头",
   "AI Cloud & Infrastructure": "AI 云与基础设施",
