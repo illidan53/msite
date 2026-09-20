@@ -116,8 +116,8 @@ test("covers the stock workbench sector dashboard without live market calls", as
   ).toBeVisible();
   await expect
     .poll(() =>
-      apiMocks.snapshotRequests.some(
-        (symbols) => symbols.join(",") === "COST,WMT,PG,KO",
+      apiMocks.snapshotRequests.some((symbols) =>
+        ["COST", "WMT", "PG", "KO"].every((symbol) => symbols.includes(symbol)),
       ),
     )
     .toBe(true);
@@ -582,6 +582,70 @@ test("keeps overview usable when the shared benchmark is unavailable", async ({
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+for (const width of [1440, 375]) {
+  test(`shows daily watchlist returns in menus and headings at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 950 });
+    const mocks = await mockWorkbenchApis(page);
+    await page.goto("/");
+    const headingBadge = page.locator(
+      ".watchlist-heading-line > .watchlist-performance",
+    );
+    await expect(headingBadge).toHaveText("+0.57%");
+    await expect(headingBadge).toHaveClass(/positive-change/);
+    await page.getByRole("button", { name: "Watchlist", exact: true }).click();
+    if (width > 600) {
+      const menu = page.getByRole("button", {
+        name: "Consumer Staples",
+        exact: true,
+      });
+      await expect(menu).toContainText("+0.50%");
+      await menu.click();
+    } else {
+      await expect(page.getByLabel("Watchlist", { exact: true })).toContainText(
+        "Consumer Staples · +0.50%",
+      );
+      await expect(page.locator(".mobile-watchlist-performance")).toContainText(
+        "+0.57%",
+      );
+      await page
+        .getByLabel("Watchlist", { exact: true })
+        .selectOption("consumer-staples");
+    }
+    await expect(headingBadge).toHaveText("+0.50%");
+    await expect(page.locator(".watchlist-performance-caption")).toContainText(
+      "4/4",
+    );
+    const count = mocks.snapshotRequests.length;
+    await page
+      .getByRole("button", {
+        name: "About Watchlist daily change",
+        exact: true,
+      })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "not your portfolio return",
+    );
+    await page.keyboard.press("Escape");
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(page.locator(".watchlist-performance-caption")).toContainText(
+      "等权日涨跌",
+    );
+    await page
+      .getByRole("button", { name: "了解列表日涨跌幅", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText("重复代码只算一次");
+    await page.keyboard.press("Escape");
+    expect(mocks.snapshotRequests.length).toBe(count);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
 
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];

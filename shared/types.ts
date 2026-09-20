@@ -39,6 +39,7 @@ export interface MarketSnapshot {
   changePercent: number | null;
   sessionChange: number | null;
   sessionChangePercent: number | null;
+  sessionDate?: string | null;
   spanChange?: number | null;
   spanChangePercent?: number | null;
   volume: number | null;

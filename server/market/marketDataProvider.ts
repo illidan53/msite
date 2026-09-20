@@ -1,4 +1,5 @@
 import type { MarketSnapshot, PriceBar, PriceSeries } from "../../shared/types";
+import { newYorkDate } from "../../shared/marketDate";
 import { ApiError } from "../http/apiError";
 import { MemoryCache } from "./memoryCache";
 import type { PolygonClient } from "./polygonClient";
@@ -60,9 +61,17 @@ type HistoryRange = PriceSeries["range"];
 
 export class MarketDataProvider {
   private readonly historyCache = new MemoryCache<PriceSeries>();
-  private readonly previousCloseCache = new MemoryCache<number | null>();
+  private readonly previousCloseCache = new MemoryCache<{
+    previousClose: number;
+    close: number;
+    date: string | null;
+  } | null>();
   private readonly snapshotCache = new MemoryCache<MarketSnapshot[]>();
-  private readonly tickerDetailsCache = new MemoryCache<{ marketCap?: number; name?: string; symbol: string }>();
+  private readonly tickerDetailsCache = new MemoryCache<{
+    marketCap?: number;
+    name?: string;
+    symbol: string;
+  }>();
 
   constructor(private readonly client: PolygonClient) {}
 
@@ -82,13 +91,18 @@ export class MarketDataProvider {
       "/v2/snapshot/locale/us/markets/stocks/tickers",
       { tickers: normalizedSymbols.join(",") },
     );
-    const snapshots = await Promise.all((response.tickers ?? []).map((ticker) => this.mapSnapshot(ticker)));
+    const snapshots = await Promise.all(
+      (response.tickers ?? []).map((ticker) => this.mapSnapshot(ticker)),
+    );
 
     this.snapshotCache.set(cacheKey, snapshots, SNAPSHOT_TTL_MS);
     return snapshots;
   }
 
-  async getHistory(input: { range: HistoryRange; symbol: string }): Promise<PriceSeries> {
+  async getHistory(input: {
+    range: HistoryRange;
+    symbol: string;
+  }): Promise<PriceSeries> {
     const symbol = normalizeMarketSymbol(input.symbol);
     const cacheKey = `history:${symbol}:${input.range}`;
     const cached = this.historyCache.get(cacheKey);
@@ -103,7 +117,10 @@ export class MarketDataProvider {
       { adjusted: true, limit: 50_000, sort: "asc" },
     );
     const series: PriceSeries = {
-      bars: trimBarsForRange(input.range, (response.results ?? []).map(mapPriceBar)),
+      bars: trimBarsForRange(
+        input.range,
+        (response.results ?? []).map(mapPriceBar),
+      ),
       range: input.range,
       symbol: response.ticker?.toUpperCase() ?? symbol,
     };
@@ -112,26 +129,43 @@ export class MarketDataProvider {
     return series;
   }
 
-  async getTickerDetails(symbol: string): Promise<{ marketCap?: number; name?: string; symbol: string }> {
+  async getTickerDetails(
+    symbol: string,
+  ): Promise<{ marketCap?: number; name?: string; symbol: string }> {
     const normalizedSymbol = normalizeMarketSymbol(symbol);
     return this.getTickerDetailsBySymbol(normalizedSymbol);
   }
 
-  private async mapSnapshot(ticker: PolygonSnapshotTicker): Promise<MarketSnapshot> {
+  private async mapSnapshot(
+    ticker: PolygonSnapshotTicker,
+  ): Promise<MarketSnapshot> {
     const snapshot = mapSnapshot(ticker);
-    const [name, previousRegularClose] = await Promise.all([
-      snapshot.name === undefined ? this.getSnapshotName(snapshot.symbol) : Promise.resolve(snapshot.name),
-      snapshot.timeframe === "PREVIOUS_CLOSE" ? this.getPreviousRegularClose(snapshot.symbol) : Promise.resolve(null),
+    const [name, previousSession] = await Promise.all([
+      snapshot.name === undefined
+        ? this.getSnapshotName(snapshot.symbol)
+        : Promise.resolve(snapshot.name),
+      snapshot.timeframe === "PREVIOUS_CLOSE"
+        ? this.getPreviousRegularClose(snapshot.symbol)
+        : Promise.resolve(null),
     ]);
 
     if (snapshot.name === undefined && name !== undefined) {
       snapshot.name = name;
     }
 
-    if (snapshot.timeframe === "PREVIOUS_CLOSE" && snapshot.price !== null && previousRegularClose !== null) {
-      const sessionChange = snapshot.price - previousRegularClose;
+    if (
+      snapshot.timeframe === "PREVIOUS_CLOSE" &&
+      snapshot.price !== null &&
+      previousSession !== null &&
+      snapshot.price === previousSession.close
+    ) {
+      const sessionChange = snapshot.price - previousSession.previousClose;
+      snapshot.sessionDate = previousSession.date;
       snapshot.change = sessionChange;
-      snapshot.changePercent = percentChange(sessionChange, previousRegularClose);
+      snapshot.changePercent = percentChange(
+        sessionChange,
+        previousSession.previousClose,
+      );
       snapshot.sessionChange = snapshot.change;
       snapshot.sessionChangePercent = snapshot.changePercent;
     }
@@ -151,7 +185,9 @@ export class MarketDataProvider {
     }
   }
 
-  private async getTickerDetailsBySymbol(symbol: string): Promise<{ marketCap?: number; name?: string; symbol: string }> {
+  private async getTickerDetailsBySymbol(
+    symbol: string,
+  ): Promise<{ marketCap?: number; name?: string; symbol: string }> {
     const cached = this.tickerDetailsCache.get(symbol);
     if (cached !== undefined) {
       return cached;
@@ -170,12 +206,18 @@ export class MarketDataProvider {
     return details;
   }
 
-  private async getPreviousRegularClose(symbol: string): Promise<number | null> {
+  private async getPreviousRegularClose(
+    symbol: string,
+  ): Promise<{
+    previousClose: number;
+    close: number;
+    date: string | null;
+  } | null> {
     if (symbol === "") {
       return null;
     }
 
-    const cacheKey = `previous-close:${symbol}`;
+    const cacheKey = `previous-close:${symbol}:${newYorkDate(new Date())}`;
     const cached = this.previousCloseCache.get(cacheKey);
     if (cached !== undefined) {
       return cached;
@@ -187,12 +229,15 @@ export class MarketDataProvider {
         `/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/1/day/${aggregateRange.from}/${aggregateRange.to}`,
         { adjusted: true, limit: 5_000, sort: "asc" },
       );
-      const closes = (response.results ?? [])
-        .map((bar) => positiveFiniteNumberOrNull(bar.c))
-        .filter((close): close is number => close !== null);
-      const previousClose = closes.length >= 2 ? closes[closes.length - 2] : null;
-      this.previousCloseCache.set(cacheKey, previousClose, PREVIOUS_CLOSE_TTL_MS);
-      return previousClose;
+      const bars = (response.results ?? []).slice(-2);
+      const previousClose = positiveFiniteNumberOrNull(bars[0]?.c);
+      const close = positiveFiniteNumberOrNull(bars[1]?.c);
+      const session =
+        bars.length === 2 && previousClose !== null && close !== null
+          ? { previousClose, close, date: newYorkDate(bars[1].t) }
+          : null;
+      this.previousCloseCache.set(cacheKey, session, PREVIOUS_CLOSE_TTL_MS);
+      return session;
     } catch {
       return null;
     }
@@ -211,12 +256,15 @@ export class MarketDataProvider {
   }
 
   async searchTickers(query: string): Promise<string[]> {
-    const response = await this.client.getJson<PolygonTickerListResponse>("/v3/reference/tickers", {
-      active: true,
-      limit: 50,
-      market: "stocks",
-      search: query,
-    });
+    const response = await this.client.getJson<PolygonTickerListResponse>(
+      "/v3/reference/tickers",
+      {
+        active: true,
+        limit: 50,
+        market: "stocks",
+        search: query,
+      },
+    );
     return mapReferenceTickers(response.results);
   }
 }
@@ -228,7 +276,9 @@ function normalizeSymbols(symbols: string[]): string[] {
 function normalizeMarketSymbol(symbol: string): string {
   const normalized = tryNormalizeMarketSymbol(symbol);
   if (normalized === null) {
-    throw new ApiError(400, "INVALID_MARKET_SYMBOL", "Invalid market symbol", { source: "polygon" });
+    throw new ApiError(400, "INVALID_MARKET_SYMBOL", "Invalid market symbol", {
+      source: "polygon",
+    });
   }
 
   return normalized;
@@ -243,11 +293,18 @@ function tryNormalizeMarketSymbol(symbol: string): string | null {
   return normalized;
 }
 
-function mapReferenceTickers(results: Array<{ ticker?: string }> | undefined): string[] {
-  return results?.flatMap((item) => normalizeReferenceTicker(item.ticker) ?? []) ?? [];
+function mapReferenceTickers(
+  results: Array<{ ticker?: string }> | undefined,
+): string[] {
+  return (
+    results?.flatMap((item) => normalizeReferenceTicker(item.ticker) ?? []) ??
+    []
+  );
 }
 
-function normalizeReferenceTicker(ticker: string | undefined): string | undefined {
+function normalizeReferenceTicker(
+  ticker: string | undefined,
+): string | undefined {
   const normalized = ticker?.trim().toUpperCase();
   return normalized === "" ? undefined : normalized;
 }
@@ -256,8 +313,12 @@ function mapSnapshot(ticker: PolygonSnapshotTicker): MarketSnapshot {
   const currentPrice = positiveFiniteNumberOrNull(ticker.day?.c);
   const previousClose = positiveFiniteNumberOrNull(ticker.prevDay?.c);
   const usePreviousClose = currentPrice === null && previousClose !== null;
-  const sessionChange = usePreviousClose ? null : finiteNumberOrNull(ticker.todaysChange);
-  const sessionChangePercent = usePreviousClose ? null : finiteNumberOrNull(ticker.todaysChangePerc);
+  const sessionChange = usePreviousClose
+    ? null
+    : finiteNumberOrNull(ticker.todaysChange);
+  const sessionChangePercent = usePreviousClose
+    ? null
+    : finiteNumberOrNull(ticker.todaysChangePerc);
 
   return {
     change: sessionChange,
@@ -266,10 +327,17 @@ function mapSnapshot(ticker: PolygonSnapshotTicker): MarketSnapshot {
     price: usePreviousClose ? previousClose : currentPrice,
     sessionChange,
     sessionChangePercent,
+    sessionDate: usePreviousClose
+      ? null
+      : timestampNsToIso(ticker.updated)
+        ? newYorkDate(timestampNsToIso(ticker.updated)!)
+        : null,
     symbol: ticker.ticker?.toUpperCase() ?? "",
     timeframe: usePreviousClose ? "PREVIOUS_CLOSE" : "DELAYED",
     updatedAt: usePreviousClose ? null : timestampNsToIso(ticker.updated),
-    volume: usePreviousClose ? finiteNumberOrNull(ticker.prevDay?.v) : finiteNumberOrNull(ticker.day?.v),
+    volume: usePreviousClose
+      ? finiteNumberOrNull(ticker.prevDay?.v)
+      : finiteNumberOrNull(ticker.day?.v),
   };
 }
 
@@ -278,7 +346,11 @@ function percentChange(change: number, base: number): number | null {
 }
 
 function timestampNsToIso(timestampNs: number | undefined): string | null {
-  if (timestampNs === undefined || timestampNs <= 0 || !Number.isFinite(timestampNs)) {
+  if (
+    timestampNs === undefined ||
+    timestampNs <= 0 ||
+    !Number.isFinite(timestampNs)
+  ) {
     return null;
   }
 
@@ -296,7 +368,9 @@ function finiteNumberOrNull(value: number | undefined): number | null {
 }
 
 function positiveFiniteNumberOrNull(value: number | undefined): number | null {
-  return value === undefined || value <= 0 || !Number.isFinite(value) ? null : value;
+  return value === undefined || value <= 0 || !Number.isFinite(value)
+    ? null
+    : value;
 }
 
 function mapPriceBar(bar: PolygonAggBar): PriceBar {
@@ -315,7 +389,9 @@ function trimBarsForRange(range: HistoryRange, bars: PriceBar[]): PriceBar[] {
     return bars;
   }
 
-  const latestTimestamp = Math.max(...bars.map((bar) => Date.parse(bar.timestamp)).filter(Number.isFinite));
+  const latestTimestamp = Math.max(
+    ...bars.map((bar) => Date.parse(bar.timestamp)).filter(Number.isFinite),
+  );
   if (!Number.isFinite(latestTimestamp)) {
     return bars;
   }
@@ -354,7 +430,12 @@ function cutoffTimestampForRange(range: HistoryRange, latest: Date): Date {
   return cutoff;
 }
 
-function rangeToAggregates(range: HistoryRange): { from: string; multiplier: number; timespan: "day" | "minute"; to: string } {
+function rangeToAggregates(range: HistoryRange): {
+  from: string;
+  multiplier: number;
+  timespan: "day" | "minute";
+  to: string;
+} {
   const to = new Date();
   const from = new Date(to);
   let multiplier = 1;

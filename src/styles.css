@@ -1171,3 +1171,52 @@ body:has(.metric-help-dialog[open]) {
     margin: 8px 0;
   }
 }
+
+.watchlist-heading-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.watchlist-performance {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.watchlist-performance.neutral-change {
+  color: var(--muted);
+}
+.watchlist-heading-line > .watchlist-performance {
+  font-size: 24px;
+  letter-spacing: -0.4px;
+}
+.watchlist-performance-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding-inline: 8px;
+}
+.watchlist-performance-button > span:first-child {
+  min-width: 0;
+}
+.mobile-watchlist-performance {
+  display: none;
+}
+@media (max-width: 600px) {
+  .mobile-watchlist-performance {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 8px 0 12px;
+  }
+  .watchlist-heading-line {
+    gap: 8px;
+  }
+  .watchlist-heading-line > .watchlist-performance {
+    font-size: 20px;
+  }
+}

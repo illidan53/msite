@@ -331,7 +331,7 @@ describe("Workbench", () => {
     );
   });
 
-  it("polls the newly selected sector as one flattened symbol list", async () => {
+  it("loads all menu performances in one batch without refetching on watchlist selection", async () => {
     const user = userEvent.setup();
     const fetchSnapshots = vi.fn(async (symbols: string[]) =>
       symbols.map(snapshotFor),
@@ -343,22 +343,146 @@ describe("Workbench", () => {
       expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols),
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "Watchlist" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Watchlist" }));
     await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
 
-    await waitFor(() =>
-      expect(fetchSnapshots).toHaveBeenLastCalledWith([
-        "COST",
-        "WMT",
-        "PG",
-        "KO",
-      ]),
-    );
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledTimes(1));
     expect(
       screen.getByRole("table", { name: "Consumer Staples quotes" }),
     ).toBeInTheDocument();
+  });
+
+  it("shows colored equal-weight returns for unvisited menus and the selected heading", async () => {
+    const watchlists = [
+      {
+        ...baseConfig.watchlists.watchlists[0],
+        id: "first",
+        name: "First",
+        rows: [
+          {
+            id: "a",
+            name: "a",
+            expandedByDefault: true,
+            symbols: ["AAA", "BBB", "AAA"],
+          },
+        ],
+      },
+      {
+        ...baseConfig.watchlists.watchlists[0],
+        id: "second",
+        name: "Second",
+        rows: [
+          { id: "b", name: "b", expandedByDefault: true, symbols: ["CCC"] },
+        ],
+      },
+    ];
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map((symbol) => ({
+        ...snapshotFor(symbol),
+        sessionChangePercent: symbol === "AAA" ? 3 : symbol === "BBB" ? -1 : -2,
+      })),
+    );
+    const { container } = render(
+      <Workbench
+        api={createApi({
+          config: { ...baseConfig, watchlists: { watchlists } },
+          fetchSnapshots,
+        })}
+      />,
+    );
+    await waitFor(() =>
+      expect(fetchSnapshots).toHaveBeenCalledWith(["AAA", "BBB", "CCC"]),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Watchlist" }));
+    const first = screen.getByRole("button", { name: "First" });
+    const second = screen.getByRole("button", { name: "Second" });
+    expect(within(first).getByText("+1.00%")).toHaveClass("positive-change");
+    expect(within(second).getByText("-2.00%")).toHaveClass("negative-change");
+    expect(
+      container.querySelector(
+        ".watchlist-heading-line > .watchlist-performance",
+      ),
+    ).toHaveTextContent("+1.00%");
+    await userEvent.click(second);
+    expect(
+      container.querySelector(
+        ".watchlist-heading-line > .watchlist-performance",
+      ),
+    ).toHaveTextContent("-2.00%");
+    expect(fetchSnapshots).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes omitted quotes on refresh instead of reusing their old returns", async () => {
+    vi.useFakeTimers();
+    const watchlist = {
+      ...baseConfig.watchlists.watchlists[0],
+      rows: [
+        {
+          id: "a",
+          name: "a",
+          expandedByDefault: true,
+          symbols: ["AAA", "BBB"],
+        },
+      ],
+    };
+    let complete = true;
+    const fetchSnapshots = vi.fn(async () =>
+      (complete ? ["AAA", "BBB"] : ["AAA"]).map((symbol) => ({
+        ...snapshotFor(symbol),
+        sessionChangePercent: symbol === "AAA" ? 2 : -2,
+      })),
+    );
+    const { container } = render(
+      <Workbench
+        api={createApi({
+          config: { ...baseConfig, watchlists: { watchlists: [watchlist] } },
+          fetchSnapshots,
+        })}
+      />,
+    );
+    await flushEffects();
+    expect(
+      container.querySelector(
+        ".watchlist-heading-line > .watchlist-performance",
+      ),
+    ).toHaveTextContent("0.00%");
+    complete = false;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+    expect(
+      container.querySelector(
+        ".watchlist-heading-line > .watchlist-performance",
+      ),
+    ).toHaveTextContent("+2.00%*");
+    expect(
+      container.querySelector(".watchlist-performance-caption"),
+    ).toHaveTextContent("1/2");
+  });
+
+  it("splits large watchlist universes into batches supported by the snapshots endpoint", async () => {
+    const symbols = Array.from({ length: 260 }, (_, index) => `S${index}`);
+    const config = {
+      ...baseConfig,
+      watchlists: {
+        watchlists: [
+          {
+            ...baseConfig.watchlists.watchlists[0],
+            rows: [
+              { id: "all", name: "all", expandedByDefault: true, symbols },
+            ],
+          },
+        ],
+      },
+    };
+    const fetchSnapshots = vi.fn(async (items: string[]) =>
+      items.map(snapshotFor),
+    );
+    render(<Workbench api={createApi({ config, fetchSnapshots })} />);
+    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledTimes(2));
+    expect(fetchSnapshots.mock.calls.map(([items]) => items.length)).toEqual([
+      250, 10,
+    ]);
   });
 
   it("shows loading and config errors accessibly", async () => {

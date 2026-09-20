@@ -22,6 +22,10 @@ import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
 
 import { SectorAnalytics } from "../analytics/SectorAnalytics";
 import { MetricHelp } from "../../shared/MetricHelp";
+import {
+  watchlistPerformances,
+  type WatchlistPerformance,
+} from "./watchlistPerformance";
 import { activityExplanations } from "../analytics/metrics";
 
 interface WorkbenchProps {
@@ -102,6 +106,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
   const [historyRequestCount, setHistoryRequestCount] = useState(0);
   const [quoteRequestCount, setQuoteRequestCount] = useState(0);
+  const [snapshotRefreshFailed, setSnapshotRefreshFailed] = useState(false);
   const [lastQuoteRefreshAt, setLastQuoteRefreshAt] = useState<string | null>(
     null,
   );
@@ -146,6 +151,11 @@ function WorkbenchContent({ api }: WorkbenchProps) {
       ),
     [watchlists],
   );
+  const performanceByWatchlist = useMemo(
+    () => watchlistPerformances(watchlists, snapshotsBySymbol),
+    [watchlists, snapshotsBySymbol],
+  );
+  const shouldPollSnapshots = activePage === "watchlist" || watchlistOpen;
   const spanMetricsBySymbol = useMemo(
     () =>
       mapSpanMetricsForRange(activeSymbols, spanMetricsByKey, selectedRange),
@@ -221,6 +231,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     configRef.current = null;
     setErrorMessage(null);
     setSnapshotsBySymbol({});
+    setSnapshotRefreshFailed(false);
     setLastQuoteRefreshAt(null);
     setSpanMetricsByKey({});
     setQuoteRequestCount(0);
@@ -273,58 +284,58 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   }, [boundedPage, currentPage]);
 
   useEffect(() => {
-    if (activePage !== "watchlist" || activeSymbols.length === 0) {
-      return;
-    }
-
+    if (!shouldPollSnapshots || allTrackedSymbols.length === 0) return;
     let isStale = false;
-    const pollingSymbols = [...activeSymbols];
+    let refreshing = false;
+    const batches: string[][] = [];
+    for (let i = 0; i < allTrackedSymbols.length; i += 250)
+      batches.push(allTrackedSymbols.slice(i, i + 250));
 
-    function refreshSnapshots() {
+    async function refreshSnapshots() {
+      if (refreshing) return;
+      refreshing = true;
       setErrorMessage(null);
-      setQuoteRequestCount((current) => current + 1);
-
-      void api
-        .fetchSnapshots(pollingSymbols)
-        .then((snapshots) => {
-          if (isStale) {
-            return;
+      setQuoteRequestCount((current) => current + batches.length);
+      const results = await Promise.allSettled(
+        batches.map((symbols) => api.fetchSnapshots(symbols)),
+      );
+      refreshing = false;
+      if (isStale) return;
+      setSnapshotsBySymbol((current) => {
+        const next = { ...current };
+        results.forEach((result, index) => {
+          if (result.status !== "fulfilled") return;
+          // An omitted quote is missing, not the previous refresh's value.
+          for (const symbol of batches[index]) delete next[symbol];
+          for (const snapshot of result.value) {
+            const symbol = snapshot.symbol.toUpperCase();
+            if (batches[index].includes(symbol)) next[symbol] = snapshot;
           }
-
-          setSnapshotsBySymbol((current) => ({
-            ...current,
-            ...Object.fromEntries(
-              snapshots.map((snapshot) => [
-                snapshot.symbol.toUpperCase(),
-                snapshot,
-              ]),
-            ),
-          }));
-          setLastQuoteRefreshAt(new Date().toISOString());
-        })
-        .catch((error: unknown) => {
-          if (isStale) {
-            return;
-          }
-
-          setErrorMessage(
-            formatErrorMessage(error, "Unable to refresh market snapshots."),
-          );
         });
+        return next;
+      });
+      const failure = results.find((result) => result.status === "rejected");
+      setSnapshotRefreshFailed(Boolean(failure));
+      if (failure?.status === "rejected")
+        setErrorMessage(
+          formatErrorMessage(
+            failure.reason,
+            "Unable to refresh market snapshots.",
+          ),
+        );
+      if (results.some((result) => result.status === "fulfilled"))
+        setLastQuoteRefreshAt(new Date().toISOString());
     }
-
-    refreshSnapshots();
-
+    void refreshSnapshots();
     const intervalId = window.setInterval(
-      refreshSnapshots,
+      () => void refreshSnapshots(),
       intervalSeconds * 1000,
     );
-
     return () => {
       isStale = true;
       window.clearInterval(intervalId);
     };
-  }, [api, activeSymbols, intervalSeconds, activePage]);
+  }, [api, allTrackedSymbols, intervalSeconds, shouldPollSnapshots]);
 
   useEffect(() => {
     if (
@@ -440,9 +451,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     void api
       .evaluateRatePlan({
         ...config.settings.polygon,
-        activeSymbolCount: activeSymbols.length,
+        activeSymbolCount: allTrackedSymbols.length,
         cacheHitRatio: 0.3,
-        endpointCount: 1,
+        endpointCount: Math.max(1, Math.ceil(allTrackedSymbols.length / 250)),
         intervalSeconds,
       })
       .then((evaluation) => {
@@ -470,7 +481,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     return () => {
       isStale = true;
     };
-  }, [api, activeSymbols.length, config, intervalSeconds]);
+  }, [api, allTrackedSymbols.length, config, intervalSeconds]);
 
   useEffect(() => {
     if (selectedSymbol && window.matchMedia?.("(max-width: 1100px)").matches) {
@@ -529,11 +540,51 @@ function WorkbenchContent({ api }: WorkbenchProps) {
               ? t("ANALYTICS / SECTORS")
               : t("WATCHLIST / MARKET OVERVIEW")}
           </p>
-          <h2>
-            {activePage === "analytics"
-              ? t("Sectors & ETFs")
-              : t(watchlist.name)}
-          </h2>
+          <div className="watchlist-heading-line">
+            <h2>
+              {activePage === "analytics"
+                ? t("Sectors & ETFs")
+                : t(watchlist.name)}
+            </h2>
+            {activePage === "watchlist" && (
+              <>
+                <PerformanceBadge
+                  performance={performanceByWatchlist[watchlist.id]}
+                  stale={snapshotRefreshFailed}
+                />
+                <MetricHelp
+                  metric={{
+                    title: t("Watchlist daily change", "列表日涨跌幅"),
+                    meaning: t(
+                      "An equal-weight view of the stocks in this watchlist for the latest available trading session.",
+                      "用列表内股票的等权平均日涨跌幅，观察最近可用交易日的整体表现。",
+                    ),
+                    formula: t(
+                      "Sum of valid daily percentage changes ÷ number of valid symbols on the same date. Symbols are deduplicated; each receives equal weight. Missing or older-session quotes are excluded, not counted as zero.",
+                      "同一交易日有效标的的日涨跌幅之和 ÷ 有效标的数量。重复代码只算一次，每只股票权重相同；缺失或较旧日期的行情不计入，也不当作零。",
+                    ),
+                    example: t(
+                      "Three stocks move +3%, −1%, +1%: the watchlist shows +1%. If only two are available, coverage is shown as 2/3 with an asterisk.",
+                      "三只股票分别涨 +3%、−1%、+1%，列表显示 +1%。若仅两只数据有效，则显示覆盖 2/3，并加星号提示。",
+                    ),
+                    caveat: t(
+                      "Uses the provider's daily change, with previous-session data outside the active session. The displayed date is authoritative. This is not your portfolio return and is unaffected by the chart range. Green means up, red means down; * flags incomplete coverage or a failed refresh.",
+                      "采用接口日涨跌幅；非交易时段可使用上一交易日数据，以展示日期为准。这不是个人持仓收益，也不随图表区间变化。绿色为涨、红色为跌；* 表示数据覆盖不全或刷新失败。",
+                    ),
+                  }}
+                />
+              </>
+            )}
+          </div>
+          {activePage === "watchlist" && (
+            <p className="watchlist-performance-caption">
+              {performanceDescription(
+                performanceByWatchlist[watchlist.id],
+                snapshotRefreshFailed,
+                t,
+              )}
+            </p>
+          )}
           {activePage === "analytics" ? (
             <p>
               {t(
@@ -667,11 +718,24 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                 </option>
                 {watchlists.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {t(item.name)}
+                    {t(item.name)} ·{" "}
+                    {performanceLabel(
+                      performanceByWatchlist[item.id],
+                      snapshotRefreshFailed,
+                    )}
                   </option>
                 ))}
               </select>
             </label>
+            {activePage === "watchlist" && (
+              <div className="mobile-watchlist-performance">
+                <span>{t("Daily change", "日涨跌")}</span>
+                <PerformanceBadge
+                  performance={performanceByWatchlist[watchlist.id]}
+                  stale={snapshotRefreshFailed}
+                />
+              </div>
+            )}
             <div className="watchlist-buttons">
               {watchlists.map((watchlistOption) => (
                 <button
@@ -681,10 +745,20 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                     activePage === "watchlist" &&
                     watchlistOption.id === watchlist.id
                   }
-                  className="watchlist-button"
+                  className="watchlist-button watchlist-performance-button"
+                  aria-label={t(watchlistOption.name)}
+                  aria-description={performanceDescription(
+                    performanceByWatchlist[watchlistOption.id],
+                    snapshotRefreshFailed,
+                    t,
+                  )}
                   onClick={() => handleWatchlistSelect(watchlistOption.id)}
                 >
-                  {t(watchlistOption.name)}
+                  <span>{t(watchlistOption.name)}</span>
+                  <PerformanceBadge
+                    performance={performanceByWatchlist[watchlistOption.id]}
+                    stale={snapshotRefreshFailed}
+                  />
                 </button>
               ))}
             </div>
@@ -1384,4 +1458,41 @@ function localizedRateMessage(plan: RatePlanEvaluation): string {
       ? "当前套餐在刷新预算模型中不限制接口调用次数。"
       : "刷新频率较高，可能增加本地负载。";
   return `预计每分钟 ${plan.estimatedCallsPerMinute} 次请求，${plan.status === "ok" ? "在配置预算内" : plan.status === "blocked" ? "已超出配置预算" : "接近配置预算"}。`;
+}
+
+function performanceLabel(
+  performance: WatchlistPerformance | undefined,
+  stale: boolean,
+): string {
+  return `${formatChangePercent(performance?.changePercent)}${performance?.changePercent != null && (stale || performance.covered < performance.total) ? "*" : ""}`;
+}
+
+function performanceDescription(
+  performance: WatchlistPerformance | undefined,
+  stale: boolean,
+  t: (en: string, zh?: string) => string,
+): string {
+  return t(
+    `Equal-weight daily change · ${performance?.sessionDate ?? "Date unavailable"} · ${performance?.covered ?? 0}/${performance?.total ?? 0} symbols${stale ? " · Refresh failed; last available data" : ""}`,
+    `等权日涨跌 · ${performance?.sessionDate ?? "日期待更新"} · 覆盖 ${performance?.covered ?? 0}/${performance?.total ?? 0} 只${stale ? " · 刷新失败，显示上次可用数据" : ""}`,
+  );
+}
+
+function PerformanceBadge({
+  performance,
+  stale,
+}: {
+  performance: WatchlistPerformance | undefined;
+  stale: boolean;
+}) {
+  const { t } = useLocale();
+  return (
+    <span
+      className={`watchlist-performance ${formatChangeClass(performance?.changePercent) ?? "neutral-change"}`}
+      title={performanceDescription(performance, stale, t)}
+      aria-label={`${t("Daily change", "日涨跌")} ${performanceLabel(performance, stale)}`}
+    >
+      {performanceLabel(performance, stale)}
+    </span>
+  );
 }
