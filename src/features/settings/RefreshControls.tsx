@@ -1,3 +1,4 @@
+import { useLocale } from "../../shared/locale";
 const INTERVALS = [
   { label: "10s", seconds: 10 },
   { label: "1m", seconds: 60 },
@@ -18,9 +19,10 @@ export function RefreshControls({
   intervalSeconds,
   onChange,
 }: RefreshControlsProps) {
+  const { t } = useLocale();
   return (
     <>
-      <label htmlFor="refresh-interval">Refresh interval</label>
+      <label htmlFor="refresh-interval">{t("Refresh interval")}</label>
       <select
         id="refresh-interval"
         value={intervalSeconds}
@@ -32,7 +34,7 @@ export function RefreshControls({
             value={interval.seconds}
             disabled={disabledIntervals.includes(interval.seconds)}
           >
-            {interval.label}
+            {t(interval.label)}
           </option>
         ))}
       </select>

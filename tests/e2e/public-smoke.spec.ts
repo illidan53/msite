@@ -26,14 +26,23 @@ test("public deployment serves the workbench shell and health endpoint", async (
   await expect(
     page.getByRole("button", { name: "Watchlist", exact: true }),
   ).toHaveAttribute("aria-expanded", "false");
-  await page.getByRole("button", { name: "板块", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "板块资金流" })).toBeVisible();
   await page
-    .getByRole("button", { name: "了解20 日流入强度", exact: true })
+    .getByRole("button", { name: "Sectors & ETFs", exact: true })
     .click();
   await expect(
-    page.getByRole("dialog", { name: "20 日流入强度", exact: true }),
+    page.getByRole("heading", { name: "Sectors & ETFs" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "About 5D price return", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "5D price return", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.getByLabel("Language", { exact: true }).selectOption("zh");
+  await expect(
+    page.getByRole("heading", { name: "板块与 ETF", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });

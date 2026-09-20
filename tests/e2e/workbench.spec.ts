@@ -105,7 +105,9 @@ test("covers the stock workbench sector dashboard without live market calls", as
   await page.getByRole("button", { name: "Next page" }).click();
 
   await expect(page.getByText("Page 2 of 2")).toBeVisible();
-  await expect(quoteTable.getByRole("button", { name: "GE" })).toBeVisible();
+  await expect(
+    quoteTable.getByRole("button", { name: "GE", exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Consumer Staples" }).click();
 
@@ -196,65 +198,77 @@ test("keeps essential quotes and chart inside a mobile viewport", async ({
 });
 
 for (const width of [1440, 375]) {
-  test(`explains sector metrics with keyboard and touch at ${width}px`, async ({
+  test(`switches languages and explains ETF activity at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
     const mocks = await mockWorkbenchApis(page);
     await page.goto("/");
-    const watchlistToggle = page.getByRole("button", {
-      name: "Watchlist",
-      exact: true,
-    });
-    await expect(watchlistToggle).toHaveAttribute("aria-expanded", "false");
     await expect(
-      page.getByRole("button", { name: "Consumer Staples" }),
-    ).toHaveCount(0);
-    await page.getByRole("button", { name: "板块", exact: true }).click();
+      page.getByRole("button", { name: "Watchlist", exact: true }),
+    ).toHaveAttribute("aria-expanded", "false");
+    await page
+      .getByRole("button", { name: "Sectors & ETFs", exact: true })
+      .click();
+    const table = page.getByRole("table", { name: "ETF comparison" });
     await expect(
-      page.getByRole("heading", { name: "板块资金流" }),
+      table.getByRole("button", { name: "SOXX", exact: true }),
     ).toBeVisible();
+    await expect(
+      table.getByRole("button", { name: "IGV", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Refresh data", exact: true }),
+    ).toBeEnabled();
+    await expect(table.getByRole("row", { name: /SOXX/ })).toContainText(
+      "2.00×",
+    );
+    expect(
+      mocks.historyRequests.some(
+        (r) => r.symbol === "SOXX" && r.range === "1y",
+      ),
+    ).toBe(true);
     await expect(
       page.getByText("资金流数据待接入", { exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: /Index benchmarks/ }).click();
+    await expect(
+      table.getByRole("button", { name: "QQQ", exact: true }),
+    ).toBeVisible();
+    await table.getByRole("button", { name: "QQQ", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "QQQ · Nasdaq-100" }),
+    ).toBeVisible();
+    await expect(page.getByText(/not a pure technology sector/)).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Refresh data", exact: true }),
+    ).toBeEnabled();
+    const calls = mocks.historyRequests.length;
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+    await expect(
+      page.getByRole("heading", { name: "板块与 ETF", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("toolbar", { name: "Table controls" }),
-    ).toHaveCount(0);
-    await page.getByLabel("观察板块").selectOption("XLF");
-    await expect(page.getByLabel("观察板块")).toHaveValue("XLF");
-
-    const help = page.getByRole("button", {
-      name: "了解20 日流入强度",
-      exact: true,
-    });
+      page.getByRole("heading", { name: "QQQ · 纳斯达克 100" }),
+    ).toBeVisible();
+    expect(mocks.historyRequests.length).toBe(calls);
+    const help = page
+      .getByRole("button", { name: "了解CMF（20 日）", exact: true })
+      .last();
     await help.focus();
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", {
-      name: "20 日流入强度",
+      name: "CMF（20 日）",
       exact: true,
     });
     await expect(dialog).toBeVisible();
-    await expect(
-      dialog.getByText("它告诉你什么", { exact: true }),
-    ).toBeVisible();
     await expect(dialog.getByText("怎么算", { exact: true })).toBeVisible();
-    await expect(dialog.getByText(/20 日流入强度 =/)).toBeVisible();
-    await expect(dialog.getByText(/这不是投资收益率/)).toBeVisible();
+    await expect(dialog.getByText(/不能当作实际资金净流入/)).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(dialog).toBeHidden();
     await expect(help).toBeFocused();
-    await expect(help).toHaveAttribute("aria-expanded", "false");
-
     await help.click();
     await dialog.getByRole("button", { name: "明白了" }).click();
-    await expect(help).toBeFocused();
-    await page
-      .getByRole("button", { name: "了解5 日累计净申赎", exact: true })
-      .click();
-    await expect(
-      page.getByRole("dialog", { name: "5 日累计净申赎", exact: true }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "关闭指标说明" }).click();
     await help.click();
     await page.mouse.click(2, 2);
     await expect(dialog).toBeHidden();
@@ -263,28 +277,84 @@ for (const width of [1440, 375]) {
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-
-    await watchlistToggle.click();
-    if (width < 600) {
+    await page.reload();
+    await expect(page).toHaveTitle("股票观察台");
+    await expect(page.getByLabel("语言", { exact: true })).toHaveValue("zh");
+    await page.getByRole("button", { name: "自选列表", exact: true }).click();
+    if (width < 600)
       await page
-        .getByLabel("Watchlist", { exact: true })
+        .getByLabel("自选列表", { exact: true })
         .selectOption("consumer-staples");
-    } else {
-      await page
-        .getByRole("button", { name: "Consumer Staples", exact: true })
-        .click();
-    }
+    else
+      await page.getByRole("button", { name: "必需消费", exact: true }).click();
+    const quotes = page.getByRole("table", { name: "必需消费行情" });
+    await expect(quotes).toBeVisible();
+    await page.getByRole("button", { name: "全部列" }).click();
+    await expect(page.getByLabel("排序方式")).toContainText("默认顺序");
+    await quotes.getByRole("button", { name: "COST", exact: true }).click();
+    await expect(page.getByLabel("COST 图表", { exact: true })).toBeVisible();
+    await page.getByText("行情与区间详情", { exact: true }).click();
     await expect(
-      page.getByRole("table", { name: "Consumer Staples quotes" }),
+      page
+        .getByRole("table", { name: "COST 详情摘要" })
+        .getByRole("row", { name: /区间最高价/ }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "All columns" }).click();
-    await page.getByRole("button", { name: "了解估算成交额" }).click();
+    await page
+      .getByRole("button", { name: "了解估算成交额", exact: true })
+      .click();
     await expect(
       page.getByRole("dialog").getByText(/也不是资金净流入/),
     ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.getByLabel("语言", { exact: true }).selectOption("en");
+    await expect(
+      page.getByRole("heading", { name: "Stock Workbench" }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", {
+        name: "About Estimated dollar volume",
+        exact: true,
+      })
+      .click();
+    await expect(
+      page
+        .getByRole("dialog")
+        .getByText("How it is calculated", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("dialog")).not.toContainText("怎么算");
     expect(mocks.unexpectedApiRequests).toEqual([]);
   });
 }
+
+test("keeps other ETFs usable when one history request fails, and retries it", async ({
+  page,
+}) => {
+  await mockWorkbenchApis(page);
+  let fail = true;
+  await page.route("**/api/market/history?**", async (route) => {
+    if (
+      fail &&
+      new URL(route.request().url()).searchParams.get("symbol") === "SOXX"
+    )
+      await route.fulfill({ status: 503, json: { error: "unavailable" } });
+    else await route.fallback();
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Sectors & ETFs", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("SOXX");
+  await expect(
+    page.getByRole("button", { name: "Refresh data", exact: true }),
+  ).toBeEnabled();
+  const table = page.getByRole("table", { name: "ETF comparison" });
+  await expect(table.getByRole("row", { name: /IGV/ })).toContainText("2.00×");
+  await expect(table.getByRole("row", { name: /SOXX/ })).toContainText("—");
+  fail = false;
+  await page.getByRole("button", { name: "Refresh data", exact: true }).click();
+  await expect(table.getByRole("row", { name: /SOXX/ })).toContainText("2.00×");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+});
 
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];
@@ -522,6 +592,25 @@ function createSnapshot(
 }
 
 function historyFor(symbol: string, range: PriceSeries["range"]): PriceSeries {
+  if (range === "1y") {
+    const bars: PriceSeries["bars"] = [];
+    const day = new Date("2025-01-01T05:00:00Z");
+    while (bars.length < 70) {
+      if (day.getUTCDay() !== 0 && day.getUTCDay() !== 6) {
+        const close = symbol === "SPY" ? 100 : 100 + bars.length;
+        bars.push({
+          timestamp: day.toISOString(),
+          open: close,
+          high: close + 2,
+          low: close - 2,
+          close,
+          volume: bars.length >= 65 ? 200 : 100,
+        });
+      }
+      day.setUTCDate(day.getUTCDate() + 1);
+    }
+    return { symbol, range, bars };
+  }
   return {
     symbol,
     range,

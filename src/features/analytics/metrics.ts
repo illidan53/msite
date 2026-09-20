@@ -1,81 +1,136 @@
 import type { MetricExplanation } from "../../shared/MetricHelp";
+import type { Locale } from "../../shared/locale";
 
-export function netFlowMetric(days: number): MetricExplanation {
+export function activityExplanations(locale: Locale) {
+  const pick = (en: MetricExplanation, zh: MetricExplanation) =>
+    locale === "en" ? en : zh;
+  const priceReturn = (days: number) =>
+    pick(
+      {
+        title: `${days}D price return`,
+        meaning: `How much the ETF price changed over ${days} trading sessions.`,
+        formula: `(Latest completed daily close ÷ close ${days} sessions earlier − 1) × 100%. Requires ${days + 1} daily closes.`,
+        example: "A move from $100 to $105 is +5%.",
+        caveat:
+          "Split-adjusted prices exclude reinvested dividends. Today's daily bar is excluded, even after the close, to avoid partial or delayed data. Missing windows show —, not zero.",
+      },
+      {
+        title: `${days} 日价格涨跌幅`,
+        meaning: `观察 ETF 价格在 ${days} 个交易日内的变化。`,
+        formula: `（最近已完成日 K 收盘价 ÷ 往前 ${days} 个交易日的收盘价 − 1）× 100%。需要 ${days + 1} 根日 K。`,
+        example: "价格由 100 美元涨到 105 美元，涨幅为 +5%。",
+        caveat:
+          "价格已处理拆股，但不含分红再投资。为避开未完成或延迟更新的数据，当日日 K 即使收盘后也暂不纳入；窗口不足显示 —，不当作零。",
+      },
+    );
   return {
-    title: `${days} 日累计净申赎`,
-    meaning: `观察最近 ${days} 个完整交易日，这只 ETF 通过新增或赎回份额净增加了多少资产。正数表示净申购，负数表示净赎回。`,
-    formula: `${days} 日累计净申赎 = 窗口内每日净申赎额之和。单日常见估算：当日每份净值（NAV）× 流通份额增量；需处理拆股并对齐日期。接入后优先使用供应商核验的净申赎额。`,
-    example:
-      "某段时间合计申购 3 亿美元、赎回 2 亿美元，累计净申赎就是 +1 亿美元。它不等于这段时间的成交额。",
-    caveat:
-      "申赎可能以证券实物完成，并非全是现金。单只 ETF 不能代表整个板块；净流入也不等于价格将上涨。缺失数据不能当作 0。",
+    priceReturn,
+    relative: pick(
+      {
+        title: "20D relative to SPY",
+        meaning:
+          "Whether the ETF outperformed the S&P 500 proxy over the same dates.",
+        formula:
+          "ETF 20-session price return − SPY 20-session price return, in percentage points (pp). Dates must match.",
+        example:
+          "ETF +6%, SPY +4% → +2 pp. ETF −2%, SPY −5% → +3 pp, despite an absolute loss.",
+        caveat:
+          "Uses prices, not dividend-reinvested total returns. Relative strength is not net fund flow or a buy signal. Check each row's date before comparing.",
+      },
+      {
+        title: "20 日相对 SPY",
+        meaning: "观察 ETF 在相同日期区间内是否跑赢以 SPY 代表的标普 500。",
+        formula:
+          "ETF 的 20 日价格涨跌幅 − SPY 的 20 日价格涨跌幅，单位为百分点。两者日期必须匹配。",
+        example:
+          "ETF +6%、SPY +4% → 领先 2 个百分点。ETF −2%、SPY −5% 时也领先 3 个百分点，但仍亏损。",
+        caveat:
+          "采用价格涨跌，不含分红再投资；相对强弱不是资金净流入，也不是买入信号。跨标的比较时留意各行日期。",
+      },
+    ),
+    rvol: pick(
+      {
+        title: "Relative volume (5/20)",
+        meaning:
+          "Whether recent trading volume is higher or lower than its earlier baseline.",
+        formula:
+          "Average volume over the latest 5 sessions ÷ average volume over the preceding 20 sessions. The windows do not overlap.",
+        example:
+          "Recent average 2 million shares, previous average 1 million → 2.00×.",
+        caveat:
+          "Measures activity, not buying direction. A zero denominator or an incomplete 25-session window produces —. A volume spike can accompany either a rise or a fall. Share splits can distort volume comparisons.",
+      },
+      {
+        title: "量比（5/20）",
+        meaning: "最近的成交量相较之前是否更活跃。",
+        formula:
+          "最近 5 个交易日的平均成交量 ÷ 再往前 20 个交易日的平均成交量。两个区间不重叠。",
+        example: "最近平均每天 200 万股，此前平均 100 万股，量比为 2.00 倍。",
+        caveat:
+          "衡量活跃程度，不判断买卖方向。分母为 0 或不足 25 个交易日时显示 —；放量可能伴随上涨，也可能伴随下跌；拆股会影响成交量的可比性。",
+      },
+    ),
+    cmf: pick(
+      {
+        title: "CMF (20)",
+        meaning:
+          "A volume-weighted measure of where prices close within each day's high–low range.",
+        formula:
+          "M = (2 × close − high − low) ÷ (high − low). CMF20 = Σ(M × volume) ÷ Σvolume over 20 sessions. If high = low, use M = 0.",
+        example:
+          "High $110, low $100, close $108 → M = 0.6. CMF weights such daily values by volume.",
+        caveat:
+          "Usually ranges from −1 to +1. Positive means closes skew toward daily highs; it is not measured capital inflow. Zero total volume or invalid OHLC data produces —.",
+      },
+      {
+        title: "CMF（20 日）",
+        meaning: "结合成交量，观察收盘价更常靠近当日最高价还是最低价。",
+        formula:
+          "M =（2 × 收盘价 − 最高价 − 最低价）÷（最高价 − 最低价）。CMF20 = 20 日 Σ（M × 成交量）÷ Σ成交量。最高价等于最低价时 M 记为 0。",
+        example:
+          "最高价 110、最低价 100、收盘价 108 美元，则 M = 0.6；再用各日成交量加权。",
+        caveat:
+          "通常介于 −1 到 +1。正值说明收盘位置更偏高，不能当作实际资金净流入。总成交量为 0 或价格数据异常时显示 —。",
+      },
+    ),
+    span: pick(
+      {
+        title: "Range price change",
+        meaning:
+          "Price movement between the first and last available bars in the selected time span.",
+        formula: "(Last bar close ÷ first bar close − 1) × 100%.",
+        example: "First close $100, last close $105 → +5%.",
+        caveat:
+          "Actual endpoints depend on available bars. Split-adjusted, excludes dividends; not capital flow.",
+      },
+      {
+        title: "区间涨跌幅",
+        meaning: "观察所选时间区间内，当前可用价格历史从头到尾的变化。",
+        formula: "（最后一根 K 线收盘价 ÷ 第一根 K 线收盘价 − 1）× 100%。",
+        example: "首根收盘价 100 美元，末根 105 美元，则区间涨幅为 +5%。",
+        caveat:
+          "起止点取决于实际返回的 K 线。少于两根时无法计算；价格处理拆股，但不含分红再投资，也不是资金流量。",
+      },
+    ),
+    dollarVolume: pick(
+      {
+        title: "Estimated dollar volume",
+        meaning: "An approximation of trading activity in dollars.",
+        formula:
+          "Snapshot price × snapshot volume. The volume belongs to the snapshot session and does not change with the Time span selector.",
+        example: "$50 per share × 1 million shares = $50 million.",
+        caveat:
+          "Not the exact sum of trade values and not net inflow. Every transaction has a buyer and a seller.",
+      },
+      {
+        title: "估算成交额",
+        meaning: "按快照报价折算成交量，粗略衡量交易活跃程度。",
+        formula:
+          "快照报价 × 快照成交量。成交量属于快照交易时段，不随时间区间选项变化。",
+        example: "50 美元 × 100 万股 = 5,000 万美元。",
+        caveat:
+          "不是逐笔成交金额的精确合计，也不是资金净流入。每笔交易都有买卖双方。",
+      },
+    ),
   };
 }
-
-export const flowIntensity: MetricExplanation = {
-  title: "20 日流入强度",
-  meaning:
-    "把净申赎与基金原有规模相比，便于比较大小不同的 ETF。AUM 指基金管理的净资产规模。",
-  formula:
-    "20 日流入强度 = 最近 20 个完整交易日累计净申赎额 ÷ 窗口开始前一交易日的 AUM × 100%。",
-  example:
-    "期初规模为 50 亿美元，20 日净流入 1 亿美元，流入强度为 +2%。同样流入 1 亿，规模 500 亿的基金只有 +0.2%。",
-  caveat:
-    "这不是投资收益率。期初规模缺失或为 0 时无法计算；小基金的比例容易受单笔申赎影响。",
-};
-
-export const persistence: MetricExplanation = {
-  title: "四周申赎持续性",
-  meaning: "观察净流入是否连续出现，区分持续配置和某一周的集中申购。",
-  formula:
-    "将最近 4 个完整交易周分别汇总：每周净申赎 = 该周每日净申赎之和。正值周数 ÷ 4，可辅助描述持续性。节假日周按实际交易日统计。",
-  example:
-    "四周依次为 +2,000 万、+1,000 万、−500 万、+3,000 万美元，即 3 / 4 周净流入；累计净流入 5,500 万美元。",
-  caveat:
-    "本周尚未结束时不纳入四个完整周。0 表示无净变化，不算净流入；任何交易日数据缺失时，该周标记为数据不完整。",
-};
-
-export const relativeReturn: MetricExplanation = {
-  title: "相对 SPY 总回报",
-  meaning:
-    "观察板块 ETF 在同一段时间是否跑赢以 SPY 代表的美国大盘。总回报包含分红再投资。",
-  formula:
-    "N 日相对总回报 = ETF 的 N 日总回报率 − SPY 的 N 日总回报率，单位为百分点。两者使用相同起止交易日及分红再投资口径。",
-  example:
-    "20 日 ETF 总回报为 +6%，SPY 为 +4%，相对总回报是 +2 个百分点。ETF −2%、SPY −5% 时，也会相对领先 +3 个百分点。",
-  caveat:
-    "相对领先不代表绝对赚钱，也不是资金流量。当前价格数据未包含分红再投资；补齐前不会把价格涨跌标成总回报。",
-};
-
-export const freshness: MetricExplanation = {
-  title: "数据时效",
-  meaning:
-    "区分数据描述的是哪一天，以及我们什么时候取得它，避免把旧数据误认为今天的变化。",
-  formula:
-    "生效日期 = 数据所对应的日期；供应商处理日期 = 供应商收到并处理数据的日期；获取时间 = 网站取得记录的时间。刷新网页不会改变生效日期。",
-  example:
-    "9 月 18 日取得一条生效于 9 月 16 日的记录，页面应显示“截至 9 月 16 日”，而不是“9 月 18 日资金流”。",
-  caveat:
-    "不同 ETF 可能存在不同延迟。横向比较应对齐日期；回测只能使用当时已发布的数据。待接入、缺失和数值 0 是不同状态。",
-};
-
-export const dollarVolume: MetricExplanation = {
-  title: "估算成交额",
-  meaning: "粗略衡量交易活跃程度，即成交股票按当前报价折算的金额。",
-  formula:
-    "此表估算成交额 = 快照报价 × 快照成交量。成交量属于快照交易时段，不随 Time span 选项变化。",
-  example:
-    "报价为 50 美元、成交量为 100 万股，估算成交额是 5,000 万美元。每笔交易都有买卖双方。",
-  caveat:
-    "不是逐笔成交金额的精确合计，也不是资金净流入；无法据此判断买入资金比卖出资金多。",
-};
-
-export const spanChange: MetricExplanation = {
-  title: "区间涨跌幅",
-  meaning: "观察 Time span 所选区间内，当前可用价格历史从头到尾变化了多少。",
-  formula:
-    "区间涨跌幅 =（最后一根 K 线收盘价 ÷ 第一根 K 线收盘价 − 1）× 100%。",
-  example: "第一根 K 线收盘价为 100 美元，最后为 105 美元，区间涨跌幅为 +5%。",
-  caveat:
-    "实际起止点取决于返回的 K 线；少于两根时无法计算。价格处理拆股，但不含分红再投资；它不是资金流量。",
-};

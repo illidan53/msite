@@ -1,3 +1,4 @@
+import { useLocale } from "./locale";
 import { Info, X } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -11,6 +12,7 @@ export interface MetricExplanation {
 }
 
 export function MetricHelp({ metric }: { metric: MetricExplanation }) {
+  const { locale, t } = useLocale();
   const id = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -22,7 +24,7 @@ export function MetricHelp({ metric }: { metric: MetricExplanation }) {
         ref={triggerRef}
         type="button"
         className="metric-info-button"
-        aria-label={`了解${metric.title}`}
+        aria-label={t(`About ${metric.title}`, `了解${metric.title}`)}
         aria-haspopup="dialog"
         aria-controls={id}
         aria-expanded={open}
@@ -39,7 +41,7 @@ export function MetricHelp({ metric }: { metric: MetricExplanation }) {
           id={id}
           className="metric-help-dialog"
           aria-labelledby={`${id}-title`}
-          lang="zh-CN"
+          lang={locale === "zh" ? "zh-CN" : "en"}
           onClose={() => {
             setOpen(false);
             triggerRef.current?.focus();
@@ -58,13 +60,13 @@ export function MetricHelp({ metric }: { metric: MetricExplanation }) {
         >
           <header className="metric-help-heading">
             <div>
-              <p className="eyebrow">指标小课堂</p>
+              <p className="eyebrow">{t("Metric guide", "指标小课堂")}</p>
               <h2 id={`${id}-title`}>{metric.title}</h2>
             </div>
             <button
               type="button"
               className="metric-info-button"
-              aria-label="关闭指标说明"
+              aria-label={t("Close metric guide", "关闭指标说明")}
               onClick={() => dialogRef.current?.close()}
             >
               <X size={20} aria-hidden="true" />
@@ -72,19 +74,19 @@ export function MetricHelp({ metric }: { metric: MetricExplanation }) {
           </header>
           <dl className="metric-help-content">
             <div>
-              <dt>它告诉你什么</dt>
+              <dt>{t("What it means", "它告诉你什么")}</dt>
               <dd>{metric.meaning}</dd>
             </div>
             <div>
-              <dt>怎么算</dt>
+              <dt>{t("How it is calculated", "怎么算")}</dt>
               <dd className="metric-formula">{metric.formula}</dd>
             </div>
             <div>
-              <dt>举个例子 · 假设数据</dt>
+              <dt>{t("Example · hypothetical data", "举个例子 · 假设数据")}</dt>
               <dd>{metric.example}</dd>
             </div>
             <div>
-              <dt>解读时留意</dt>
+              <dt>{t("Keep in mind", "解读时留意")}</dt>
               <dd>{metric.caveat}</dd>
             </div>
           </dl>
@@ -93,7 +95,7 @@ export function MetricHelp({ metric }: { metric: MetricExplanation }) {
             className="metric-help-done"
             onClick={() => dialogRef.current?.close()}
           >
-            明白了
+            {t("Got it", "明白了")}
           </button>
         </dialog>,
         document.body,

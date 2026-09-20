@@ -1,3 +1,4 @@
+import { useLocale } from "../../shared/locale";
 import {
   CandlestickSeries,
   ColorType,
@@ -49,6 +50,7 @@ export function SymbolChart({
   range,
   onRangeChange,
 }: SymbolChartProps) {
+  const { locale, t } = useLocale();
   const [mode, setMode] = useState<ChartMode>("trend");
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -59,6 +61,7 @@ export function SymbolChart({
 
     const container = containerRef.current;
     const chart = createChart(container, {
+      localization: { locale: locale === "zh" ? "zh-CN" : "en-US" },
       height: container.clientHeight || CHART_HEIGHT,
       layout: {
         background: { type: ColorType.Solid, color: "#ffffff" },
@@ -99,31 +102,37 @@ export function SymbolChart({
       resizeObserver?.disconnect();
       chart.remove();
     };
-  }, [mode, range, series.bars]);
+  }, [mode, range, series.bars, locale]);
 
   return (
-    <section className="symbol-chart" aria-label={`${symbol} chart`}>
+    <section
+      className="symbol-chart"
+      aria-label={t(`${symbol} chart`, `${symbol} 图表`)}
+    >
       <header className="symbol-chart-header">
         <strong>{symbol}</strong>
 
-        <div className="segmented-control" aria-label="Chart mode">
+        <div className="segmented-control" aria-label={t("Chart mode")}>
           <button
             type="button"
             aria-pressed={mode === "trend"}
             onClick={() => setMode("trend")}
           >
-            Trend
+            {t("Trend")}
           </button>
           <button
             type="button"
             aria-pressed={mode === "candles"}
             onClick={() => setMode("candles")}
           >
-            Candles
+            {t("Candles")}
           </button>
         </div>
 
-        <div className="segmented-control" aria-label="Chart range">
+        <div
+          className="segmented-control chart-range"
+          aria-label={t("Chart range")}
+        >
           {RANGES.map((rangeOption) => (
             <button
               key={rangeOption.value}
@@ -131,7 +140,7 @@ export function SymbolChart({
               aria-pressed={range === rangeOption.value}
               onClick={() => onRangeChange(rangeOption.value)}
             >
-              {rangeOption.label}
+              {t(rangeOption.label)}
             </button>
           ))}
         </div>

@@ -1,4 +1,9 @@
 import {
+  LocaleProvider,
+  LanguageSwitcher,
+  useLocale,
+} from "../../shared/locale";
+import {
   Activity,
   ChartNoAxesCombined,
   ChevronDown,
@@ -17,10 +22,7 @@ import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
 
 import { SectorAnalytics } from "../analytics/SectorAnalytics";
 import { MetricHelp } from "../../shared/MetricHelp";
-import {
-  dollarVolume as dollarVolumeHelp,
-  spanChange,
-} from "../analytics/metrics";
+import { activityExplanations } from "../analytics/metrics";
 
 interface WorkbenchProps {
   api: WorkbenchApi;
@@ -69,7 +71,18 @@ const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: "updated", label: "Updated" },
 ];
 
-export function Workbench({ api }: WorkbenchProps) {
+export function Workbench(props: WorkbenchProps) {
+  return (
+    <LocaleProvider>
+      <WorkbenchContent {...props} />
+    </LocaleProvider>
+  );
+}
+
+function WorkbenchContent({ api }: WorkbenchProps) {
+  const { locale, t } = useLocale();
+  const { span: spanChange, dollarVolume: dollarVolumeHelp } =
+    activityExplanations(locale);
   const [activePage, setActivePage] = useState<"watchlist" | "analytics">(
     "watchlist",
   );
@@ -489,6 +502,7 @@ export function Workbench({ api }: WorkbenchProps) {
   if (errorMessage && !config) {
     return (
       <main className="workbench">
+        <BrandBar />
         <ErrorAlert message={errorMessage} />
       </main>
     );
@@ -497,7 +511,8 @@ export function Workbench({ api }: WorkbenchProps) {
   if (!config || !watchlist) {
     return (
       <main className="workbench" aria-busy="true">
-        <p className="loading-copy">Loading watchlists...</p>
+        <BrandBar />
+        <p className="loading-copy">{t("Loading watchlists...")}</p>
       </main>
     );
   }
@@ -506,50 +521,58 @@ export function Workbench({ api }: WorkbenchProps) {
     <main
       className={`workbench ${activePage === "analytics" ? "analytics-workbench" : selectedSymbol ? "has-selection" : ""}`}
     >
-      <header className="brand-bar">
-        <div className="brand">
-          <span className="brand-mark">
-            <Activity size={20} aria-hidden="true" />
-          </span>
-          <h1>Stock Workbench</h1>
-        </div>
-        <span className="brand-caption">
-          MARKET OBSERVATORY <span> / US EQUITIES</span>
-        </span>
-      </header>
+      <BrandBar />
       <div className="workspace-heading">
         <div>
           <p className="eyebrow">
             {activePage === "analytics"
-              ? "ANALYTICS / SECTORS"
-              : "WATCHLIST / MARKET OVERVIEW"}
+              ? t("ANALYTICS / SECTORS")
+              : t("WATCHLIST / MARKET OVERVIEW")}
           </p>
-          <h2>{activePage === "analytics" ? "板块资金流" : watchlist.name}</h2>
+          <h2>
+            {activePage === "analytics"
+              ? t("Sectors & ETFs")
+              : t(watchlist.name)}
+          </h2>
           {activePage === "analytics" ? (
-            <p>11 只板块 ETF · USD · 指标与计算口径</p>
+            <p>
+              {t(
+                "23 ETFs · Daily price and volume",
+                "23 只 ETF · 日线价格与成交量",
+              )}
+            </p>
           ) : (
             <p>
-              {activeSymbols.length} symbols <span aria-hidden="true">·</span>{" "}
-              USD <span aria-hidden="true">·</span> {watchlist.description}
+              {t(
+                `${activeSymbols.length} symbols`,
+                `${activeSymbols.length} 只标的`,
+              )}{" "}
+              <span aria-hidden="true">·</span> {t("USD")}{" "}
+              <span aria-hidden="true">·</span> {t(watchlist.description ?? "")}
             </p>
           )}
         </div>
-        <span className="market-note">Source timing shown per symbol</span>
+        <span className="market-note">
+          {t("Source timing shown per symbol")}
+        </span>
       </div>
       {activePage === "watchlist" && (
         <header
           className="workbench-topbar"
           role="toolbar"
-          aria-label="Table controls"
+          aria-label={t("Table controls")}
         >
           <span className="quote-refresh-status" aria-live="polite">
             {lastQuoteRefreshAt
-              ? `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}`
-              : "Refresh pending"}
+              ? t(
+                  `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}`,
+                  `上次刷新 ${formatUpdatedAt(lastQuoteRefreshAt)}`,
+                )
+              : t("Refresh pending")}
           </span>
 
           <div className="control-field">
-            <label htmlFor="time-span">Time span</label>
+            <label htmlFor="time-span">{t("Time span")}</label>
             <select
               id="time-span"
               value={selectedRange}
@@ -559,7 +582,7 @@ export function Workbench({ api }: WorkbenchProps) {
             >
               {TIME_SPAN_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
-                  {option.label}
+                  {t(option.label)}
                 </option>
               ))}
             </select>
@@ -572,7 +595,7 @@ export function Workbench({ api }: WorkbenchProps) {
             />
           </div>
           <div className="control-field">
-            <label htmlFor="sort-mode">Sort by</label>
+            <label htmlFor="sort-mode">{t("Sort by")}</label>
             <select
               id="sort-mode"
               value={sortMode}
@@ -580,13 +603,13 @@ export function Workbench({ api }: WorkbenchProps) {
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.label}
+                  {t(option.label)}
                 </option>
               ))}
             </select>
           </div>
           <div className="control-field">
-            <label htmlFor="page-size">Rows</label>
+            <label htmlFor="page-size">{t("Rows")}</label>
             <select
               id="page-size"
               value={pageSize}
@@ -605,13 +628,16 @@ export function Workbench({ api }: WorkbenchProps) {
             aria-pressed={expandedColumns}
             onClick={() => setExpandedColumns(!expandedColumns)}
           >
-            {expandedColumns ? "Essential columns" : "All columns"}
+            {t(expandedColumns ? "Essential columns" : "All columns")}
           </button>
         </header>
       )}
 
-      <aside className="watchlist-rail" aria-label="Watchlists">
-        <nav aria-label="Workspace navigation">
+      <aside
+        className="watchlist-rail"
+        aria-label={t("Workspace sidebar", "工作区侧栏")}
+      >
+        <nav aria-label={t("Workspace navigation")}>
           <button
             type="button"
             className="rail-menu-toggle"
@@ -620,7 +646,7 @@ export function Workbench({ api }: WorkbenchProps) {
             onClick={() => setWatchlistOpen(!watchlistOpen)}
           >
             <Layers size={17} aria-hidden="true" />
-            <span>Watchlist</span>
+            <span>{t("Watchlist")}</span>
             <ChevronDown size={16} aria-hidden="true" />
           </button>
           <div
@@ -629,19 +655,19 @@ export function Workbench({ api }: WorkbenchProps) {
             hidden={!watchlistOpen}
           >
             <label className="mobile-watchlist" htmlFor="mobile-watchlist">
-              Watchlist
+              {t("Watchlist")}
               <select
                 id="mobile-watchlist"
-                aria-label="Watchlist"
+                aria-label={t("Watchlist")}
                 value={activePage === "watchlist" ? watchlist.id : ""}
                 onChange={(event) => handleWatchlistSelect(event.target.value)}
               >
                 <option value="" disabled>
-                  选择 Watchlist
+                  {t("Choose a watchlist")}
                 </option>
                 {watchlists.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.name}
+                    {t(item.name)}
                   </option>
                 ))}
               </select>
@@ -658,7 +684,7 @@ export function Workbench({ api }: WorkbenchProps) {
                   className="watchlist-button"
                   onClick={() => handleWatchlistSelect(watchlistOption.id)}
                 >
-                  {watchlistOption.name}
+                  {t(watchlistOption.name)}
                 </button>
               ))}
             </div>
@@ -671,7 +697,7 @@ export function Workbench({ api }: WorkbenchProps) {
             onClick={() => setAnalyticsOpen(!analyticsOpen)}
           >
             <ChartNoAxesCombined size={17} aria-hidden="true" />
-            <span>Analytics</span>
+            <span>{t("Analytics")}</span>
             <ChevronDown size={16} aria-hidden="true" />
           </button>
           <div
@@ -688,45 +714,47 @@ export function Workbench({ api }: WorkbenchProps) {
                 handleCloseDetails();
               }}
             >
-              板块
+              {t("Sectors & ETFs")}
             </button>
           </div>
         </nav>
         <details className="connection-details">
-          <summary>Data connection</summary>
-          <table className="usage-table" aria-label="API usage summary">
+          <summary>{t("Data connection")}</summary>
+          <table className="usage-table" aria-label={t("API usage summary")}>
             <tbody>
               <tr>
-                <th scope="row">Quote requests this session</th>
+                <th scope="row">{t("Quote requests this session")}</th>
                 <td>{formatInteger(quoteRequestCount)}</td>
               </tr>
               <tr>
-                <th scope="row">Tracked symbols</th>
+                <th scope="row">{t("Tracked symbols")}</th>
                 <td>{formatInteger(allTrackedSymbols.length)}</td>
               </tr>
               <tr>
-                <th scope="row">History requests this session</th>
+                <th scope="row">{t("History requests this session")}</th>
                 <td>{formatInteger(historyRequestCount)}</td>
               </tr>
               <tr>
-                <th scope="row">REST requests this session</th>
+                <th scope="row">{t("REST requests this session")}</th>
                 <td>{formatInteger(totalWorkbenchRequestCount)}</td>
               </tr>
             </tbody>
           </table>
           <p role="status" className={`rate-status ${ratePlan.status}`}>
-            {ratePlan.message}
+            {locale === "en"
+              ? ratePlan.message
+              : localizedRateMessage(ratePlan)}
           </p>
         </details>
       </aside>
 
       {activePage === "analytics" ? (
-        <SectorAnalytics />
+        <SectorAnalytics api={api} onHistoryRequests={setHistoryRequestCount} />
       ) : (
         <>
           <section
             className="watchlist-main"
-            aria-label={`${watchlist.name} dashboard`}
+            aria-label={`${t(watchlist.name)} dashboard`}
           >
             {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
             <section
@@ -734,31 +762,35 @@ export function Workbench({ api }: WorkbenchProps) {
             >
               <table
                 className="quote-table sector-table"
-                aria-label={`${watchlist.name} quotes`}
+                aria-label={t(
+                  `${watchlist.name} quotes`,
+                  `${t(watchlist.name)}行情`,
+                )}
               >
                 <thead>
                   <tr>
-                    <th scope="col">Symbol</th>
-                    <th scope="col">Name</th>
-                    <th scope="col">Business</th>
-                    <th scope="col">Price</th>
-                    <th scope="col">Session Chg</th>
-                    <th scope="col">Session Chg %</th>
-                    <th scope="col">Span Chg</th>
-                    <th scope="col" aria-label="Span Chg %">
+                    <th scope="col">{t("Symbol")}</th>
+                    <th scope="col">{t("Name")}</th>
+                    <th scope="col">{t("Business")}</th>
+                    <th scope="col">{t("Price")}</th>
+                    <th scope="col">{t("Session Chg")}</th>
+                    <th scope="col">{t("Session Chg %")}</th>
+                    <th scope="col">{t("Span Chg")}</th>
+                    <th scope="col" aria-label={t("Span Chg %")}>
                       <span className="metric-label">
-                        Span Chg %<MetricHelp metric={spanChange} />
+                        {t("Span Chg %")}
+                        <MetricHelp metric={spanChange} />
                       </span>
                     </th>
-                    <th scope="col">Volume</th>
-                    <th scope="col" aria-label="Dollar Volume">
+                    <th scope="col">{t("Volume")}</th>
+                    <th scope="col" aria-label={t("Dollar Volume")}>
                       <span className="metric-label">
-                        Dollar Volume
+                        {t("Dollar Volume")}
                         <MetricHelp metric={dollarVolumeHelp} />
                       </span>
                     </th>
-                    <th scope="col">Timeframe</th>
-                    <th scope="col">Updated</th>
+                    <th scope="col">{t("Timeframe")}</th>
+                    <th scope="col">{t("Updated")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -788,18 +820,18 @@ export function Workbench({ api }: WorkbenchProps) {
                             <span>{symbol}</span>
                             {!expandedColumns ? (
                               <small>
-                                {snapshot?.name ?? "Quote unavailable"}
+                                {snapshot?.name ?? t("Quote unavailable")}
                               </small>
                             ) : null}
                           </button>
                         </td>
                         <td>{snapshot?.name ?? "--"}</td>
-                        <td>{symbolDescriptions[symbol] ?? "--"}</td>
+                        <td>{t(symbolDescriptions[symbol] ?? "--")}</td>
                         <td>
                           {formatPrice(snapshot?.price)}
                           {!expandedColumns ? (
                             <small className="quote-timing">
-                              {snapshot?.timeframe ?? "Pending"}
+                              {t(snapshot?.timeframe ?? "Pending")}
                             </small>
                           ) : null}
                         </td>
@@ -821,7 +853,7 @@ export function Workbench({ api }: WorkbenchProps) {
                         </td>
                         <td>{formatVolume(snapshot?.volume)}</td>
                         <td>{formatDollarVolume(snapshot)}</td>
-                        <td>{snapshot?.timeframe ?? "--"}</td>
+                        <td>{t(snapshot?.timeframe ?? "--")}</td>
                         <td>{formatUpdatedAt(snapshot?.updatedAt)}</td>
                       </tr>
                     );
@@ -830,15 +862,23 @@ export function Workbench({ api }: WorkbenchProps) {
               </table>
             </section>
 
-            <nav className="pagination-controls" aria-label="Table pagination">
+            <nav
+              className="pagination-controls"
+              aria-label={t("Table pagination")}
+            >
               <button
                 type="button"
                 disabled={boundedPage <= 1}
                 onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
               >
-                Previous page
+                {t("Previous page")}
               </button>
-              <span>{`Page ${boundedPage} of ${totalPages}`}</span>
+              <span>
+                {t(
+                  `Page ${boundedPage} of ${totalPages}`,
+                  `第 ${boundedPage} / ${totalPages} 页`,
+                )}
+              </span>
               <button
                 type="button"
                 disabled={boundedPage >= totalPages}
@@ -846,7 +886,7 @@ export function Workbench({ api }: WorkbenchProps) {
                   setCurrentPage((page) => Math.min(totalPages, page + 1))
                 }
               >
-                Next page
+                {t("Next page")}
               </button>
             </nav>
           </section>
@@ -855,7 +895,10 @@ export function Workbench({ api }: WorkbenchProps) {
             <aside
               ref={detailRef}
               role="complementary"
-              aria-label={`${selectedSymbol} details`}
+              aria-label={t(
+                `${selectedSymbol} details`,
+                `${selectedSymbol} 详情`,
+              )}
               className="symbol-detail-drawer"
             >
               <header className="symbol-detail-header">
@@ -864,7 +907,7 @@ export function Workbench({ api }: WorkbenchProps) {
                   <span>{selectedSnapshot?.name ?? selectedSymbol}</span>
                 </div>
                 <button type="button" onClick={handleCloseDetails}>
-                  Close details
+                  {t("Close details")}
                 </button>
               </header>
 
@@ -880,11 +923,12 @@ export function Workbench({ api }: WorkbenchProps) {
                     selectedSnapshot?.sessionChangePercent ??
                       selectedSnapshot?.changePercent,
                   )}{" "}
-                  <small>session</small>
+                  <small>{t("session")}</small>
                 </span>
                 <p>
-                  {selectedSnapshot?.timeframe ?? "Timing unavailable"} · Quote
-                  as of {formatUpdatedAt(selectedSnapshot?.updatedAt)}
+                  {t(selectedSnapshot?.timeframe ?? "Timing unavailable")} ·{" "}
+                  {t("Quote as of", "行情截至")}{" "}
+                  {formatUpdatedAt(selectedSnapshot?.updatedAt)}
                 </p>
               </div>
               <div className="chart-region">
@@ -900,25 +944,31 @@ export function Workbench({ api }: WorkbenchProps) {
                   />
                 ) : null}
                 {!historySeries && !historyErrorMessage ? (
-                  <p className="loading-copy">Loading chart...</p>
+                  <p className="loading-copy">{t("Loading chart...")}</p>
                 ) : null}
               </div>
               {selectedDetailRows.length > 0 ? (
                 <section
                   className="symbol-detail-summary"
-                  aria-label={`${selectedSymbol} summary`}
+                  aria-label={t(
+                    `${selectedSymbol} summary`,
+                    `${selectedSymbol} 摘要`,
+                  )}
                 >
                   <details>
-                    <summary>Quote & range details</summary>
+                    <summary>{t("Quote & range details")}</summary>
                     <table
                       className="detail-summary-table"
-                      aria-label={`${selectedSymbol} detail summary`}
+                      aria-label={t(
+                        `${selectedSymbol} detail summary`,
+                        `${selectedSymbol} 详情摘要`,
+                      )}
                     >
                       <tbody>
                         {selectedDetailRows.map((row) => (
                           <tr key={row.label}>
-                            <th scope="row">{row.label}</th>
-                            <td className={row.className}>{row.value}</td>
+                            <th scope="row">{t(row.label)}</th>
+                            <td className={row.className}>{t(row.value)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -930,21 +980,22 @@ export function Workbench({ api }: WorkbenchProps) {
           ) : (
             <aside
               className="symbol-detail-drawer detail-empty"
-              aria-label="Stock analysis"
+              aria-label={t("Stock analysis")}
             >
               <ChartNoAxesCombined size={36} aria-hidden="true" />
-              <p className="eyebrow">FOCUS VIEW</p>
-              <h2>A closer look.</h2>
+              <p className="eyebrow">{t("FOCUS VIEW")}</p>
+              <h2>{t("A closer look.")}</h2>
               <p>
-                Select a symbol to explore its price history and quote details
-                alongside your watchlist.
+                {t(
+                  "Select a symbol to explore its price history and quote details alongside your watchlist.",
+                )}
               </p>
               <button
                 type="button"
                 disabled={!pageSymbols[0]}
                 onClick={() => handleSymbolSelect(pageSymbols[0])}
               >
-                Explore {pageSymbols[0] ?? "a symbol"}
+                {t("Explore", "查看")} {pageSymbols[0] ?? t("a symbol")}
               </button>
             </aside>
           )}
@@ -1094,9 +1145,10 @@ function dollarVolume(snapshot: MarketSnapshot | undefined): number | null {
 }
 
 function ErrorAlert({ message }: { message: string }) {
+  const { locale } = useLocale();
   return (
     <section className="workbench-error" role="alert">
-      <p>{message}</p>
+      <p>{locale === "en" ? message : "数据加载失败，请稍后重试。"}</p>
     </section>
   );
 }
@@ -1302,4 +1354,34 @@ function formatChangeClass(
   }
 
   return value > 0 ? "positive-change" : "negative-change";
+}
+
+function BrandBar() {
+  const { t } = useLocale();
+  return (
+    <header className="brand-bar">
+      <div className="brand">
+        <span className="brand-mark">
+          <Activity size={20} aria-hidden="true" />
+        </span>
+        <h1>{t("Stock Workbench")}</h1>
+      </div>
+      <div className="brand-actions">
+        <span className="brand-caption">
+          {t("MARKET OBSERVATORY / US EQUITIES")}
+        </span>
+        <LanguageSwitcher />
+      </div>
+    </header>
+  );
+}
+
+function localizedRateMessage(plan: RatePlanEvaluation): string {
+  if (plan.message.includes("Unable") || plan.message.includes("failed"))
+    return "暂时无法评估刷新预算。";
+  if (plan.plan === "paid")
+    return plan.status === "ok"
+      ? "当前套餐在刷新预算模型中不限制接口调用次数。"
+      : "刷新频率较高，可能增加本地负载。";
+  return `预计每分钟 ${plan.estimatedCallsPerMinute} 次请求，${plan.status === "ok" ? "在配置预算内" : plan.status === "blocked" ? "已超出配置预算" : "接近配置预算"}。`;
 }
