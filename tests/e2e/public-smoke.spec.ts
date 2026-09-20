@@ -60,6 +60,12 @@ test("public deployment serves the workbench shell and health endpoint", async (
     page.getByRole("heading", { name: "板块与 ETF", exact: true }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await page.getByLabel("对比指标", { exact: true }).selectOption("rvol");
+  await expect(
+    page
+      .getByRole("region", { name: "走势对比", exact: true })
+      .getByRole("heading", { name: "量比（5/20）", exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "板块轮动总览", exact: true }),
   ).toBeVisible();

@@ -381,6 +381,69 @@ for (const width of [1440, 375]) {
       page.getByRole("img", { name: "Cumulative price change chart" }),
     ).toBeVisible();
     const calls = mocks.historyRequests.length;
+    const comparison = page.getByRole("region", {
+      name: "Trend comparison",
+      exact: true,
+    });
+    const selectMetric = comparison.getByLabel("Comparison metric", {
+      exact: true,
+    });
+    const metricValues = comparison.getByRole("list", {
+      name: "Metric values on selected date",
+    });
+    await selectMetric.selectOption("rvol");
+    await expect(
+      comparison.getByRole("heading", {
+        name: "Relative volume (5/20)",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(metricValues.getByText("2.00×", { exact: true })).toHaveCount(
+      5,
+    );
+    await expect(comparison.locator(".comparison-context")).toContainText(
+      "Reference: 1×",
+    );
+    await expect(comparison.getByRole("img")).toContainText("Unit: ×");
+    await expect(
+      page.getByLabel("Heatmap metric", { exact: true }),
+    ).toHaveValue("relative20");
+    await selectMetric.selectOption("relative20");
+    await expect(
+      metricValues.getByText("+13.42 pp", { exact: true }),
+    ).toHaveCount(4);
+    await expect(
+      metricValues.getByText("0.00 pp", { exact: true }),
+    ).toHaveCount(1);
+    await selectMetric.selectOption("cmf");
+    await expect(metricValues.getByText("0.00", { exact: true })).toHaveCount(
+      5,
+    );
+    await expect(comparison.getByRole("img")).toContainText("Unit: unitless");
+    await comparison
+      .getByRole("button", { name: "About CMF (20)", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "not measured capital inflow",
+    );
+    await page.keyboard.press("Escape");
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(page.getByLabel("对比指标", { exact: true })).toHaveValue(
+      "cmf",
+    );
+    await expect(
+      page
+        .getByRole("region", { name: "走势对比", exact: true })
+        .getByRole("img"),
+    ).toContainText("单位: 无量纲");
+    await page.getByLabel("语言", { exact: true }).selectOption("en");
+    await selectMetric.selectOption("priceChange");
+    await expect(
+      comparison.getByRole("heading", {
+        name: "Cumulative price change",
+        exact: true,
+      }),
+    ).toBeVisible();
     await page
       .getByLabel("Heatmap metric", { exact: true })
       .selectOption("rvol");

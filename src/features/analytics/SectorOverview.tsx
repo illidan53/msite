@@ -6,6 +6,9 @@ import { activityExplanations } from "./metrics";
 import { etfs, groups, type EtfGroup } from "./catalog";
 import {
   buildOverview,
+  comparisonValue,
+  comparisonScale,
+  type ComparisonMetric,
   linePath,
   type OverviewMetric,
   type OverviewData,
@@ -31,12 +34,64 @@ export function SectorOverview({
   const { locale, t } = useLocale();
   const [sessions, setSessions] = useState(60);
   const [metric, setMetric] = useState<OverviewMetric>("relative20");
+  const [comparison, setComparison] = useState<ComparisonMetric>("priceChange");
   const [compared, setCompared] = useState(["SOXX", "IGV", "QQQ", "XLK"]);
   const data = useMemo(
     () => buildOverview(records, sessions),
     [records, sessions],
   );
   const explanations = activityExplanations(locale);
+  const comparisonOptions = [
+    {
+      id: "priceChange",
+      title: t("Cumulative price change", "累计价格涨跌幅"),
+      unit: "%",
+      axisUnit: "%",
+      help: {
+        title: t("Rebased price paths", "同起点价格走势"),
+        meaning: t(
+          "Compare cumulative price changes from the same date, regardless of ETF share price.",
+          "把不同价格的 ETF 放到同一起点，比较此后的累计涨跌。",
+        ),
+        formula: t(
+          "(Daily close ÷ close on the shared first date − 1) × 100%. SPY uses the same formula. The baseline is 0%.",
+          "（每日收盘价 ÷ 统一起始日收盘价 − 1）× 100%。SPY 也采用同一公式，起点为 0%。",
+        ),
+        example: t(
+          "An ETF moves $100 → $110, SPY $200 → $210: the lines end at +10% and +5%.",
+          "ETF 从 100 涨到 110，SPY 从 200 涨到 210：两条线分别到达 +10% 和 +5%。",
+        ),
+        caveat: t(
+          "Prices exclude reinvested dividends. Missing dates break the line; a missing starting price leaves the entire series blank. Use the date slider for exact values. At most four ETFs plus SPY are plotted.",
+          "不含分红再投资。缺失日期处断线，缺少起始日价格则整条线留空。拖动日期滑块可读精确数值；最多同时对比 4 只 ETF 与 SPY。",
+        ),
+      },
+    },
+    {
+      id: "relative20",
+      title: explanations.relative.title,
+      unit: t(" pp", " 个百分点"),
+      axisUnit: t("pp", "百分点"),
+      help: explanations.relative,
+    },
+    {
+      id: "rvol",
+      title: explanations.rvol.title,
+      unit: "×",
+      axisUnit: "×",
+      help: explanations.rvol,
+    },
+    {
+      id: "cmf",
+      title: explanations.cmf.title,
+      unit: "",
+      axisUnit: t("unitless", "无量纲"),
+      help: explanations.cmf,
+    },
+  ] as const;
+  const selectedComparison = comparisonOptions.find(
+    (option) => option.id === comparison,
+  )!;
   const options = [
     {
       id: "relative20",
@@ -112,44 +167,37 @@ export function SectorOverview({
       )}
       <section
         className="overview-panel"
-        aria-label={t("Price paths", "价格走势对比")}
+        aria-label={t("Trend comparison", "走势对比")}
       >
         <div className="overview-panel-heading">
           <div>
             <p className="eyebrow">01 / {t("COMPARE", "走势对比")}</p>
-            <h4>
-              {t(
-                "One starting point. Different paths.",
-                "同一起点，看走势分化",
-              )}
-            </h4>
+            <h4>{selectedComparison.title}</h4>
           </div>
-          <MetricHelp
-            metric={{
-              title: t("Rebased price paths", "同起点价格走势"),
-              meaning: t(
-                "Compare cumulative price changes from the same date, regardless of ETF share price.",
-                "把不同价格的 ETF 放到同一起点，比较此后的累计涨跌。",
-              ),
-              formula: t(
-                "(Daily close ÷ close on the shared first date − 1) × 100%. SPY uses the same formula. The baseline is 0%.",
-                "（每日收盘价 ÷ 统一起始日收盘价 − 1）× 100%。SPY 也采用同一公式，起点为 0%。",
-              ),
-              example: t(
-                "An ETF moves $100 → $110, SPY $200 → $210: the lines end at +10% and +5%.",
-                "ETF 从 100 涨到 110，SPY 从 200 涨到 210：两条线分别到达 +10% 和 +5%。",
-              ),
-              caveat: t(
-                "Prices exclude reinvested dividends. Missing dates break the line; a missing starting price leaves the entire series blank. Use the date slider for exact values. At most four ETFs plus SPY are plotted.",
-                "不含分红再投资。缺失日期处断线，缺少起始日价格则整条线留空。拖动日期滑块可读精确数值；最多同时对比 4 只 ETF 与 SPY。",
-              ),
-            }}
-          />
+          <div className="overview-metric-select">
+            <label>
+              {t("Comparison metric", "对比指标")}
+              <select
+                aria-label={t("Comparison metric", "对比指标")}
+                value={comparison}
+                onChange={(event) =>
+                  setComparison(event.target.value as ComparisonMetric)
+                }
+              >
+                {comparisonOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <MetricHelp metric={selectedComparison.help} />
+          </div>
         </div>
         <p className="overview-caption">
           {t(
-            "Choose up to 4 ETFs; SPY stays as the benchmark. Use the date slider to inspect changes.",
-            "选择最多 4 只 ETF，与固定基准 SPY 对比。拖动日期滑块查看每日变化。",
+            "Choose up to 4 ETFs alongside SPY. Use the date slider to inspect changes. The heatmap metric is selected separately.",
+            "选择最多 4 只 ETF，与 SPY 对比。拖动日期滑块查看每日变化；热力图的指标可独立选择。",
           )}
         </p>
         <details className="overview-picker">
@@ -192,7 +240,25 @@ export function SectorOverview({
             </fieldset>
           ))}
         </details>
-        <PricePaths data={data} symbols={[...compared, "SPY"]} />
+        <p className="overview-caption comparison-context">
+          {comparison === "priceChange"
+            ? t(
+                "Reference: 0%. Cumulative change from the shared first date; changing the lookback changes that starting point.",
+                "参考线：0%。从统一起始日计算累计涨跌；切换观察区间会改变起点。",
+              )
+            : t(
+                `Reference: ${comparison === "rvol" ? "1×" : comparison === "relative20" ? "0 pp" : "0"}. Values are rolling daily indicators, not rebased to zero. The 60/120-session lookback changes the displayed history, not the calculation window.`,
+                `参考线：${comparison === "rvol" ? "1 倍" : comparison === "relative20" ? "0 个百分点" : "0"}。展示每日滚动指标，不归零；60/120 日只改变展示范围，不改变指标计算窗口。`,
+              )}
+        </p>
+        <TrendPaths
+          data={data}
+          symbols={[...compared, "SPY"]}
+          metric={comparison}
+          title={selectedComparison.title}
+          unit={selectedComparison.unit}
+          axisUnit={selectedComparison.axisUnit}
+        />
       </section>
       <section
         className="overview-panel overview-heat-panel"
@@ -385,12 +451,20 @@ export function SectorOverview({
   );
 }
 
-function PricePaths({
+function TrendPaths({
   data,
   symbols,
+  metric,
+  title,
+  unit,
+  axisUnit,
 }: {
   data: OverviewData;
   symbols: string[];
+  metric: ComparisonMetric;
+  title: string;
+  unit: string;
+  axisUnit: string;
 }) {
   const { t } = useLocale();
   const container = useRef<HTMLDivElement>(null);
@@ -409,14 +483,12 @@ function PricePaths({
   }, []);
   const values = symbols.flatMap((symbol) =>
     (data.series[symbol] ?? []).flatMap((point) =>
-      point.priceChange == null ? [] : [point.priceChange],
+      comparisonValue(point, metric) == null
+        ? []
+        : [comparisonValue(point, metric)!],
     ),
   );
-  const lower = Math.min(0, ...values),
-    upper = Math.max(0, ...values);
-  const padding = Math.max(1, (upper - lower) * 0.1);
-  const min = lower - padding,
-    max = upper + padding;
+  const { min, max, reference } = comparisonScale(values, metric);
   const x = (index: number) =>
     52 + (index / Math.max(1, data.dates.length - 1)) * (width - 72);
   const y = (value: number) => 24 + ((max - value) / (max - min)) * 216;
@@ -430,15 +502,19 @@ function PricePaths({
       <svg
         viewBox={`0 0 ${width} 278`}
         role="img"
-        aria-label={t("Cumulative price change chart", "累计价格涨跌幅图")}
+        aria-label={
+          metric === "priceChange"
+            ? t("Cumulative price change chart", "累计价格涨跌幅图")
+            : `${title} · ${t("Chart", "图表")}`
+        }
       >
         <title>
-          {t(
-            "Cumulative price change (%) from the shared first date. Exact values are available below using the date slider.",
-            "从统一起始日计算的累计价格涨跌幅（%）。使用下方日期滑块可读取精确数值。",
-          )}
+          {`${title} (${axisUnit}). ${t("Exact daily values are available below using the date slider. Missing data breaks the line.", "使用下方日期滑块读取每日精确数值，缺失数据处断线。")}`}
         </title>
-        {[min, 0, max].map((value) => (
+        <text x={52} y={12}>
+          {t("Unit", "单位")}: {axisUnit}
+        </text>
+        {[min, reference, max].map((value) => (
           <g key={value}>
             <line
               x1={52}
@@ -448,22 +524,25 @@ function PricePaths({
               className="chart-grid"
             />
             <text x={44} y={y(value) + 4} textAnchor="end">
-              {value.toFixed(1)}%
+              {value.toFixed(metric === "cmf" ? 2 : 1)}
+              {metric === "priceChange" ? "%" : metric === "rvol" ? "×" : ""}
             </text>
           </g>
         ))}
         <line
           x1={52}
           x2={width - 20}
-          y1={y(0)}
-          y2={y(0)}
+          y1={y(reference)}
+          y2={y(reference)}
           className="chart-zero"
         />
         {symbols.map((symbol, i) => (
           <path
             key={symbol}
             d={linePath(
-              (data.series[symbol] ?? []).map((point) => point.priceChange),
+              (data.series[symbol] ?? []).map((point) =>
+                comparisonValue(point, metric),
+              ),
               x,
               y,
             )}
@@ -504,8 +583,8 @@ function PricePaths({
       {values.length === 0 && (
         <p className="overview-empty">
           {t(
-            "No comparable price paths available yet.",
-            "暂无可对比的价格走势。",
+            "No comparable values available for this metric yet.",
+            "该指标暂无可对比的数据。",
           )}
         </p>
       )}
@@ -530,7 +609,11 @@ function PricePaths({
       </label>
       <ul
         className="price-path-legend"
-        aria-label={t("Price changes on selected date", "所选日期价格涨跌幅")}
+        aria-label={
+          metric === "priceChange"
+            ? t("Price changes on selected date", "所选日期价格涨跌幅")
+            : t("Metric values on selected date", "所选日期指标值")
+        }
       >
         {symbols.map((symbol, i) => (
           <li key={symbol}>
@@ -546,7 +629,12 @@ function PricePaths({
               />
             </svg>
             <strong>{symbol}</strong>
-            <span>{format(data.series[symbol]?.[index]?.priceChange)}</span>
+            <span>
+              {format(
+                comparisonValue(data.series[symbol]?.[index], metric),
+                unit,
+              )}
+            </span>
           </li>
         ))}
       </ul>

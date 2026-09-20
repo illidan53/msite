@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { PriceSeries } from "../../../shared/types";
-import { buildOverview, linePath } from "./overviewData";
+import {
+  buildOverview,
+  linePath,
+  comparisonValue,
+  comparisonScale,
+} from "./overviewData";
 import { calculateMetrics } from "./calculateMetrics";
 
 const now = new Date("2026-09-20T12:00:00Z");
@@ -103,5 +108,53 @@ describe("rotation history", () => {
     expect(buildOverview({ SPY: spy }, 60, now).dates.at(-1)).toBe(
       latest.timestamp.slice(0, 10),
     );
+  });
+});
+
+// The lookback changes the displayed dates, not the rolling indicator formula.
+describe("comparison metric selection", () => {
+  it("preserves rolling values when the displayed lookback changes", () => {
+    const records = { SPY: history("SPY"), SOXX: history("SOXX") };
+    const short = buildOverview(records, 60, now).series.SOXX;
+    const long = buildOverview(records, 120, now).series.SOXX;
+    for (const metric of ["relative20", "rvol", "cmf"] as const) {
+      expect(comparisonValue(short.at(-1), metric)).toBe(
+        comparisonValue(long.at(-1), metric),
+      );
+    }
+    expect(comparisonValue(short.at(-1), "priceChange")).not.toBe(
+      comparisonValue(long.at(-1), "priceChange"),
+    );
+    expect(comparisonValue(short.at(-1), "rvol")).toBe(2);
+    expect(comparisonValue(short.at(-1), "cmf")).toBe(0.5);
+    expect(comparisonValue(undefined, "rvol")).toBeNull();
+    expect(
+      comparisonValue(
+        { date: "2025-01-01", metrics: null, priceChange: 5 },
+        "cmf",
+      ),
+    ).toBeNull();
+  });
+
+  it("uses meaningful reference lines and domains for each unit", () => {
+    expect(comparisonScale([0.5, 1, 2], "rvol")).toEqual({
+      min: 0,
+      max: 2.2,
+      reference: 1,
+    });
+    expect(comparisonScale([0.1, 0.5], "cmf")).toEqual({
+      min: -1,
+      max: 1,
+      reference: 0,
+    });
+    expect(comparisonScale([], "rvol")).toEqual({
+      min: 0,
+      max: 2,
+      reference: 1,
+    });
+    const relative = comparisonScale([-4, 10], "relative20");
+    expect(relative.min).toBeLessThan(-4);
+    expect(relative.max).toBeGreaterThan(10);
+    expect(relative.reference).toBe(0);
   });
 });

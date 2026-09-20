@@ -86,3 +86,31 @@ export function linePath(
     })
     .join(" ");
 }
+
+export type ComparisonMetric = "priceChange" | "relative20" | "rvol" | "cmf";
+
+export function comparisonValue(
+  point: OverviewPoint | undefined,
+  metric: ComparisonMetric,
+): number | null {
+  return (
+    (metric === "priceChange"
+      ? point?.priceChange
+      : point?.metrics?.[metric]) ?? null
+  );
+}
+
+export function comparisonScale(values: number[], metric: ComparisonMetric) {
+  if (metric === "cmf") return { min: -1, max: 1, reference: 0 };
+  const finite = values.filter(Number.isFinite);
+  if (metric === "rvol")
+    return {
+      min: 0,
+      max: Math.max(2, ...finite.map((value) => value * 1.1)),
+      reference: 1,
+    };
+  const lower = Math.min(0, ...finite),
+    upper = Math.max(0, ...finite);
+  const padding = Math.max(1, (upper - lower) * 0.1);
+  return { min: lower - padding, max: upper + padding, reference: 0 };
+}
