@@ -23,7 +23,7 @@ export function SectorAnalytics({
   onHistoryRequests: Dispatch<SetStateAction<number>>;
 }) {
   const { locale, t } = useLocale();
-  const [group, setGroup] = useState<EtfGroup | "overview">("industry");
+  const [group, setGroup] = useState<EtfGroup | "overview">("overview");
   const [symbol, setSymbol] = useState("SOXX");
   const [records, setRecords] = useState<Record<string, PriceSeries>>({});
   const [errors, setErrors] = useState<string[]>([]);

@@ -160,10 +160,12 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.price-path-legend li {
+.price-path-legend button {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px;
+  border: 1px solid transparent;
   padding: 8px 12px;
   background: var(--background);
   border-radius: 6px;
@@ -357,4 +359,12 @@
   .heatmap-legend {
     gap: 12px;
   }
+}
+
+.price-path-legend button:hover {
+  border-color: var(--accent);
+}
+.price-path-legend button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }

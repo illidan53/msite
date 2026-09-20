@@ -32,14 +32,17 @@ test("public deployment serves the workbench shell and health endpoint", async (
   await expect(
     page.getByRole("heading", { name: "Sectors & ETFs" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "About 5D price return", exact: true })
-    .click();
-  await expect(
-    page.getByRole("dialog", { name: "5D price return", exact: true }),
-  ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: /^Overview/ }).click();
+  await expect(page.getByRole("button", { name: /^Overview/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const highlight = page.getByRole("button", {
+    name: "Highlight SOXX",
+    exact: true,
+  });
+  await highlight.click();
+  await expect(highlight).toHaveAttribute("aria-pressed", "true");
+  await highlight.click();
   await expect(
     page.getByRole("heading", { name: "Rotation overview", exact: true }),
   ).toBeVisible();

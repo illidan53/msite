@@ -469,6 +469,12 @@ function TrendPaths({
   const { t } = useLocale();
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
+  const [highlighted, setHighlighted] = useState<string | null>(null);
+  const activeHighlight =
+    highlighted && symbols.includes(highlighted) ? highlighted : null;
+  useEffect(() => {
+    if (highlighted && !symbols.includes(highlighted)) setHighlighted(null);
+  }, [highlighted, symbols]);
   const [inspection, setInspection] = useState<{
     date: string;
     index: number;
@@ -536,22 +542,31 @@ function TrendPaths({
           y2={y(reference)}
           className="chart-zero"
         />
-        {symbols.map((symbol, i) => (
-          <path
-            key={symbol}
-            d={linePath(
-              (data.series[symbol] ?? []).map((point) =>
-                comparisonValue(point, metric),
-              ),
-              x,
-              y,
-            )}
-            fill="none"
-            stroke={colors[symbol === "SPY" ? 4 : i]}
-            strokeWidth={2.3}
-            strokeDasharray={dashes[symbol === "SPY" ? 4 : i]}
-          />
-        ))}
+        {[...symbols]
+          .sort(
+            (a, b) =>
+              Number(a === activeHighlight) - Number(b === activeHighlight),
+          )
+          .map((symbol) => (
+            <path
+              data-symbol={symbol}
+              key={symbol}
+              d={linePath(
+                (data.series[symbol] ?? []).map((point) =>
+                  comparisonValue(point, metric),
+                ),
+                x,
+                y,
+              )}
+              fill="none"
+              stroke={colors[symbol === "SPY" ? 4 : symbols.indexOf(symbol)]}
+              strokeWidth={symbol === activeHighlight ? 3.5 : 2.3}
+              opacity={activeHighlight && symbol !== activeHighlight ? 0.18 : 1}
+              strokeDasharray={
+                dashes[symbol === "SPY" ? 4 : symbols.indexOf(symbol)]
+              }
+            />
+          ))}
         {date && (
           <line
             x1={x(index)}
@@ -607,7 +622,16 @@ function TrendPaths({
           }
         />
       </label>
+      <p className="overview-caption">
+        {t(
+          "Click a legend name to highlight its line; click again or press Escape to show all lines equally.",
+          "点击下方图例名称突出对应曲线；再次点击或按 Esc 恢复全部曲线。",
+        )}
+      </p>
       <ul
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setHighlighted(null);
+        }}
         className="price-path-legend"
         aria-label={
           metric === "priceChange"
@@ -617,24 +641,33 @@ function TrendPaths({
       >
         {symbols.map((symbol, i) => (
           <li key={symbol}>
-            <svg width="28" height="14" aria-hidden="true">
-              <line
-                x1="0"
-                x2="28"
-                y1="7"
-                y2="7"
-                stroke={colors[symbol === "SPY" ? 4 : i]}
-                strokeWidth="3"
-                strokeDasharray={dashes[symbol === "SPY" ? 4 : i]}
-              />
-            </svg>
-            <strong>{symbol}</strong>
-            <span>
-              {format(
-                comparisonValue(data.series[symbol]?.[index], metric),
-                unit,
-              )}
-            </span>
+            <button
+              type="button"
+              aria-label={t(`Highlight ${symbol}`, `高亮 ${symbol}`)}
+              aria-pressed={activeHighlight === symbol}
+              onClick={() =>
+                setHighlighted(activeHighlight === symbol ? null : symbol)
+              }
+            >
+              <svg width="28" height="14" aria-hidden="true">
+                <line
+                  x1="0"
+                  x2="28"
+                  y1="7"
+                  y2="7"
+                  stroke={colors[symbol === "SPY" ? 4 : i]}
+                  strokeWidth="3"
+                  strokeDasharray={dashes[symbol === "SPY" ? 4 : i]}
+                />
+              </svg>
+              <strong>{symbol}</strong>
+              <span>
+                {format(
+                  comparisonValue(data.series[symbol]?.[index], metric),
+                  unit,
+                )}
+              </span>
+            </button>
           </li>
         ))}
       </ul>

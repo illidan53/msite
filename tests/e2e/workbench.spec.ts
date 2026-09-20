@@ -210,6 +210,7 @@ for (const width of [1440, 375]) {
     await page
       .getByRole("button", { name: "Sectors & ETFs", exact: true })
       .click();
+    await page.getByRole("button", { name: /^Industries/ }).click();
     const table = page.getByRole("table", { name: "ETF comparison" });
     await expect(
       table.getByRole("button", { name: "SOXX", exact: true }),
@@ -347,6 +348,7 @@ test("keeps other ETFs usable when one history request fails, and retries it", a
   await expect(
     page.getByRole("button", { name: "Refresh data", exact: true }),
   ).toBeEnabled();
+  await page.getByRole("button", { name: /^Industries/ }).click();
   const table = page.getByRole("table", { name: "ETF comparison" });
   await expect(table.getByRole("row", { name: /IGV/ })).toContainText("2.00×");
   await expect(table.getByRole("row", { name: /SOXX/ })).toContainText("—");
@@ -366,7 +368,9 @@ for (const width of [1440, 375]) {
     await page
       .getByRole("button", { name: "Sectors & ETFs", exact: true })
       .click();
-    await page.getByRole("button", { name: /^Overview/ }).click();
+    await expect(
+      page.getByRole("button", { name: /^Overview/ }),
+    ).toHaveAttribute("aria-pressed", "true");
     await expect(
       page.getByRole("heading", { name: "Rotation overview", exact: true }),
     ).toBeVisible();
@@ -381,6 +385,32 @@ for (const width of [1440, 375]) {
       page.getByRole("img", { name: "Cumulative price change chart" }),
     ).toBeVisible();
     const calls = mocks.historyRequests.length;
+    const chart = page.getByRole("region", {
+      name: "Trend comparison",
+      exact: true,
+    });
+    const highlight = chart.getByRole("button", {
+      name: "Highlight SOXX",
+      exact: true,
+    });
+    const soxxPath = chart.locator('path[data-symbol="SOXX"]');
+    const spyPath = chart.locator('path[data-symbol="SPY"]');
+    await highlight.click();
+    await expect(highlight).toHaveAttribute("aria-pressed", "true");
+    await expect(soxxPath).toHaveAttribute("stroke-width", "3.5");
+    await expect(spyPath).toHaveAttribute("opacity", "0.18");
+    await chart
+      .getByRole("button", { name: "Highlight SPY", exact: true })
+      .click();
+    await expect(spyPath).toHaveAttribute("opacity", "1");
+    await expect(soxxPath).toHaveAttribute("opacity", "0.18");
+    await page.keyboard.press("Escape");
+    await expect(soxxPath).toHaveAttribute("opacity", "1");
+    await highlight.focus();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await expect(highlight).toHaveAttribute("aria-pressed", "false");
+    await highlight.click();
     const comparison = page.getByRole("region", {
       name: "Trend comparison",
       exact: true,
@@ -392,6 +422,8 @@ for (const width of [1440, 375]) {
       name: "Metric values on selected date",
     });
     await selectMetric.selectOption("rvol");
+    await expect(highlight).toHaveAttribute("aria-pressed", "true");
+    await expect(spyPath).toHaveAttribute("opacity", "0.18");
     await expect(
       comparison.getByRole("heading", {
         name: "Relative volume (5/20)",
@@ -479,6 +511,7 @@ for (const width of [1440, 375]) {
       .isDisabled()
       .then((disabled) => expect(disabled).toBe(true));
     await page.getByRole("checkbox", { name: /SOXX/ }).uncheck();
+    await expect(spyPath).toHaveAttribute("opacity", "1");
     await page.getByRole("checkbox", { name: /SMH/ }).check();
     await expect(legend.getByText("SMH", { exact: true })).toBeVisible();
     await expect(legend.getByText("SOXX", { exact: true })).toHaveCount(0);
