@@ -91,6 +91,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     "watchlist",
   );
   const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [otherWatchlistsOpen, setOtherWatchlistsOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(true);
   const [config, setConfig] = useState<WorkbenchConfig | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -138,6 +139,12 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   const watchlist: Watchlist | undefined =
     watchlists.find((candidate) => candidate.id === selectedWatchlistId) ??
     watchlists[0];
+  const primaryWatchlists = watchlists.filter(
+    (item) => item.navigationGroup !== "other",
+  );
+  const otherWatchlists = watchlists.filter(
+    (item) => item.navigationGroup === "other",
+  );
   const symbolDescriptions = watchlist?.symbolDescriptions ?? {};
 
   const activeSymbols = useMemo(
@@ -492,6 +499,11 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   function handleWatchlistSelect(nextWatchlistId: string) {
     setActivePage("watchlist");
     setSelectedWatchlistId(nextWatchlistId);
+    if (
+      watchlists.find((item) => item.id === nextWatchlistId)
+        ?.navigationGroup === "other"
+    )
+      setOtherWatchlistsOpen(true);
     setSelectedSymbol(null);
     setHistorySeries(null);
     setHistoryErrorMessage(null);
@@ -508,6 +520,32 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     setSelectedSymbol(null);
     setHistorySeries(null);
     setHistoryErrorMessage(null);
+  }
+
+  function renderWatchlistButton(watchlistOption: Watchlist) {
+    return (
+      <button
+        key={watchlistOption.id}
+        type="button"
+        aria-pressed={
+          activePage === "watchlist" && watchlistOption.id === watchlist?.id
+        }
+        className="watchlist-button watchlist-performance-button"
+        aria-label={t(watchlistOption.name)}
+        aria-description={performanceDescription(
+          performanceByWatchlist[watchlistOption.id],
+          snapshotRefreshFailed,
+          t,
+        )}
+        onClick={() => handleWatchlistSelect(watchlistOption.id)}
+      >
+        <span>{t(watchlistOption.name)}</span>
+        <PerformanceBadge
+          performance={performanceByWatchlist[watchlistOption.id]}
+          stale={snapshotRefreshFailed}
+        />
+      </button>
+    );
   }
 
   if (errorMessage && !config) {
@@ -601,6 +639,27 @@ function WorkbenchContent({ api }: WorkbenchProps) {
               <span aria-hidden="true">·</span> {t("USD")}{" "}
               <span aria-hidden="true">·</span> {t(watchlist.description ?? "")}
             </p>
+          )}
+          {activePage === "watchlist" && watchlist.selectionNote && (
+            <details className="watchlist-selection-policy">
+              <summary>
+                {t("Selection criteria & coverage", "入选标准与覆盖")}
+              </summary>
+              <p>{t(watchlist.selectionNote)}</p>
+              <p>
+                {t(
+                  "Reviewed 2026-09-20: US-listed symbols with 20 available daily bars through 2026-09-18 and estimated average daily traded value above $20 million. This is a reviewed watchlist, not an automatic ranking or an ETF portfolio. Cross-list overlap is intentional.",
+                  "2026-09-20 核验：美股上市标的，截至 2026-09-18 有 20 根可用日线，估算日均成交额超过 2,000 万美元。这是经核验的观察名单，不是自动排名或 ETF 持仓；不同列表之间允许重叠。",
+                )}
+              </p>
+              <ul>
+                {watchlist.rows.map((row) => (
+                  <li key={row.id}>
+                    <strong>{t(row.name)}</strong> · {row.symbols.join(" · ")}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
         <span className="market-note">
@@ -716,7 +775,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                 <option value="" disabled>
                   {t("Choose a watchlist")}
                 </option>
-                {watchlists.map((item) => (
+                {primaryWatchlists.map((item) => (
                   <option key={item.id} value={item.id}>
                     {t(item.name)} ·{" "}
                     {performanceLabel(
@@ -725,6 +784,20 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                     )}
                   </option>
                 ))}
+                {otherWatchlists.length > 0 && (
+                  <optgroup label={t("Other", "其他")}>
+                    {" "}
+                    {otherWatchlists.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {t(item.name)} ·{" "}
+                        {performanceLabel(
+                          performanceByWatchlist[item.id],
+                          snapshotRefreshFailed,
+                        )}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
               </select>
             </label>
             {activePage === "watchlist" && (
@@ -737,30 +810,29 @@ function WorkbenchContent({ api }: WorkbenchProps) {
               </div>
             )}
             <div className="watchlist-buttons">
-              {watchlists.map((watchlistOption) => (
-                <button
-                  key={watchlistOption.id}
-                  type="button"
-                  aria-pressed={
-                    activePage === "watchlist" &&
-                    watchlistOption.id === watchlist.id
-                  }
-                  className="watchlist-button watchlist-performance-button"
-                  aria-label={t(watchlistOption.name)}
-                  aria-description={performanceDescription(
-                    performanceByWatchlist[watchlistOption.id],
-                    snapshotRefreshFailed,
-                    t,
-                  )}
-                  onClick={() => handleWatchlistSelect(watchlistOption.id)}
-                >
-                  <span>{t(watchlistOption.name)}</span>
-                  <PerformanceBadge
-                    performance={performanceByWatchlist[watchlistOption.id]}
-                    stale={snapshotRefreshFailed}
-                  />
-                </button>
-              ))}
+              {primaryWatchlists.map(renderWatchlistButton)}
+              {otherWatchlists.length > 0 && (
+                <>
+                  <button
+                    type="button"
+                    className="watchlist-button other-watchlists-toggle"
+                    aria-label={t("Other", "其他")}
+                    aria-expanded={otherWatchlistsOpen}
+                    aria-controls="other-watchlists"
+                    onClick={() => setOtherWatchlistsOpen(!otherWatchlistsOpen)}
+                  >
+                    <span>{t("Other", "其他")}</span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </button>
+                  <div
+                    id="other-watchlists"
+                    className="other-watchlists"
+                    hidden={!otherWatchlistsOpen}
+                  >
+                    {otherWatchlists.map(renderWatchlistButton)}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           <button

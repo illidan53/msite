@@ -10,6 +10,8 @@ describe("shared config schemas", () => {
           name: "Semiconductors",
           description: "Large semiconductor names and user focus list",
           theme: "semiconductors",
+          navigationGroup: "primary",
+          selectionNote: "Coverage before capitalization",
           pinnedSymbols: ["nvda", " AMD "],
           symbolDescriptions: {
             " amd ": "AI accelerator chips",
@@ -35,6 +37,8 @@ describe("shared config schemas", () => {
 
     expect(parsed.watchlists[0]).toMatchObject({
       id: "semiconductors",
+      navigationGroup: "primary",
+      selectionNote: "Coverage before capitalization",
       pinnedSymbols: ["NVDA", "AMD"],
       symbolDescriptions: {
         AMD: "AI accelerator chips",

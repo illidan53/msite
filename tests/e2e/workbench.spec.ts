@@ -647,6 +647,91 @@ for (const width of [1440, 375]) {
   });
 }
 
+for (const width of [1440, 390]) {
+  test(`groups secondary watchlists under Other at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 950 });
+    await mockWorkbenchApis(page);
+    const focus = workbenchConfig.watchlists.watchlists[0];
+    await page.route("**/api/config", (route) =>
+      route.fulfill({
+        json: {
+          ...workbenchConfig,
+          watchlists: {
+            watchlists: [
+              ...workbenchConfig.watchlists.watchlists,
+              { ...focus, id: "mega-cap-tech", name: "Mega-Cap Tech" },
+              {
+                ...focus,
+                id: "software",
+                name: "Software & SaaS",
+                selectionNote: "Software coverage",
+              },
+              {
+                ...focus,
+                id: "energy",
+                name: "Energy",
+                navigationGroup: "other",
+              },
+            ],
+          },
+        },
+      }),
+    );
+    await page.goto("/");
+    await page.getByRole("button", { name: "Watchlist", exact: true }).click();
+    if (width > 600) {
+      await expect(
+        page.locator(".watchlist-buttons > .watchlist-performance-button"),
+      ).toHaveCount(4);
+      const other = page.getByRole("button", { name: "Other", exact: true });
+      await expect(other).toHaveAttribute("aria-expanded", "false");
+      await expect(
+        page.getByRole("button", { name: "Energy", exact: true }),
+      ).toBeHidden();
+      await other.click();
+      await page.getByRole("button", { name: "Energy", exact: true }).click();
+      await expect(
+        page.getByRole("heading", { name: "Energy", exact: true }),
+      ).toBeVisible();
+      await other.click();
+      await expect(
+        page.getByRole("heading", { name: "Energy", exact: true }),
+      ).toBeVisible();
+      await page
+        .getByRole("button", { name: "Software & SaaS", exact: true })
+        .click();
+    } else {
+      await expect(page.locator('optgroup[label="Other"] option')).toHaveCount(
+        1,
+      );
+      await page
+        .getByLabel("Watchlist", { exact: true })
+        .selectOption("software");
+    }
+    await page
+      .getByText("Selection criteria & coverage", { exact: true })
+      .click();
+    await expect(
+      page.getByText("Software coverage", { exact: true }),
+    ).toBeVisible();
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    if (width > 600) {
+      await expect(
+        page.getByRole("button", { name: "其他", exact: true }),
+      ).toBeVisible();
+    } else {
+      await expect(page.locator('optgroup[label="其他"]')).toHaveCount(1);
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
+
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];

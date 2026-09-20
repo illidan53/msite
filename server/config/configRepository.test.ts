@@ -82,7 +82,17 @@ describe("ConfigRepository", () => {
     const symbols = new Set(watchlists.watchlists.flatMap((watchlist) => watchlist.rows.flatMap((row) => row.symbols)));
     const closeWatch = watchlists.watchlists.find((watchlist) => watchlist.id === "close-watch");
 
-    expect(watchlists.watchlists).toHaveLength(12);
+    expect(watchlists.watchlists).toHaveLength(13);
+    expect(watchlists.watchlists.filter((item) => item.navigationGroup === "primary").map((item) => item.id)).toEqual(["semiconductors", "consumer-staples", "mega-cap-tech", "software"]);
+    expect(watchlists.watchlists.filter((item) => item.navigationGroup === "other")).toHaveLength(9);
+    const semiconductorSymbols = watchlists.watchlists[0].rows.flatMap((row) => row.symbols);
+    expect(semiconductorSymbols).toEqual(expect.arrayContaining(["LITE", "NOK", "CRDO", "ALAB"]));
+    for (const item of watchlists.watchlists.filter((item) => item.navigationGroup === "primary")) {
+      const members = item.rows.flatMap((row) => row.symbols);
+      expect(new Set(members).size).toBe(members.length);
+      expect(members).not.toContain("GOOG");
+      expect(item.selectionNote).toBeTruthy();
+    }
     expect(symbols.size).toBeGreaterThan(200);
     expect(closeWatch).toMatchObject({
       name: "close watch",

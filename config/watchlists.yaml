@@ -1,7 +1,7 @@
 watchlists:
   - id: semiconductors
     name: Semiconductors
-    description: Semiconductor supply chain plus photonics, optical networking, and AI interconnect; includes adjacent businesses
+    description: Semiconductor leaders across six supply-chain segments, including user-focused photonics and AI interconnect
     theme: semiconductors
     pinnedSymbols:
       - NVDA
@@ -12,136 +12,200 @@ watchlists:
       CRDO: High-speed connectivity, active electrical cables, SerDes, and optical DSPs
       ALAB: PCIe, CXL, and Ethernet connectivity for AI and cloud infrastructure
     rows:
-      - id: ai-interconnect
-        name: Photonics & AI Interconnect
-        expandedByDefault: true
-        symbols:
-          - LITE
-          - NOK
-          - CRDO
-          - ALAB
-      - id: core
-        name: Core
+      - id: segment-1
+        name: AI compute & chip platforms
         expandedByDefault: true
         symbols:
           - NVDA
           - AMD
           - AVGO
+          - ARM
+      - id: segment-2
+        name: Foundries & manufacturing
+        expandedByDefault: true
+        symbols:
           - TSM
+          - INTC
+          - GFS
+      - id: segment-3
+        name: Equipment & testing
+        expandedByDefault: true
+        symbols:
           - ASML
           - AMAT
           - LRCX
           - KLAC
+          - TER
+          - FORM
+      - id: segment-4
+        name: Memory & interfaces
+        expandedByDefault: true
+        symbols:
           - MU
+          - RMBS
+      - id: segment-5
+        name: Analog, power & embedded
+        expandedByDefault: true
+        symbols:
           - QCOM
           - TXN
-          - INTC
-          - MRVL
           - ADI
-          - MCHP
-          - ON
           - NXPI
+          - ON
           - MPWR
-          - ARM
-          - GFS
-          - WOLF
-          - QRVO
-          - SWKS
+          - MCHP
           - LSCC
-          - ALGM
-          - TER
+      - id: segment-6
+        name: Photonics & AI interconnect
+        expandedByDefault: true
+        symbols:
+          - MRVL
+          - ALAB
+          - CRDO
+          - LITE
           - COHR
-          - ACLS
-          - CAMT
-          - UMC
-          - STM
-          - DIOD
+          - NOK
           - SMTC
-          - FORM
-          - RMBS
-
+    navigationGroup: primary
+    selectionNote: Coverage-led selection across compute, manufacturing, equipment, memory, analog and interconnect. Retains user-requested LITE, NOK, CRDO and ALAB; NOK is adjacent optical networking exposure, not a pure semiconductor company.
   - id: consumer-staples
     name: Consumer Staples
-    description: Food, beverages, household products, retail staples, and tobacco names
+    description: Representative staples businesses across retail, household products, beverages, food and tobacco
     theme: consumer staples
     pinnedSymbols:
       - COST
       - WMT
     rows:
-      - id: core
-        name: Core
+      - id: segment-1
+        name: Staples retail & distribution
         expandedByDefault: true
         symbols:
           - WMT
           - COST
-          - PG
-          - KO
-          - PEP
-          - PM
-          - MO
-          - MDLZ
-          - CL
-          - KMB
-          - GIS
-          - KHC
-          - HSY
-          - KDP
-          - MNST
-          - SJM
-          - CPB
-          - CAG
-          - TAP
-          - STZ
-          - EL
-          - CLX
-          - CHD
-          - HRL
-          - TSN
           - KR
           - SYY
+      - id: segment-2
+        name: Household & personal care
+        expandedByDefault: true
+        symbols:
+          - PG
+          - CL
+          - CHD
+          - KMB
+          - CLX
+      - id: segment-3
+        name: Beverages
+        expandedByDefault: true
+        symbols:
+          - KO
+          - PEP
+          - MNST
+          - KDP
+          - STZ
+      - id: segment-4
+        name: Food & agriculture
+        expandedByDefault: true
+        symbols:
+          - MDLZ
+          - HSY
+          - GIS
+          - KHC
+          - TSN
           - ADM
-          - BG
-          - CELH
-
+      - id: segment-5
+        name: Tobacco
+        expandedByDefault: true
+        symbols:
+          - PM
+          - MO
+    navigationGroup: primary
+    selectionNote: "XLP industry coverage guides selection: staples retail, household products, beverages, food and tobacco. Representative established businesses are prioritized over adding every consumer brand."
   - id: mega-cap-tech
     name: Mega-Cap Tech
-    description: Large technology and platform companies with heavy market attention
+    description: Ten cross-sector technology leaders with one share class per company
     theme: mega-cap technology
     pinnedSymbols:
       - AAPL
       - MSFT
       - NVDA
     rows:
-      - id: core
-        name: Core
+      - id: segment-1
+        name: Platforms & ecosystems
         expandedByDefault: true
         symbols:
-          - AAPL
           - MSFT
-          - NVDA
+          - AAPL
           - GOOGL
-          - GOOG
           - AMZN
           - META
-          - TSLA
+      - id: segment-2
+        name: AI chips & enterprise infrastructure
+        expandedByDefault: true
+        symbols:
+          - NVDA
           - AVGO
           - ORCL
-          - CRM
+      - id: segment-3
+        name: Consumer technology & media
+        expandedByDefault: true
+        symbols:
+          - TSLA
           - NFLX
-          - ADBE
-          - AMD
-          - CSCO
-          - IBM
-          - INTU
+    navigationGroup: primary
+    selectionNote: A deliberately compact cross-sector technology leadership watchlist, not a mechanical top-10 market-cap ranking. Alphabet uses GOOGL only; software specialists are primarily covered in Software & SaaS.
+  - id: software
+    name: Software & SaaS
+    description: Software and SaaS across enterprise applications, cybersecurity, data platforms and engineering tools
+    theme: software SaaS
+    navigationGroup: primary
+    selectionNote: IGV-style software exposure plus SaaS specialists across applications, cybersecurity, data platforms and engineering tools. These are selected stocks, not a replication of IGV holdings or weights; not every company is pure SaaS.
+    pinnedSymbols:
+      - MSFT
+      - CRM
+      - NOW
+    rows:
+      - id: segment-1
+        name: Enterprise applications & SaaS
+        expandedByDefault: true
+        symbols:
+          - MSFT
+          - ORCL
+          - CRM
           - NOW
-          - PANW
+          - ADBE
+          - INTU
+          - WDAY
+          - HUBS
+          - VEEV
           - SHOP
-          - UBER
-          - ABNB
-          - PYPL
-          - SNOW
+      - id: segment-2
+        name: Cybersecurity
+        expandedByDefault: true
+        symbols:
+          - PANW
+          - CRWD
+          - FTNT
+          - ZS
+          - OKTA
+      - id: segment-3
+        name: Data, AI & cloud operations
+        expandedByDefault: true
+        symbols:
           - PLTR
-
+          - DDOG
+          - SNOW
+          - MDB
+          - NET
+          - DT
+      - id: segment-4
+        name: Development & engineering software
+        expandedByDefault: true
+        symbols:
+          - TEAM
+          - GTLB
+          - ADSK
+          - CDNS
+          - SNPS
   - id: ai-cloud-infrastructure
     name: AI Cloud & Infrastructure
     description: Cloud platforms, data centers, AI servers, power, networking, and storage infrastructure
@@ -184,7 +248,7 @@ watchlists:
           - AMD
           - NVDA
           - AVGO
-
+    navigationGroup: other
   - id: healthcare-biotech
     name: Healthcare & Biotech
     description: Large healthcare, managed care, medtech, pharma, and biotech names
@@ -227,7 +291,7 @@ watchlists:
           - IDXX
           - MCK
           - COR
-
+    navigationGroup: other
   - id: financials
     name: Financials
     description: Banks, card networks, exchanges, asset managers, insurers, and brokers
@@ -270,7 +334,7 @@ watchlists:
           - MET
           - PRU
           - BRK.B
-
+    navigationGroup: other
   - id: energy
     name: Energy
     description: Integrated energy, exploration, oilfield services, midstream, and global majors
@@ -313,7 +377,7 @@ watchlists:
           - SHEL
           - TTE
           - PBR
-
+    navigationGroup: other
   - id: consumer-discretionary
     name: Consumer Discretionary
     description: E-commerce, autos, restaurants, lodging, apparel, home improvement, and homebuilders
@@ -355,7 +419,7 @@ watchlists:
           - ULTA
           - DECK
           - BURL
-
+    navigationGroup: other
   - id: communication-media
     name: Communication & Media
     description: Social platforms, telecom, streaming, entertainment, gaming, and advertising names
@@ -396,7 +460,7 @@ watchlists:
           - SIRI
           - IPG
           - OMC
-
+    navigationGroup: other
   - id: industrials-defense
     name: Industrials & Defense
     description: Aerospace, defense, machinery, transport, industrial tech, and infrastructure services
@@ -441,7 +505,7 @@ watchlists:
           - IR
           - AXON
           - TXT
-
+    navigationGroup: other
   - id: utilities-power
     name: Utilities & Power
     description: Regulated utilities, independent power producers, grid exposure, and water utilities
@@ -486,7 +550,7 @@ watchlists:
           - BEPC
           - CWEN
           - ORA
-
+    navigationGroup: other
   - id: close-watch
     name: close watch
     description: User-defined close watch symbols
@@ -518,3 +582,4 @@ watchlists:
           - EQPT
           - EXE
           - CLS
+    navigationGroup: other

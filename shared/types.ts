@@ -18,6 +18,8 @@ export interface WatchlistRow {
 }
 
 export interface Watchlist {
+  navigationGroup?: "primary" | "other";
+  selectionNote?: string;
   id: string;
   name: string;
   description?: string;

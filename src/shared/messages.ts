@@ -1,4 +1,40 @@
 export const chineseMessages: Record<string, string> = {
+  "Software & SaaS": "软件",
+  Other: "其他",
+  "AI compute & chip platforms": "AI 计算与芯片平台",
+  "Foundries & manufacturing": "晶圆代工与制造",
+  "Equipment & testing": "设备与测试",
+  "Memory & interfaces": "存储与接口",
+  "Analog, power & embedded": "模拟、功率与嵌入式",
+  "Photonics & AI interconnect": "光通信与 AI 互连",
+  "Staples retail & distribution": "必需消费零售与分销",
+  "Household & personal care": "家庭与个人护理",
+  Beverages: "饮料",
+  "Food & agriculture": "食品与农业",
+  Tobacco: "烟草",
+  "Platforms & ecosystems": "平台与生态",
+  "AI chips & enterprise infrastructure": "AI 芯片与企业基础设施",
+  "Consumer technology & media": "消费科技与媒体",
+  "Enterprise applications & SaaS": "企业应用与 SaaS",
+  Cybersecurity: "网络安全",
+  "Data, AI & cloud operations": "数据、AI 与云运维",
+  "Development & engineering software": "研发与工程软件",
+  "Coverage-led selection across compute, manufacturing, equipment, memory, analog and interconnect. Retains user-requested LITE, NOK, CRDO and ALAB; NOK is adjacent optical networking exposure, not a pure semiconductor company.":
+    "按计算、制造、设备、存储、模拟芯片与互连环节覆盖选取。保留你关注的 LITE、NOK、CRDO、ALAB；NOK 属于关联的光网络业务，并非纯半导体公司。",
+  "Semiconductor leaders across six supply-chain segments, including user-focused photonics and AI interconnect":
+    "覆盖六个产业链环节的半导体代表企业，包含重点关注的光通信与 AI 互连",
+  "XLP industry coverage guides selection: staples retail, household products, beverages, food and tobacco. Representative established businesses are prioritized over adding every consumer brand.":
+    "参考 XLP 的行业范围，覆盖必需消费零售、家庭用品、饮料、食品和烟草；优先选择有代表性的成熟企业，不追求穷举消费品牌。",
+  "Representative staples businesses across retail, household products, beverages, food and tobacco":
+    "覆盖零售、家庭用品、饮料、食品和烟草的必需消费代表企业",
+  "A deliberately compact cross-sector technology leadership watchlist, not a mechanical top-10 market-cap ranking. Alphabet uses GOOGL only; software specialists are primarily covered in Software & SaaS.":
+    "精简的跨板块科技核心观察池，并非机械的市值前十排名。Alphabet 只保留 GOOGL；细分软件企业主要放入软件列表。",
+  "Ten cross-sector technology leaders with one share class per company":
+    "十家跨板块科技核心企业，每家公司只保留一种股权代码",
+  "IGV-style software exposure plus SaaS specialists across applications, cybersecurity, data platforms and engineering tools. These are selected stocks, not a replication of IGV holdings or weights; not every company is pure SaaS.":
+    "参考 IGV 的软件覆盖，并补充 SaaS 细分企业，涵盖应用、安全、数据平台及工程工具。这是精选股票观察池，不复制 IGV 的持仓或权重，也并非每家公司都是纯 SaaS。",
+  "Software and SaaS across enterprise applications, cybersecurity, data platforms and engineering tools":
+    "企业应用、网络安全、数据平台及工程工具领域的软件与 SaaS 企业",
   "MARKET OBSERVATORY / US EQUITIES": "市场观察 / 美股",
   "Stock Workbench": "股票观察台",
   Language: "语言",

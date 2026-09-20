@@ -14,18 +14,22 @@ const watchlistRowSchema = z.object({
   symbols: z.array(symbolSchema).min(1),
 });
 
-const symbolDescriptionsSchema = z.record(z.string()).transform((descriptions) =>
-  Object.fromEntries(
-    Object.entries(descriptions).flatMap(([rawSymbol, rawDescription]) => {
-      const symbol = rawSymbol.trim().toUpperCase();
-      const description = rawDescription.trim();
+const symbolDescriptionsSchema = z
+  .record(z.string())
+  .transform((descriptions) =>
+    Object.fromEntries(
+      Object.entries(descriptions).flatMap(([rawSymbol, rawDescription]) => {
+        const symbol = rawSymbol.trim().toUpperCase();
+        const description = rawDescription.trim();
 
-      return symbol && description ? [[symbol, description]] : [];
-    }),
-  ),
-);
+        return symbol && description ? [[symbol, description]] : [];
+      }),
+    ),
+  );
 
 const watchlistSchema = z.object({
+  navigationGroup: z.enum(["primary", "other"]).optional(),
+  selectionNote: z.string().optional(),
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),

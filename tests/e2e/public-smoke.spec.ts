@@ -29,6 +29,20 @@ test("public deployment serves the workbench shell and health endpoint", async (
   await expect(
     page.locator(".watchlist-heading-line > .watchlist-performance"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
+  await expect(
+    page.locator(".watchlist-buttons > .watchlist-performance-button"),
+  ).toHaveCount(4);
+  const other = page.getByRole("button", { name: "Other", exact: true });
+  await expect(other).toHaveAttribute("aria-expanded", "false");
+  await other.click();
+  await expect(page.locator("#other-watchlists > button")).toHaveCount(9);
+  await page
+    .getByRole("button", { name: "Software & SaaS", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Software & SaaS", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Sectors & ETFs", exact: true })
     .click();
