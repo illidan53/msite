@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 
+export const ColorType = { Solid: "solid" };
 export const CandlestickSeries = Symbol("CandlestickSeries");
 export const LineSeries = Symbol("LineSeries");
 

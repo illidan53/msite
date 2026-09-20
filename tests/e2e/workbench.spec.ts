@@ -1,50 +1,103 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { MarketSnapshot, PriceSeries, RatePlanEvaluation, SettingsConfig, WatchlistsConfig } from "../../shared/types";
+import type {
+  MarketSnapshot,
+  PriceSeries,
+  RatePlanEvaluation,
+  SettingsConfig,
+  WatchlistsConfig,
+} from "../../shared/types";
 
-test("covers the stock workbench sector dashboard without live market calls", async ({ page }) => {
+test("covers the stock workbench sector dashboard without live market calls", async ({
+  page,
+}) => {
   const apiMocks = await mockWorkbenchApis(page);
 
   await page.goto("/");
 
   await expect(page).toHaveTitle("Stock Workbench");
-  await expect(page.getByRole("heading", { name: "Stock Workbench" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Semiconductors" })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "New Watchlist" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Stock Workbench" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Semiconductors" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "New Watchlist" })).toHaveCount(
+    0,
+  );
+  await page.getByText("Data connection", { exact: true }).click();
+  await page.getByRole("button", { name: "All columns" }).click();
   const usageTable = page.getByRole("table", { name: "API usage summary" });
   await expect(usageTable).toBeVisible();
-  await expect(usageTable.getByRole("row", { name: "Quote requests this session 1" })).toBeVisible();
-  await expect(usageTable.getByRole("row", { name: "REST requests this session 21" })).toBeVisible();
+  await expect(
+    usageTable.getByRole("row", { name: "Quote requests this session 1" }),
+  ).toBeVisible();
+  await expect(
+    usageTable.getByRole("row", { name: "REST requests this session 21" }),
+  ).toBeVisible();
   await expect(page.getByText("Today's API calls")).toHaveCount(0);
 
   const quoteTable = page.getByRole("table", { name: "Semiconductors quotes" });
 
   await expect(quoteTable).toBeVisible();
-  await expect(quoteTable.getByRole("columnheader", { name: "Session Chg", exact: true })).toBeVisible();
-  await expect(quoteTable.getByRole("columnheader", { name: "Span Chg %", exact: true })).toBeVisible();
-  await expect(quoteTable.getByRole("columnheader", { name: "Dollar Volume" })).toBeVisible();
+  await expect(
+    quoteTable.getByRole("columnheader", { name: "Session Chg", exact: true }),
+  ).toBeVisible();
+  await expect(
+    quoteTable.getByRole("columnheader", { name: "Span Chg %", exact: true }),
+  ).toBeVisible();
+  await expect(
+    quoteTable.getByRole("columnheader", { name: "Dollar Volume" }),
+  ).toBeVisible();
   await expect(quoteTable.getByText("NVIDIA")).toBeVisible();
-  await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.length === sectorSymbols.length)).toBe(true);
+  await expect
+    .poll(() =>
+      apiMocks.snapshotRequests.some(
+        (symbols) => symbols.length === sectorSymbols.length,
+      ),
+    )
+    .toBe(true);
   await expect(page.getByText("Live workspace")).toHaveCount(0);
   const toolbar = page.getByRole("toolbar", { name: "Table controls" });
   await expect(toolbar.getByLabel("Time span")).toHaveValue("1h");
   await expect(toolbar.getByLabel("Refresh interval")).toHaveValue("60");
 
   await toolbar.getByLabel("Sort by").selectOption("heat");
-  await expect(quoteTable.getByRole("button").first()).toHaveText("NVDA");
+  await expect(quoteTable.getByRole("button").first()).toHaveAccessibleName(
+    "NVDA",
+  );
 
   await quoteTable.getByRole("button", { name: "NVDA" }).click();
-  const detailPanel = page.getByRole("dialog", { name: "NVDA details" });
+  const detailPanel = page.getByRole("complementary", { name: "NVDA details" });
 
   await expect(detailPanel).toBeVisible();
   await expect(detailPanel.getByLabel("NVDA chart")).toBeVisible();
-  await expect(detailPanel.getByRole("table", { name: "NVDA detail summary" })).toBeVisible();
-  await expect(detailPanel.getByRole("row", { name: "Name NVIDIA" })).toBeVisible();
-  await expect(detailPanel.getByRole("row", { name: "Range High $126.00" })).toBeVisible();
-  await expect.poll(() => apiMocks.historyRequests.some((request) => request.symbol === "NVDA" && request.range === "1h")).toBe(true);
+  await detailPanel.getByText("Quote & range details").click();
+  await expect(
+    detailPanel.getByRole("table", { name: "NVDA detail summary" }),
+  ).toBeVisible();
+  await expect(
+    detailPanel.getByRole("row", { name: "Name NVIDIA" }),
+  ).toBeVisible();
+  await expect(
+    detailPanel.getByRole("row", { name: "Range High $126.00" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      apiMocks.historyRequests.some(
+        (request) => request.symbol === "NVDA" && request.range === "1h",
+      ),
+    )
+    .toBe(true);
 
   await detailPanel.getByRole("button", { name: "5y" }).click();
 
-  await expect.poll(() => apiMocks.historyRequests.some((request) => request.symbol === "NVDA" && request.range === "5y")).toBe(true);
+  await expect
+    .poll(() =>
+      apiMocks.historyRequests.some(
+        (request) => request.symbol === "NVDA" && request.range === "5y",
+      ),
+    )
+    .toBe(true);
   await detailPanel.getByRole("button", { name: "Close details" }).click();
   await expect(detailPanel).toBeHidden();
 
@@ -55,11 +108,23 @@ test("covers the stock workbench sector dashboard without live market calls", as
 
   await page.getByRole("button", { name: "Consumer Staples" }).click();
 
-  await expect(page.getByRole("table", { name: "Consumer Staples quotes" })).toBeVisible();
-  await expect.poll(() => apiMocks.snapshotRequests.some((symbols) => symbols.join(",") === "COST,WMT,PG,KO")).toBe(true);
+  await expect(
+    page.getByRole("table", { name: "Consumer Staples quotes" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      apiMocks.snapshotRequests.some(
+        (symbols) => symbols.join(",") === "COST,WMT,PG,KO",
+      ),
+    )
+    .toBe(true);
 
-  expect(apiMocks.configRequests).toEqual(expect.arrayContaining(["GET /api/config"]));
-  expect(apiMocks.configRequests.every((request) => request === "GET /api/config")).toBe(true);
+  expect(apiMocks.configRequests).toEqual(
+    expect.arrayContaining(["GET /api/config"]),
+  );
+  expect(
+    apiMocks.configRequests.every((request) => request === "GET /api/config"),
+  ).toBe(true);
   expect(apiMocks.ratePlanRequests).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
@@ -73,10 +138,67 @@ test("covers the stock workbench sector dashboard without live market calls", as
   expect(apiMocks.unexpectedApiRequests).toEqual([]);
 });
 
+test("keeps the quote list available while switching the linked chart", async ({
+  page,
+}) => {
+  await mockWorkbenchApis(page);
+  await page.goto("/");
+  const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
+  await expect(
+    quotes.getByRole("columnheader", { name: "Price", exact: true }),
+  ).toBeVisible();
+  await expect(
+    quotes.getByRole("columnheader", { name: "Business" }),
+  ).toHaveCount(0);
+  await quotes.getByRole("button", { name: "NVDA", exact: true }).click();
+  await expect(page.getByLabel("NVDA chart")).toBeVisible();
+  await quotes.getByRole("button", { name: "AMD", exact: true }).click();
+  await expect(page.getByLabel("AMD chart")).toBeVisible();
+  await quotes.getByRole("button", { name: "AMD", exact: true }).click();
+  await expect(page.getByLabel("AMD chart")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Consumer Staples", exact: true })
+    .click();
+  await expect(
+    page.getByRole("complementary", { name: "AMD details" }),
+  ).toHaveCount(0);
+});
+
+test("keeps essential quotes and chart inside a mobile viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await mockWorkbenchApis(page);
+  await page.goto("/");
+  const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
+  await quotes.getByRole("button", { name: "NVDA", exact: true }).click();
+  await expect(page.getByLabel("NVDA chart")).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .getByLabel("Watchlist", { exact: true })
+    .selectOption("consumer-staples");
+  await expect(
+    page.getByRole("table", { name: "Consumer Staples quotes" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];
-  const historyRequests: Array<{ range: PriceSeries["range"]; symbol: string }> = [];
+  const historyRequests: Array<{
+    range: PriceSeries["range"];
+    symbol: string;
+  }> = [];
   const ratePlanRequests: unknown[] = [];
   const unexpectedApiRequests: string[] = [];
 
@@ -122,7 +244,9 @@ async function mockWorkbenchApis(page: Page) {
     }
 
     const payload = route.request().postDataJSON() as { symbols?: string[] };
-    const symbols = (payload.symbols ?? []).map((symbol) => symbol.toUpperCase());
+    const symbols = (payload.symbols ?? []).map((symbol) =>
+      symbol.toUpperCase(),
+    );
 
     snapshotRequests.push(symbols);
 
@@ -139,7 +263,8 @@ async function mockWorkbenchApis(page: Page) {
 
     const url = new URL(route.request().url());
     const symbol = (url.searchParams.get("symbol") ?? "NVDA").toUpperCase();
-    const range = (url.searchParams.get("range") ?? "1h") as PriceSeries["range"];
+    const range = (url.searchParams.get("range") ??
+      "1h") as PriceSeries["range"];
 
     historyRequests.push({ range, symbol });
 
@@ -205,7 +330,10 @@ const sectorSymbols = [
   "RTX",
 ];
 
-const workbenchConfig: { settings: SettingsConfig; watchlists: WatchlistsConfig } = {
+const workbenchConfig: {
+  settings: SettingsConfig;
+  watchlists: WatchlistsConfig;
+} = {
   settings: {
     polygon: {
       plan: "paid",
@@ -273,10 +401,18 @@ function snapshotFor(symbol: string): MarketSnapshot {
   };
   const index = sectorSymbols.indexOf(symbol);
 
-  return snapshots[symbol] ?? createSnapshot(symbol, `${symbol} Inc.`, 100 + Math.max(index, 0), 0.5);
+  return (
+    snapshots[symbol] ??
+    createSnapshot(symbol, `${symbol} Inc.`, 100 + Math.max(index, 0), 0.5)
+  );
 }
 
-function createSnapshot(symbol: string, name: string, price: number, changePercent: number): MarketSnapshot {
+function createSnapshot(
+  symbol: string,
+  name: string,
+  price: number,
+  changePercent: number,
+): MarketSnapshot {
   return {
     symbol,
     name,

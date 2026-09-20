@@ -1,4 +1,11 @@
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSnapshot, PriceSeries } from "../../../shared/types";
@@ -12,31 +19,65 @@ afterEach(() => {
 
 describe("Workbench", () => {
   it("renders a file-backed sector table with API stats and no watchlist creation", async () => {
-    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map(snapshotFor),
+    );
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols));
+    await waitFor(() =>
+      expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols),
+    );
 
-    expect(screen.queryByRole("button", { name: "New Watchlist" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Data connection"));
+    await userEvent.click(screen.getByRole("button", { name: "All columns" }));
+    expect(
+      screen.queryByRole("button", { name: "New Watchlist" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Live workspace")).not.toBeInTheDocument();
-    expect(screen.getByRole("table", { name: "API usage summary" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("table", { name: "API usage summary" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Tracked symbols")).toBeInTheDocument();
     expect(screen.getByText("23")).toBeInTheDocument();
     expect(screen.getByText("Quote requests this session")).toBeInTheDocument();
-    expect(screen.getByText("History requests this session")).toBeInTheDocument();
+    expect(
+      screen.getByText("History requests this session"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Today's API calls")).not.toBeInTheDocument();
     expect(screen.queryByText("Historical API calls")).not.toBeInTheDocument();
-    expect(screen.getByText("stocks-starter has unlimited REST calls for this planner.")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Business" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "AI GPU platforms" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Session Chg" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Session Chg %" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Span Chg" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Span Chg %" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Dollar Volume" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Timeframe" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "stocks-starter has unlimited REST calls for this planner.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Name" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Business" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("cell", { name: "AI GPU platforms" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Session Chg" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Session Chg %" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Span Chg" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Span Chg %" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Dollar Volume" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Timeframe" }),
+    ).toBeInTheDocument();
     expect(await screen.findByText("$39.1B")).toBeInTheDocument();
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
   });
@@ -55,28 +96,49 @@ describe("Workbench", () => {
 
     await flushEffects();
     expect(fetchSnapshots).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("Last refreshed 2026-05-26 15:00 UTC")).toBeInTheDocument();
-    expect(screen.getAllByText("2026-05-26 14:53 UTC").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Last refreshed 2026-05-26 15:00 UTC"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("2026-05-26 14:53 UTC").length).toBeGreaterThan(
+      0,
+    );
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
 
     expect(fetchSnapshots).toHaveBeenCalledTimes(2);
-    expect(screen.getByText("Last refreshed 2026-05-26 15:01 UTC")).toBeInTheDocument();
-    expect(screen.getAllByText("2026-05-26 14:53 UTC").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Last refreshed 2026-05-26 15:01 UTC"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("2026-05-26 14:53 UTC").length).toBeGreaterThan(
+      0,
+    );
   });
 
   it("counts quote refreshes as batched workbench requests instead of symbol refresh units", async () => {
-    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map(snapshotFor),
+    );
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    const usageTable = await screen.findByRole("table", { name: "API usage summary" });
+    await userEvent.click(await screen.findByText("Data connection"));
+    const usageTable = await screen.findByRole("table", {
+      name: "API usage summary",
+    });
 
     await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledTimes(1));
-    expect(within(usageTable).getByRole("row", { name: "Quote requests this session 1" })).toBeInTheDocument();
-    expect(within(usageTable).getByRole("row", { name: "REST requests this session 21" })).toBeInTheDocument();
+    expect(
+      within(usageTable).getByRole("row", {
+        name: "Quote requests this session 1",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(usageTable).getByRole("row", {
+        name: "REST requests this session 21",
+      }),
+    ).toBeInTheDocument();
     expect(within(usageTable).queryByText("41,510")).not.toBeInTheDocument();
   });
 
@@ -86,37 +148,60 @@ describe("Workbench", () => {
     await screen.findByRole("table", { name: "Semiconductors quotes" });
 
     const toolbar = screen.getByRole("toolbar", { name: "Table controls" });
-    const labels = within(toolbar).getAllByText(/^(Time span|Refresh interval|Sort by|Rows)$/);
+    const labels = within(toolbar).getAllByText(
+      /^(Time span|Refresh interval|Sort by|Rows)$/,
+    );
 
-    expect(labels.map((label) => label.textContent)).toEqual(["Time span", "Refresh interval", "Sort by", "Rows"]);
-    expect(screen.getAllByRole("toolbar", { name: "Table controls" })).toHaveLength(1);
-    expect(within(toolbar).getByLabelText("Refresh interval")).toHaveValue("60");
+    expect(labels.map((label) => label.textContent)).toEqual([
+      "Time span",
+      "Refresh interval",
+      "Sort by",
+      "Rows",
+    ]);
+    expect(
+      screen.getAllByRole("toolbar", { name: "Table controls" }),
+    ).toHaveLength(1);
+    expect(within(toolbar).getByLabelText("Refresh interval")).toHaveValue(
+      "60",
+    );
     expect(within(toolbar).getByLabelText("Time span")).toHaveValue("1h");
     expect(
-      within(within(toolbar).getByLabelText("Refresh interval")).getAllByRole("option").map((option) => option.textContent),
+      within(within(toolbar).getByLabelText("Refresh interval"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
     ).toEqual(["10s", "1m", "5m", "30m", "1h", "1d"]);
     expect(
-      within(within(toolbar).getByLabelText("Time span")).getAllByRole("option").map((option) => option.textContent),
+      within(within(toolbar).getByLabelText("Time span"))
+        .getAllByRole("option")
+        .map((option) => option.textContent),
     ).toEqual(["1h", "1d", "5d", "30d", "3months", "1y", "5y"]);
   });
 
   it("sorts by heat and paginates the selected sector", async () => {
     const user = userEvent.setup();
-    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map(snapshotFor),
+    );
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    const quoteTable = await screen.findByRole("table", {
+      name: "Semiconductors quotes",
+    });
 
     await user.selectOptions(screen.getByLabelText("Sort by"), "heat");
 
-    expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent("NVDA");
+    expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent(
+      "NVDA",
+    );
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
 
     expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-    expect(within(quoteTable).getByRole("button", { name: "GE" })).toBeInTheDocument();
+    expect(
+      within(quoteTable).getByRole("button", { name: "GE" }),
+    ).toBeInTheDocument();
   });
 
   it("uses selected time span movement for heat sorting when history is available", async () => {
@@ -135,47 +220,84 @@ describe("Workbench", () => {
 
     render(<Workbench api={createApi({ getHistory })} />);
 
-    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
-    await waitFor(() => expect(within(quoteTable).getByText("+25.00%")).toBeInTheDocument());
+    const quoteTable = await screen.findByRole("table", {
+      name: "Semiconductors quotes",
+    });
+    await waitFor(() =>
+      expect(within(quoteTable).getByText("+25.00%")).toBeInTheDocument(),
+    );
 
     await user.selectOptions(screen.getByLabelText("Sort by"), "heat");
 
-    await waitFor(() => expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent("AMD"));
+    await waitFor(() =>
+      expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent(
+        "AMD",
+      ),
+    );
   });
 
-  it("opens symbol history in an off-canvas detail panel and closes it", async () => {
+  it("opens symbol history in an linked detail panel and closes it", async () => {
     const user = userEvent.setup();
-    const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
+    const getHistory = vi.fn(async (symbol, range) =>
+      priceSeries(symbol, range),
+    );
 
     render(<Workbench api={createApi({ getHistory })} />);
 
-    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    const quoteTable = await screen.findByRole("table", {
+      name: "Semiconductors quotes",
+    });
     await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
 
-    expect(await screen.findByRole("dialog", { name: "NVDA details" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("complementary", { name: "NVDA details" }),
+    ).toBeInTheDocument();
     expect(await screen.findByLabelText("NVDA chart")).toBeInTheDocument();
-    const detailSummary = await screen.findByRole("table", { name: "NVDA detail summary" });
-    expect(within(detailSummary).getByRole("row", { name: "Name NVIDIA Corporation" })).toBeInTheDocument();
-    expect(within(detailSummary).getByRole("row", { name: "Price $927.75" })).toBeInTheDocument();
-    expect(within(detailSummary).getByRole("row", { name: "Span Chg +3.00" })).toBeInTheDocument();
-    expect(within(detailSummary).getByRole("row", { name: "Range High $15.00" })).toBeInTheDocument();
-    expect(within(detailSummary).getByRole("row", { name: "Range Volume 300" })).toBeInTheDocument();
+    await user.click(screen.getByText("Quote & range details"));
+    const detailSummary = await screen.findByRole("table", {
+      name: "NVDA detail summary",
+    });
+    expect(
+      within(detailSummary).getByRole("row", {
+        name: "Name NVIDIA Corporation",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      within(detailSummary).getByRole("row", { name: "Price $927.75" }),
+    ).toBeInTheDocument();
+    expect(
+      within(detailSummary).getByRole("row", { name: "Span Chg +3.00" }),
+    ).toBeInTheDocument();
+    expect(
+      within(detailSummary).getByRole("row", { name: "Range High $15.00" }),
+    ).toBeInTheDocument();
+    expect(
+      within(detailSummary).getByRole("row", { name: "Range Volume 300" }),
+    ).toBeInTheDocument();
     expect(getHistory).toHaveBeenCalledWith("NVDA", "1h");
 
     await user.click(screen.getByRole("button", { name: "Close details" }));
 
-    expect(screen.queryByRole("dialog", { name: "NVDA details" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("complementary", { name: "NVDA details" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("requests new history when the off-canvas chart range changes", async () => {
+  it("requests new history when the linked chart range changes", async () => {
     const user = userEvent.setup();
-    const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
+    const getHistory = vi.fn(async (symbol, range) =>
+      priceSeries(symbol, range),
+    );
 
     render(<Workbench api={createApi({ getHistory })} />);
 
-    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    const quoteTable = await screen.findByRole("table", {
+      name: "Semiconductors quotes",
+    });
     await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
-    const detailPanel = await screen.findByRole("dialog", { name: "NVDA details" });
+    const detailPanel = await screen.findByRole("complementary", {
+      name: "NVDA details",
+    });
     await user.click(within(detailPanel).getByRole("button", { name: "5y" }));
 
     await waitFor(() => expect(getHistory).toHaveBeenCalledWith("NVDA", "5y"));
@@ -183,45 +305,78 @@ describe("Workbench", () => {
 
   it("uses the selected toolbar time span when opening history without changing refresh cadence", async () => {
     const user = userEvent.setup();
-    const getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range));
+    const getHistory = vi.fn(async (symbol, range) =>
+      priceSeries(symbol, range),
+    );
     const evaluateRatePlan = vi.fn(async () => ratePlanEvaluation);
 
     render(<Workbench api={createApi({ getHistory, evaluateRatePlan })} />);
 
-    const toolbar = await screen.findByRole("toolbar", { name: "Table controls" });
+    const toolbar = await screen.findByRole("toolbar", {
+      name: "Table controls",
+    });
     await user.selectOptions(within(toolbar).getByLabelText("Time span"), "5d");
 
-    const quoteTable = await screen.findByRole("table", { name: "Semiconductors quotes" });
+    const quoteTable = await screen.findByRole("table", {
+      name: "Semiconductors quotes",
+    });
     await user.click(within(quoteTable).getByRole("button", { name: "NVDA" }));
 
-    expect(await screen.findByRole("dialog", { name: "NVDA details" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("complementary", { name: "NVDA details" }),
+    ).toBeInTheDocument();
     await waitFor(() => expect(getHistory).toHaveBeenCalledWith("NVDA", "5d"));
-    expect(evaluateRatePlan).toHaveBeenCalledWith(expect.objectContaining({ intervalSeconds: 60 }));
+    expect(evaluateRatePlan).toHaveBeenCalledWith(
+      expect.objectContaining({ intervalSeconds: 60 }),
+    );
   });
 
   it("polls the newly selected sector as one flattened symbol list", async () => {
     const user = userEvent.setup();
-    const fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor));
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map(snapshotFor),
+    );
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols));
+    await waitFor(() =>
+      expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols),
+    );
 
     await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
 
-    await waitFor(() => expect(fetchSnapshots).toHaveBeenLastCalledWith(["COST", "WMT", "PG", "KO"]));
-    expect(screen.getByRole("table", { name: "Consumer Staples quotes" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchSnapshots).toHaveBeenLastCalledWith([
+        "COST",
+        "WMT",
+        "PG",
+        "KO",
+      ]),
+    );
+    expect(
+      screen.getByRole("table", { name: "Consumer Staples quotes" }),
+    ).toBeInTheDocument();
   });
 
   it("shows loading and config errors accessibly", async () => {
-    const { unmount } = render(<Workbench api={createApi({ configPromise: new Promise(() => undefined) })} />);
+    const { unmount } = render(
+      <Workbench
+        api={createApi({ configPromise: new Promise(() => undefined) })}
+      />,
+    );
 
     expect(screen.getByText("Loading watchlists...")).toBeInTheDocument();
     unmount();
 
-    render(<Workbench api={createApi({ configError: new Error("Config unavailable") })} />);
+    render(
+      <Workbench
+        api={createApi({ configError: new Error("Config unavailable") })}
+      />,
+    );
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Config unavailable");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Config unavailable",
+    );
   });
 
   it("renders an accessible error when snapshot fetching fails", async () => {
@@ -231,7 +386,9 @@ describe("Workbench", () => {
 
     render(<Workbench api={createApi({ fetchSnapshots })} />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Snapshots unavailable");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Snapshots unavailable",
+    );
   });
 
   it("evaluates the refresh budget with selected sector symbol count and default one minute interval", async () => {
@@ -297,8 +454,18 @@ const baseConfig: WorkbenchConfig = {
           AMD: "AI accelerator chips",
         },
         rows: [
-          { id: "leaders", name: "Leaders", expandedByDefault: true, symbols: ["nvda", "AMD", "ASML", "NVDA"] },
-          { id: "market", name: "Market", expandedByDefault: true, symbols: sectorSymbols.slice(3) },
+          {
+            id: "leaders",
+            name: "Leaders",
+            expandedByDefault: true,
+            symbols: ["nvda", "AMD", "ASML", "NVDA"],
+          },
+          {
+            id: "market",
+            name: "Market",
+            expandedByDefault: true,
+            symbols: sectorSymbols.slice(3),
+          },
         ],
       },
       {
@@ -306,14 +473,21 @@ const baseConfig: WorkbenchConfig = {
         name: "Consumer Staples",
         pinnedSymbols: ["COST"],
         rows: [
-          { id: "staples", name: "Staples", expandedByDefault: true, symbols: ["COST", "WMT", "PG", "KO"] },
+          {
+            id: "staples",
+            name: "Staples",
+            expandedByDefault: true,
+            symbols: ["COST", "WMT", "PG", "KO"],
+          },
         ],
       },
     ],
   },
 };
 
-const ratePlanEvaluation: Awaited<ReturnType<WorkbenchApi["evaluateRatePlan"]>> = {
+const ratePlanEvaluation: Awaited<
+  ReturnType<WorkbenchApi["evaluateRatePlan"]>
+> = {
   status: "ok",
   plan: "paid",
   intervalSeconds: 60,
@@ -400,7 +574,11 @@ function snapshotFor(symbol: string): MarketSnapshot {
   };
 }
 
-function priceSeries(symbol: string, range: PriceSeries["range"], closes = [11, 14]): PriceSeries {
+function priceSeries(
+  symbol: string,
+  range: PriceSeries["range"],
+  closes = [11, 14],
+): PriceSeries {
   return {
     symbol,
     range,

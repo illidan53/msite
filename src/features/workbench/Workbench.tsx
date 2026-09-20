@@ -1,5 +1,11 @@
+import { Activity, ChartNoAxesCombined, Layers } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { MarketSnapshot, PriceSeries, RatePlanEvaluation, Watchlist } from "../../../shared/types";
+import type {
+  MarketSnapshot,
+  PriceSeries,
+  RatePlanEvaluation,
+  Watchlist,
+} from "../../../shared/types";
 import { SymbolChart } from "../charts/SymbolChart";
 import { RefreshControls } from "../settings/RefreshControls";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
@@ -8,7 +14,14 @@ interface WorkbenchProps {
   api: WorkbenchApi;
 }
 
-type SortMode = "config" | "size" | "heat" | "volume" | "changePercent" | "price" | "updated";
+type SortMode =
+  | "config"
+  | "size"
+  | "heat"
+  | "volume"
+  | "changePercent"
+  | "price"
+  | "updated";
 interface SpanMetric {
   change: number | null;
   changePercent: number | null;
@@ -24,15 +37,16 @@ const DEFAULT_INTERVAL_SECONDS = 60;
 const DEFAULT_RANGE: PriceSeries["range"] = "1h";
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
-const TIME_SPAN_OPTIONS: Array<{ label: string; value: PriceSeries["range"] }> = [
-  { label: "1h", value: "1h" },
-  { label: "1d", value: "1d" },
-  { label: "5d", value: "5d" },
-  { label: "30d", value: "30d" },
-  { label: "3months", value: "3month" },
-  { label: "1y", value: "1y" },
-  { label: "5y", value: "5y" },
-];
+const TIME_SPAN_OPTIONS: Array<{ label: string; value: PriceSeries["range"] }> =
+  [
+    { label: "1h", value: "1h" },
+    { label: "1d", value: "1d" },
+    { label: "5d", value: "5d" },
+    { label: "30d", value: "30d" },
+    { label: "3months", value: "3month" },
+    { label: "1y", value: "1y" },
+    { label: "5y", value: "5y" },
+  ];
 const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
   { id: "config", label: "Config order" },
   { id: "size", label: "Size" },
@@ -46,19 +60,33 @@ const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
 export function Workbench({ api }: WorkbenchProps) {
   const [config, setConfig] = useState<WorkbenchConfig | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(null);
-  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(null);
+  const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(
+    null,
+  );
+  const [selectedWatchlistId, setSelectedWatchlistId] = useState<string | null>(
+    null,
+  );
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [selectedRange, setSelectedRange] = useState<PriceSeries["range"]>(DEFAULT_RANGE);
+  const [selectedRange, setSelectedRange] =
+    useState<PriceSeries["range"]>(DEFAULT_RANGE);
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
   const [historyRequestCount, setHistoryRequestCount] = useState(0);
   const [quoteRequestCount, setQuoteRequestCount] = useState(0);
-  const [lastQuoteRefreshAt, setLastQuoteRefreshAt] = useState<string | null>(null);
-  const [snapshotsBySymbol, setSnapshotsBySymbol] = useState<Record<string, MarketSnapshot>>({});
-  const [spanMetricsByKey, setSpanMetricsByKey] = useState<Record<string, SpanMetric>>({});
-  const [intervalSeconds, setIntervalSeconds] = useState(DEFAULT_INTERVAL_SECONDS);
+  const [lastQuoteRefreshAt, setLastQuoteRefreshAt] = useState<string | null>(
+    null,
+  );
+  const [snapshotsBySymbol, setSnapshotsBySymbol] = useState<
+    Record<string, MarketSnapshot>
+  >({});
+  const [spanMetricsByKey, setSpanMetricsByKey] = useState<
+    Record<string, SpanMetric>
+  >({});
+  const [intervalSeconds, setIntervalSeconds] = useState(
+    DEFAULT_INTERVAL_SECONDS,
+  );
   const [sortMode, setSortMode] = useState<SortMode>("config");
   const [currentPage, setCurrentPage] = useState(1);
+  const [expandedColumns, setExpandedColumns] = useState(false);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [ratePlan, setRatePlan] = useState<RatePlanEvaluation>({
     status: "ok" as const,
@@ -68,30 +96,46 @@ export function Workbench({ api }: WorkbenchProps) {
     message: "Refresh interval is within the configured budget.",
     disabledIntervals: [] as number[],
   });
+  const detailRef = useRef<HTMLElement | null>(null);
   const configRef = useRef<WorkbenchConfig | null>(null);
 
   const watchlists = config?.watchlists.watchlists ?? [];
   const watchlist: Watchlist | undefined =
-    watchlists.find((candidate) => candidate.id === selectedWatchlistId) ?? watchlists[0];
+    watchlists.find((candidate) => candidate.id === selectedWatchlistId) ??
+    watchlists[0];
   const symbolDescriptions = watchlist?.symbolDescriptions ?? {};
 
-  const activeSymbols = useMemo(() => (watchlist ? flattenWatchlistSymbols(watchlist) : []), [watchlist]);
+  const activeSymbols = useMemo(
+    () => (watchlist ? flattenWatchlistSymbols(watchlist) : []),
+    [watchlist],
+  );
   const allTrackedSymbols = useMemo(
-    () => uniqueUppercaseSymbols(watchlists.flatMap((item) => item.rows.flatMap((row) => row.symbols))),
+    () =>
+      uniqueUppercaseSymbols(
+        watchlists.flatMap((item) => item.rows.flatMap((row) => row.symbols)),
+      ),
     [watchlists],
   );
   const spanMetricsBySymbol = useMemo(
-    () => mapSpanMetricsForRange(activeSymbols, spanMetricsByKey, selectedRange),
+    () =>
+      mapSpanMetricsForRange(activeSymbols, spanMetricsByKey, selectedRange),
     [activeSymbols, selectedRange, spanMetricsByKey],
   );
   const sortedSymbols = useMemo(
-    () => sortSymbols(activeSymbols, snapshotsBySymbol, spanMetricsBySymbol, sortMode),
+    () =>
+      sortSymbols(
+        activeSymbols,
+        snapshotsBySymbol,
+        spanMetricsBySymbol,
+        sortMode,
+      ),
     [activeSymbols, snapshotsBySymbol, sortMode, spanMetricsBySymbol],
   );
   const totalPages = Math.max(1, Math.ceil(sortedSymbols.length / pageSize));
   const boundedPage = Math.min(currentPage, totalPages);
   const pageSymbols = useMemo(
-    () => sortedSymbols.slice((boundedPage - 1) * pageSize, boundedPage * pageSize),
+    () =>
+      sortedSymbols.slice((boundedPage - 1) * pageSize, boundedPage * pageSize),
     [boundedPage, pageSize, sortedSymbols],
   );
   const spanSymbolsForHistory = useMemo(
@@ -100,14 +144,21 @@ export function Workbench({ api }: WorkbenchProps) {
   );
   const spanSymbolsForHistoryKey = spanSymbolsForHistory.join("|");
   const totalWorkbenchRequestCount = quoteRequestCount + historyRequestCount;
-  const selectedSnapshot = selectedSymbol ? snapshotsBySymbol[selectedSymbol] : undefined;
-  const selectedBusinessDescription = selectedSymbol ? symbolDescriptions[selectedSymbol] : undefined;
+  const selectedSnapshot = selectedSymbol
+    ? snapshotsBySymbol[selectedSymbol]
+    : undefined;
+  const selectedBusinessDescription = selectedSymbol
+    ? symbolDescriptions[selectedSymbol]
+    : undefined;
   const selectedSpanMetric = useMemo(() => {
     if (!selectedSymbol) {
       return undefined;
     }
 
-    return spanMetricsBySymbol[selectedSymbol] ?? (historySeries ? spanMetricFromSeries(historySeries) : undefined);
+    return (
+      spanMetricsBySymbol[selectedSymbol] ??
+      (historySeries ? spanMetricFromSeries(historySeries) : undefined)
+    );
   }, [historySeries, selectedSymbol, spanMetricsBySymbol]);
   const selectedDetailRows = useMemo(
     () =>
@@ -119,7 +170,14 @@ export function Workbench({ api }: WorkbenchProps) {
         historySeries,
         selectedRange,
       ),
-    [historySeries, selectedBusinessDescription, selectedRange, selectedSnapshot, selectedSpanMetric, selectedSymbol],
+    [
+      historySeries,
+      selectedBusinessDescription,
+      selectedRange,
+      selectedSnapshot,
+      selectedSpanMetric,
+      selectedSymbol,
+    ],
   );
 
   useEffect(() => {
@@ -152,7 +210,9 @@ export function Workbench({ api }: WorkbenchProps) {
         setConfig(loadedConfig);
         configRef.current = loadedConfig;
         setErrorMessage(null);
-        setSelectedWatchlistId(loadedConfig.watchlists.watchlists[0]?.id ?? null);
+        setSelectedWatchlistId(
+          loadedConfig.watchlists.watchlists[0]?.id ?? null,
+        );
       })
       .catch((error: unknown) => {
         if (isStale) {
@@ -162,7 +222,9 @@ export function Workbench({ api }: WorkbenchProps) {
         setConfig(null);
         configRef.current = null;
         setSelectedWatchlistId(null);
-        setErrorMessage(formatErrorMessage(error, "Unable to load workbench configuration."));
+        setErrorMessage(
+          formatErrorMessage(error, "Unable to load workbench configuration."),
+        );
       });
 
     return () => {
@@ -201,7 +263,12 @@ export function Workbench({ api }: WorkbenchProps) {
 
           setSnapshotsBySymbol((current) => ({
             ...current,
-            ...Object.fromEntries(snapshots.map((snapshot) => [snapshot.symbol.toUpperCase(), snapshot])),
+            ...Object.fromEntries(
+              snapshots.map((snapshot) => [
+                snapshot.symbol.toUpperCase(),
+                snapshot,
+              ]),
+            ),
           }));
           setLastQuoteRefreshAt(new Date().toISOString());
         })
@@ -210,13 +277,18 @@ export function Workbench({ api }: WorkbenchProps) {
             return;
           }
 
-          setErrorMessage(formatErrorMessage(error, "Unable to refresh market snapshots."));
+          setErrorMessage(
+            formatErrorMessage(error, "Unable to refresh market snapshots."),
+          );
         });
     }
 
     refreshSnapshots();
 
-    const intervalId = window.setInterval(refreshSnapshots, intervalSeconds * 1000);
+    const intervalId = window.setInterval(
+      refreshSnapshots,
+      intervalSeconds * 1000,
+    );
 
     return () => {
       isStale = true;
@@ -230,7 +302,8 @@ export function Workbench({ api }: WorkbenchProps) {
     }
 
     const missingSymbols = spanSymbolsForHistory.filter(
-      (symbol) => spanMetricsByKey[spanMetricKey(symbol, selectedRange)] === undefined,
+      (symbol) =>
+        spanMetricsByKey[spanMetricKey(symbol, selectedRange)] === undefined,
     );
     if (missingSymbols.length === 0) {
       return;
@@ -243,7 +316,10 @@ export function Workbench({ api }: WorkbenchProps) {
     void Promise.all(
       missingSymbols.map(async (symbol) => {
         const series = await api.getHistory(symbol, selectedRange);
-        return [spanMetricKey(symbol, selectedRange), spanMetricFromSeries(series)] as const;
+        return [
+          spanMetricKey(symbol, selectedRange),
+          spanMetricFromSeries(series),
+        ] as const;
       }),
     )
       .then((entries) => {
@@ -261,13 +337,25 @@ export function Workbench({ api }: WorkbenchProps) {
           return;
         }
 
-        setErrorMessage(formatErrorMessage(error, "Unable to load selected time span movement."));
+        setErrorMessage(
+          formatErrorMessage(
+            error,
+            "Unable to load selected time span movement.",
+          ),
+        );
       });
 
     return () => {
       isStale = true;
     };
-  }, [api, config, selectedRange, spanMetricsByKey, spanSymbolsForHistory, spanSymbolsForHistoryKey]);
+  }, [
+    api,
+    config,
+    selectedRange,
+    spanMetricsByKey,
+    spanSymbolsForHistory,
+    spanSymbolsForHistoryKey,
+  ]);
 
   useEffect(() => {
     if (!selectedSymbol) {
@@ -297,7 +385,9 @@ export function Workbench({ api }: WorkbenchProps) {
         }
 
         setHistorySeries(null);
-        setHistoryErrorMessage(formatErrorMessage(error, "Unable to load price history."));
+        setHistoryErrorMessage(
+          formatErrorMessage(error, "Unable to load price history."),
+        );
       });
 
     return () => {
@@ -335,7 +425,10 @@ export function Workbench({ api }: WorkbenchProps) {
         setRatePlan((current) => ({
           ...current,
           status: "warning",
-          message: formatErrorMessage(error, "Unable to evaluate refresh budget."),
+          message: formatErrorMessage(
+            error,
+            "Unable to evaluate refresh budget.",
+          ),
         }));
       });
 
@@ -343,6 +436,12 @@ export function Workbench({ api }: WorkbenchProps) {
       isStale = true;
     };
   }, [api, activeSymbols.length, config, intervalSeconds]);
+
+  useEffect(() => {
+    if (selectedSymbol && window.matchMedia?.("(max-width: 1100px)").matches) {
+      detailRef.current?.scrollIntoView?.({ block: "start" });
+    }
+  }, [selectedSymbol]);
 
   function handleWatchlistSelect(nextWatchlistId: string) {
     setSelectedWatchlistId(nextWatchlistId);
@@ -352,6 +451,7 @@ export function Workbench({ api }: WorkbenchProps) {
   }
 
   function handleSymbolSelect(symbol: string) {
+    if (selectedSymbol === symbol.toUpperCase()) return;
     setSelectedSymbol(symbol.toUpperCase());
     setHistorySeries(null);
     setHistoryErrorMessage(null);
@@ -380,81 +480,120 @@ export function Workbench({ api }: WorkbenchProps) {
   }
 
   return (
-    <main className="workbench">
-      {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
-
-      <header className="workbench-topbar" role="toolbar" aria-label="Table controls">
+    <main className={`workbench ${selectedSymbol ? "has-selection" : ""}`}>
+      <header className="brand-bar">
+        <div className="brand">
+          <span className="brand-mark">
+            <Activity size={20} aria-hidden="true" />
+          </span>
+          <h1>Stock Workbench</h1>
+        </div>
+        <span className="brand-caption">
+          MARKET OBSERVATORY <span> / US EQUITIES</span>
+        </span>
+      </header>
+      <div className="workspace-heading">
+        <div>
+          <p className="eyebrow">WATCHLIST / MARKET OVERVIEW</p>
+          <h2>{watchlist.name}</h2>
+          <p>
+            {activeSymbols.length} symbols <span aria-hidden="true">·</span> USD{" "}
+            <span aria-hidden="true">·</span> {watchlist.description}
+          </p>
+        </div>
+        <span className="market-note">Source timing shown per symbol</span>
+      </div>
+      <header
+        className="workbench-topbar"
+        role="toolbar"
+        aria-label="Table controls"
+      >
         <span className="quote-refresh-status" aria-live="polite">
-          {lastQuoteRefreshAt ? `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}` : "Refresh pending"}
+          {lastQuoteRefreshAt
+            ? `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}`
+            : "Refresh pending"}
         </span>
 
-        <label htmlFor="time-span">Time span</label>
-        <select
-          id="time-span"
-          value={selectedRange}
-          onChange={(event) => setSelectedRange(event.target.value as PriceSeries["range"])}
+        <div className="control-field">
+          <label htmlFor="time-span">Time span</label>
+          <select
+            id="time-span"
+            value={selectedRange}
+            onChange={(event) =>
+              setSelectedRange(event.target.value as PriceSeries["range"])
+            }
+          >
+            {TIME_SPAN_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="control-field">
+          <RefreshControls
+            intervalSeconds={intervalSeconds}
+            disabledIntervals={ratePlan.disabledIntervals}
+            onChange={setIntervalSeconds}
+          />
+        </div>
+        <div className="control-field">
+          <label htmlFor="sort-mode">Sort by</label>
+          <select
+            id="sort-mode"
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as SortMode)}
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="control-field">
+          <label htmlFor="page-size">Rows</label>
+          <select
+            id="page-size"
+            value={pageSize}
+            onChange={(event) => setPageSize(Number(event.target.value))}
+          >
+            {PAGE_SIZE_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          className="columns-toggle"
+          type="button"
+          aria-pressed={expandedColumns}
+          onClick={() => setExpandedColumns(!expandedColumns)}
         >
-          {TIME_SPAN_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-
-        <RefreshControls
-          intervalSeconds={intervalSeconds}
-          disabledIntervals={ratePlan.disabledIntervals}
-          onChange={setIntervalSeconds}
-        />
-
-        <label htmlFor="sort-mode">Sort by</label>
-        <select id="sort-mode" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-
-        <label htmlFor="page-size">Rows</label>
-        <select
-          id="page-size"
-          value={pageSize}
-          onChange={(event) => setPageSize(Number(event.target.value))}
-        >
-          {PAGE_SIZE_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          {expandedColumns ? "Essential columns" : "All columns"}
+        </button>
       </header>
 
       <aside className="watchlist-rail" aria-label="Watchlists">
-        <h1>Stock Workbench</h1>
-        <table className="usage-table" aria-label="API usage summary">
-          <tbody>
-            <tr>
-              <th scope="row">Quote requests this session</th>
-              <td>{formatInteger(quoteRequestCount)}</td>
-            </tr>
-            <tr>
-              <th scope="row">Tracked symbols</th>
-              <td>{formatInteger(allTrackedSymbols.length)}</td>
-            </tr>
-            <tr>
-              <th scope="row">History requests this session</th>
-              <td>{formatInteger(historyRequestCount)}</td>
-            </tr>
-            <tr>
-              <th scope="row">REST requests this session</th>
-              <td>{formatInteger(totalWorkbenchRequestCount)}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p role="status" className={`rate-status ${ratePlan.status}`}>
-          {ratePlan.message}
+        <p className="eyebrow rail-title">
+          <Layers size={14} aria-hidden="true" /> WATCHLISTS
         </p>
+        <label className="mobile-watchlist" htmlFor="mobile-watchlist">
+          Watchlist
+          <select
+            id="mobile-watchlist"
+            aria-label="Watchlist"
+            value={watchlist.id}
+            onChange={(event) => handleWatchlistSelect(event.target.value)}
+          >
+            {watchlists.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <div className="watchlist-buttons">
           {watchlists.map((watchlistOption) => (
             <button
@@ -468,11 +607,46 @@ export function Workbench({ api }: WorkbenchProps) {
             </button>
           ))}
         </div>
+        <details className="connection-details">
+          <summary>Data connection</summary>
+          <table className="usage-table" aria-label="API usage summary">
+            <tbody>
+              <tr>
+                <th scope="row">Quote requests this session</th>
+                <td>{formatInteger(quoteRequestCount)}</td>
+              </tr>
+              <tr>
+                <th scope="row">Tracked symbols</th>
+                <td>{formatInteger(allTrackedSymbols.length)}</td>
+              </tr>
+              <tr>
+                <th scope="row">History requests this session</th>
+                <td>{formatInteger(historyRequestCount)}</td>
+              </tr>
+              <tr>
+                <th scope="row">REST requests this session</th>
+                <td>{formatInteger(totalWorkbenchRequestCount)}</td>
+              </tr>
+            </tbody>
+          </table>
+          <p role="status" className={`rate-status ${ratePlan.status}`}>
+            {ratePlan.message}
+          </p>
+        </details>
       </aside>
 
-      <section className="watchlist-main" aria-label={`${watchlist.name} dashboard`}>
-        <section className="watchlist-row sector-table-panel">
-          <table className="quote-table sector-table" aria-label={`${watchlist.name} quotes`}>
+      <section
+        className="watchlist-main"
+        aria-label={`${watchlist.name} dashboard`}
+      >
+        {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
+        <section
+          className={`watchlist-row sector-table-panel ${expandedColumns ? "expanded-columns" : "essential-columns"}`}
+        >
+          <table
+            className="quote-table sector-table"
+            aria-label={`${watchlist.name} quotes`}
+          >
             <thead>
               <tr>
                 <th scope="col">Symbol</th>
@@ -493,30 +667,54 @@ export function Workbench({ api }: WorkbenchProps) {
               {pageSymbols.map((symbol) => {
                 const snapshot = snapshotsBySymbol[symbol];
                 const spanMetric = spanMetricsBySymbol[symbol];
-                const sessionChange = snapshot?.sessionChange ?? snapshot?.change;
-                const sessionChangePercent = snapshot?.sessionChangePercent ?? snapshot?.changePercent;
+                const sessionChange =
+                  snapshot?.sessionChange ?? snapshot?.change;
+                const sessionChangePercent =
+                  snapshot?.sessionChangePercent ?? snapshot?.changePercent;
 
                 return (
-                  <tr key={symbol}>
+                  <tr
+                    key={symbol}
+                    className={
+                      selectedSymbol === symbol ? "selected-row" : undefined
+                    }
+                  >
                     <td>
                       <button
                         type="button"
                         className="symbol-button"
+                        aria-label={symbol}
                         aria-pressed={selectedSymbol === symbol}
                         onClick={() => handleSymbolSelect(symbol)}
                       >
-                        {symbol}
+                        <span>{symbol}</span>
+                        {!expandedColumns ? (
+                          <small>{snapshot?.name ?? "Quote unavailable"}</small>
+                        ) : null}
                       </button>
                     </td>
                     <td>{snapshot?.name ?? "--"}</td>
                     <td>{symbolDescriptions[symbol] ?? "--"}</td>
-                    <td>{formatPrice(snapshot?.price)}</td>
-                    <td className={formatChangeClass(sessionChange)}>{formatChange(sessionChange)}</td>
+                    <td>
+                      {formatPrice(snapshot?.price)}
+                      {!expandedColumns ? (
+                        <small className="quote-timing">
+                          {snapshot?.timeframe ?? "Pending"}
+                        </small>
+                      ) : null}
+                    </td>
+                    <td className={formatChangeClass(sessionChange)}>
+                      {formatChange(sessionChange)}
+                    </td>
                     <td className={formatChangeClass(sessionChangePercent)}>
                       {formatChangePercent(sessionChangePercent)}
                     </td>
-                    <td className={formatChangeClass(spanMetric?.change)}>{formatChange(spanMetric?.change)}</td>
-                    <td className={formatChangeClass(spanMetric?.changePercent)}>
+                    <td className={formatChangeClass(spanMetric?.change)}>
+                      {formatChange(spanMetric?.change)}
+                    </td>
+                    <td
+                      className={formatChangeClass(spanMetric?.changePercent)}
+                    >
                       {formatChangePercent(spanMetric?.changePercent)}
                     </td>
                     <td>{formatVolume(snapshot?.volume)}</td>
@@ -531,14 +729,20 @@ export function Workbench({ api }: WorkbenchProps) {
         </section>
 
         <nav className="pagination-controls" aria-label="Table pagination">
-          <button type="button" disabled={boundedPage <= 1} onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}>
+          <button
+            type="button"
+            disabled={boundedPage <= 1}
+            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+          >
             Previous page
           </button>
           <span>{`Page ${boundedPage} of ${totalPages}`}</span>
           <button
             type="button"
             disabled={boundedPage >= totalPages}
-            onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+            onClick={() =>
+              setCurrentPage((page) => Math.min(totalPages, page + 1))
+            }
           >
             Next page
           </button>
@@ -546,24 +750,45 @@ export function Workbench({ api }: WorkbenchProps) {
       </section>
 
       {selectedSymbol ? (
-        <div className="detail-overlay" onClick={handleCloseDetails}>
-          <aside
-            role="dialog"
-            aria-label={`${selectedSymbol} details`}
-            className="symbol-detail-drawer"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="symbol-detail-header">
-              <div>
-                <h2>{selectedSymbol}</h2>
-                <span>{selectedRange}</span>
-              </div>
-              <button type="button" onClick={handleCloseDetails}>
-                Close details
-              </button>
-            </header>
+        <aside
+          ref={detailRef}
+          role="complementary"
+          aria-label={`${selectedSymbol} details`}
+          className="symbol-detail-drawer"
+        >
+          <header className="symbol-detail-header">
+            <div>
+              <h2>{selectedSymbol}</h2>
+              <span>{selectedSnapshot?.name ?? selectedSymbol}</span>
+            </div>
+            <button type="button" onClick={handleCloseDetails}>
+              Close details
+            </button>
+          </header>
 
-            {historyErrorMessage ? <ErrorAlert message={historyErrorMessage} /> : null}
+          <div className="detail-price">
+            <strong>{formatPrice(selectedSnapshot?.price)}</strong>
+            <span
+              className={formatChangeClass(
+                selectedSnapshot?.sessionChangePercent ??
+                  selectedSnapshot?.changePercent,
+              )}
+            >
+              {formatChangePercent(
+                selectedSnapshot?.sessionChangePercent ??
+                  selectedSnapshot?.changePercent,
+              )}{" "}
+              <small>session</small>
+            </span>
+            <p>
+              {selectedSnapshot?.timeframe ?? "Timing unavailable"} · Quote as
+              of {formatUpdatedAt(selectedSnapshot?.updatedAt)}
+            </p>
+          </div>
+          <div className="chart-region">
+            {historyErrorMessage ? (
+              <ErrorAlert message={historyErrorMessage} />
+            ) : null}
             {historySeries ? (
               <SymbolChart
                 symbol={selectedSymbol}
@@ -572,11 +797,21 @@ export function Workbench({ api }: WorkbenchProps) {
                 onRangeChange={setSelectedRange}
               />
             ) : null}
-            {!historySeries && !historyErrorMessage ? <p className="loading-copy">Loading chart...</p> : null}
-            {selectedDetailRows.length > 0 ? (
-              <section className="symbol-detail-summary" aria-label={`${selectedSymbol} summary`}>
-                <h3>Details</h3>
-                <table className="detail-summary-table" aria-label={`${selectedSymbol} detail summary`}>
+            {!historySeries && !historyErrorMessage ? (
+              <p className="loading-copy">Loading chart...</p>
+            ) : null}
+          </div>
+          {selectedDetailRows.length > 0 ? (
+            <section
+              className="symbol-detail-summary"
+              aria-label={`${selectedSymbol} summary`}
+            >
+              <details>
+                <summary>Quote & range details</summary>
+                <table
+                  className="detail-summary-table"
+                  aria-label={`${selectedSymbol} detail summary`}
+                >
                   <tbody>
                     {selectedDetailRows.map((row) => (
                       <tr key={row.label}>
@@ -586,11 +821,31 @@ export function Workbench({ api }: WorkbenchProps) {
                     ))}
                   </tbody>
                 </table>
-              </section>
-            ) : null}
-          </aside>
-        </div>
-      ) : null}
+              </details>
+            </section>
+          ) : null}
+        </aside>
+      ) : (
+        <aside
+          className="symbol-detail-drawer detail-empty"
+          aria-label="Stock analysis"
+        >
+          <ChartNoAxesCombined size={36} aria-hidden="true" />
+          <p className="eyebrow">FOCUS VIEW</p>
+          <h2>A closer look.</h2>
+          <p>
+            Select a symbol to explore its price history and quote details
+            alongside your watchlist.
+          </p>
+          <button
+            type="button"
+            disabled={!pageSymbols[0]}
+            onClick={() => handleSymbolSelect(pageSymbols[0])}
+          >
+            Explore {pageSymbols[0] ?? "a symbol"}
+          </button>
+        </aside>
+      )}
     </main>
   );
 }
@@ -600,7 +855,11 @@ function flattenWatchlistSymbols(watchlist: Watchlist): string[] {
 }
 
 function uniqueUppercaseSymbols(symbols: string[]): string[] {
-  return [...new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean))];
+  return [
+    ...new Set(
+      symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean),
+    ),
+  ];
 }
 
 function mapSpanMetricsForRange(
@@ -608,7 +867,12 @@ function mapSpanMetricsForRange(
   spanMetricsByKey: Record<string, SpanMetric>,
   range: PriceSeries["range"],
 ): Record<string, SpanMetric | undefined> {
-  return Object.fromEntries(symbols.map((symbol) => [symbol, spanMetricsByKey[spanMetricKey(symbol, range)]]));
+  return Object.fromEntries(
+    symbols.map((symbol) => [
+      symbol,
+      spanMetricsByKey[spanMetricKey(symbol, range)],
+    ]),
+  );
 }
 
 function spanMetricKey(symbol: string, range: PriceSeries["range"]): string {
@@ -646,8 +910,16 @@ function sortSymbols(
   return [...symbols].sort((left, right) => {
     const leftSnapshot = snapshotsBySymbol[left];
     const rightSnapshot = snapshotsBySymbol[right];
-    const leftValue = sortValue(leftSnapshot, spanMetricsBySymbol[left], sortMode);
-    const rightValue = sortValue(rightSnapshot, spanMetricsBySymbol[right], sortMode);
+    const leftValue = sortValue(
+      leftSnapshot,
+      spanMetricsBySymbol[left],
+      sortMode,
+    );
+    const rightValue = sortValue(
+      rightSnapshot,
+      spanMetricsBySymbol[right],
+      sortMode,
+    );
 
     if (leftValue === null && rightValue === null) {
       return symbols.indexOf(left) - symbols.indexOf(right);
@@ -682,8 +954,13 @@ function sortValue(
     case "size":
       return dollarVolume(snapshot) ?? snapshot.volume;
     case "heat": {
-      const heatValue = spanMetric?.changePercent ?? snapshot.sessionChangePercent ?? snapshot.changePercent;
-      return heatValue === null || heatValue === undefined ? null : Math.abs(heatValue);
+      const heatValue =
+        spanMetric?.changePercent ??
+        snapshot.sessionChangePercent ??
+        snapshot.changePercent;
+      return heatValue === null || heatValue === undefined
+        ? null
+        : Math.abs(heatValue);
     }
     case "volume":
       return snapshot.volume;
@@ -741,7 +1018,9 @@ function formatChange(change: MarketSnapshot["change"] | undefined): string {
   return `${sign}${change.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`;
 }
 
-function formatChangePercent(changePercent: MarketSnapshot["changePercent"] | undefined): string {
+function formatChangePercent(
+  changePercent: MarketSnapshot["changePercent"] | undefined,
+): string {
   if (changePercent === undefined || changePercent === null) {
     return "--";
   }
@@ -781,19 +1060,28 @@ function buildSymbolDetailRows(
   }
 
   const sessionChange = snapshot?.sessionChange ?? snapshot?.change;
-  const sessionChangePercent = snapshot?.sessionChangePercent ?? snapshot?.changePercent;
+  const sessionChangePercent =
+    snapshot?.sessionChangePercent ?? snapshot?.changePercent;
   const rows: DetailRow[] = [
     { label: "Symbol", value: selectedSymbol },
     { label: "Name", value: snapshot?.name ?? "--" },
     { label: "Business", value: businessDescription ?? "--" },
     { label: "Price", value: formatPrice(snapshot?.price) },
-    { label: "Session Chg", value: formatChange(sessionChange), className: formatChangeClass(sessionChange) },
+    {
+      label: "Session Chg",
+      value: formatChange(sessionChange),
+      className: formatChangeClass(sessionChange),
+    },
     {
       label: "Session Chg %",
       value: formatChangePercent(sessionChangePercent),
       className: formatChangeClass(sessionChangePercent),
     },
-    { label: "Span Chg", value: formatChange(spanMetric?.change), className: formatChangeClass(spanMetric?.change) },
+    {
+      label: "Span Chg",
+      value: formatChange(spanMetric?.change),
+      className: formatChangeClass(spanMetric?.change),
+    },
     {
       label: "Span Chg %",
       value: formatChangePercent(spanMetric?.changePercent),
@@ -819,7 +1107,10 @@ function buildSymbolDetailRows(
     { label: "Range Close", value: formatPrice(seriesSummary.close) },
     { label: "Range Volume", value: formatVolume(seriesSummary.volume) },
     { label: "Bars", value: formatInteger(seriesSummary.bars) },
-    { label: "First Bar", value: formatUpdatedAt(seriesSummary.firstTimestamp) },
+    {
+      label: "First Bar",
+      value: formatUpdatedAt(seriesSummary.firstTimestamp),
+    },
     { label: "Last Bar", value: formatUpdatedAt(seriesSummary.lastTimestamp) },
   ];
 }
@@ -845,7 +1136,9 @@ function summarizeSeries(series: PriceSeries | null) {
 }
 
 function formatRangeLabel(range: PriceSeries["range"]): string {
-  return TIME_SPAN_OPTIONS.find((option) => option.value === range)?.label ?? range;
+  return (
+    TIME_SPAN_OPTIONS.find((option) => option.value === range)?.label ?? range
+  );
 }
 
 function formatCompactNumber(value: number): string {
@@ -865,14 +1158,19 @@ function formatCompactNumber(value: number): string {
 }
 
 function formatCompactDecimal(value: number): string {
-  return value.toLocaleString("en-US", { maximumFractionDigits: 1, minimumFractionDigits: value < 10 ? 1 : 0 });
+  return value.toLocaleString("en-US", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: value < 10 ? 1 : 0,
+  });
 }
 
 function formatInteger(value: number): string {
   return value.toLocaleString("en-US");
 }
 
-function formatUpdatedAt(updatedAt: MarketSnapshot["updatedAt"] | undefined): string {
+function formatUpdatedAt(
+  updatedAt: MarketSnapshot["updatedAt"] | undefined,
+): string {
   if (!updatedAt) {
     return "--";
   }
@@ -892,7 +1190,9 @@ function padTime(value: number): string {
   return value.toString().padStart(2, "0");
 }
 
-function formatChangeClass(value: number | null | undefined): string | undefined {
+function formatChangeClass(
+  value: number | null | undefined,
+): string | undefined {
   if (value === undefined || value === null || value === 0) {
     return undefined;
   }

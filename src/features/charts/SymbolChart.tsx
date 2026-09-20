@@ -1,4 +1,9 @@
-import { CandlestickSeries, LineSeries, createChart } from "lightweight-charts";
+import {
+  CandlestickSeries,
+  ColorType,
+  LineSeries,
+  createChart,
+} from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 import type { PriceBar, PriceSeries } from "../../../shared/types";
 
@@ -9,7 +14,7 @@ interface ChartSeriesApi {
 }
 
 interface SymbolChartApi {
-  addSeries(definition: unknown): ChartSeriesApi;
+  addSeries(definition: unknown, options?: object): ChartSeriesApi;
   addLineSeries(): ChartSeriesApi;
   addCandlestickSeries(): ChartSeriesApi;
   addHistogramSeries(): ChartSeriesApi;
@@ -38,7 +43,12 @@ const RANGES: Array<{ label: string; value: PriceSeries["range"] }> = [
 ];
 const CHART_HEIGHT = 380;
 
-export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChartProps) {
+export function SymbolChart({
+  symbol,
+  series,
+  range,
+  onRangeChange,
+}: SymbolChartProps) {
   const [mode, setMode] = useState<ChartMode>("trend");
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -49,7 +59,15 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
 
     const container = containerRef.current;
     const chart = createChart(container, {
-      height: CHART_HEIGHT,
+      height: container.clientHeight || CHART_HEIGHT,
+      layout: {
+        background: { type: ColorType.Solid, color: "#ffffff" },
+        textColor: "#626c7c",
+        fontSize: 11,
+      },
+      grid: { vertLines: { visible: false }, horzLines: { color: "#edf0f5" } },
+      rightPriceScale: { borderVisible: false },
+      timeScale: { borderVisible: false },
       width: container.clientWidth || 640,
     }) as unknown as SymbolChartApi;
     const resizeObserver =
@@ -65,9 +83,13 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
           });
 
     if (mode === "trend") {
-      addLineSeries(chart).setData(series.bars.map((bar) => toLinePoint(bar, range)));
+      addLineSeries(chart).setData(
+        series.bars.map((bar) => toLinePoint(bar, range)),
+      );
     } else {
-      addCandlestickSeries(chart).setData(series.bars.map((bar) => toCandlePoint(bar, range)));
+      addCandlestickSeries(chart).setData(
+        series.bars.map((bar) => toCandlePoint(bar, range)),
+      );
     }
 
     chart.timeScale().fitContent();
@@ -85,10 +107,18 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
         <strong>{symbol}</strong>
 
         <div className="segmented-control" aria-label="Chart mode">
-          <button type="button" aria-pressed={mode === "trend"} onClick={() => setMode("trend")}>
+          <button
+            type="button"
+            aria-pressed={mode === "trend"}
+            onClick={() => setMode("trend")}
+          >
             Trend
           </button>
-          <button type="button" aria-pressed={mode === "candles"} onClick={() => setMode("candles")}>
+          <button
+            type="button"
+            aria-pressed={mode === "candles"}
+            onClick={() => setMode("candles")}
+          >
             Candles
           </button>
         </div>
@@ -107,7 +137,11 @@ export function SymbolChart({ symbol, series, range, onRangeChange }: SymbolChar
         </div>
       </header>
 
-      <div ref={containerRef} className="chart-canvas" data-testid="symbol-chart-container" />
+      <div
+        ref={containerRef}
+        className="chart-canvas"
+        data-testid="symbol-chart-container"
+      />
     </section>
   );
 }
@@ -124,7 +158,7 @@ function addLineSeries(chart: SymbolChartApi) {
     return chart.addLineSeries();
   }
 
-  return chart.addSeries(LineSeries);
+  return chart.addSeries(LineSeries, { color: "#5652b5", lineWidth: 2 });
 }
 
 function addCandlestickSeries(chart: SymbolChartApi) {
