@@ -13,6 +13,7 @@ test("covers the stock workbench sector dashboard without live market calls", as
   const apiMocks = await mockWorkbenchApis(page);
 
   await page.goto("/");
+  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
 
   await expect(page).toHaveTitle("Stock Workbench");
   await expect(
@@ -62,9 +63,9 @@ test("covers the stock workbench sector dashboard without live market calls", as
   await expect(toolbar.getByLabel("Refresh interval")).toHaveValue("60");
 
   await toolbar.getByLabel("Sort by").selectOption("heat");
-  await expect(quoteTable.getByRole("button").first()).toHaveAccessibleName(
-    "NVDA",
-  );
+  await expect(
+    quoteTable.getByRole("button", { name: /^[A-Z]+$/ }).first(),
+  ).toHaveAccessibleName("NVDA");
 
   await quoteTable.getByRole("button", { name: "NVDA" }).click();
   const detailPanel = page.getByRole("complementary", { name: "NVDA details" });
@@ -143,6 +144,7 @@ test("keeps the quote list available while switching the linked chart", async ({
 }) => {
   await mockWorkbenchApis(page);
   await page.goto("/");
+  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
   const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
   await expect(
     quotes.getByRole("columnheader", { name: "Price", exact: true }),
@@ -171,6 +173,7 @@ test("keeps essential quotes and chart inside a mobile viewport", async ({
   await page.setViewportSize({ width: 375, height: 812 });
   await mockWorkbenchApis(page);
   await page.goto("/");
+  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
   const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
   await quotes.getByRole("button", { name: "NVDA", exact: true }).click();
   await expect(page.getByLabel("NVDA chart")).toBeVisible();
@@ -191,6 +194,97 @@ test("keeps essential quotes and chart inside a mobile viewport", async ({
     ),
   ).toBe(true);
 });
+
+for (const width of [1440, 375]) {
+  test(`explains sector metrics with keyboard and touch at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const mocks = await mockWorkbenchApis(page);
+    await page.goto("/");
+    const watchlistToggle = page.getByRole("button", {
+      name: "Watchlist",
+      exact: true,
+    });
+    await expect(watchlistToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      page.getByRole("button", { name: "Consumer Staples" }),
+    ).toHaveCount(0);
+    await page.getByRole("button", { name: "板块", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "板块资金流" }),
+    ).toBeVisible();
+    await expect(
+      page.getByText("资金流数据待接入", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("toolbar", { name: "Table controls" }),
+    ).toHaveCount(0);
+    await page.getByLabel("观察板块").selectOption("XLF");
+    await expect(page.getByLabel("观察板块")).toHaveValue("XLF");
+
+    const help = page.getByRole("button", {
+      name: "了解20 日流入强度",
+      exact: true,
+    });
+    await help.focus();
+    await page.keyboard.press("Enter");
+    const dialog = page.getByRole("dialog", {
+      name: "20 日流入强度",
+      exact: true,
+    });
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByText("它告诉你什么", { exact: true }),
+    ).toBeVisible();
+    await expect(dialog.getByText("怎么算", { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/20 日流入强度 =/)).toBeVisible();
+    await expect(dialog.getByText(/这不是投资收益率/)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(help).toBeFocused();
+    await expect(help).toHaveAttribute("aria-expanded", "false");
+
+    await help.click();
+    await dialog.getByRole("button", { name: "明白了" }).click();
+    await expect(help).toBeFocused();
+    await page
+      .getByRole("button", { name: "了解5 日累计净申赎", exact: true })
+      .click();
+    await expect(
+      page.getByRole("dialog", { name: "5 日累计净申赎", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "关闭指标说明" }).click();
+    await help.click();
+    await page.mouse.click(2, 2);
+    await expect(dialog).toBeHidden();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+
+    await watchlistToggle.click();
+    if (width < 600) {
+      await page
+        .getByLabel("Watchlist", { exact: true })
+        .selectOption("consumer-staples");
+    } else {
+      await page
+        .getByRole("button", { name: "Consumer Staples", exact: true })
+        .click();
+    }
+    await expect(
+      page.getByRole("table", { name: "Consumer Staples quotes" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "All columns" }).click();
+    await page.getByRole("button", { name: "了解估算成交额" }).click();
+    await expect(
+      page.getByRole("dialog").getByText(/也不是资金净流入/),
+    ).toBeVisible();
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+  });
+}
 
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];

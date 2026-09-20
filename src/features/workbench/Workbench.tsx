@@ -1,4 +1,9 @@
-import { Activity, ChartNoAxesCombined, Layers } from "lucide-react";
+import {
+  Activity,
+  ChartNoAxesCombined,
+  ChevronDown,
+  Layers,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   MarketSnapshot,
@@ -9,6 +14,13 @@ import type {
 import { SymbolChart } from "../charts/SymbolChart";
 import { RefreshControls } from "../settings/RefreshControls";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
+
+import { SectorAnalytics } from "../analytics/SectorAnalytics";
+import { MetricHelp } from "../../shared/MetricHelp";
+import {
+  dollarVolume as dollarVolumeHelp,
+  spanChange,
+} from "../analytics/metrics";
 
 interface WorkbenchProps {
   api: WorkbenchApi;
@@ -58,6 +70,11 @@ const SORT_OPTIONS: Array<{ id: SortMode; label: string }> = [
 ];
 
 export function Workbench({ api }: WorkbenchProps) {
+  const [activePage, setActivePage] = useState<"watchlist" | "analytics">(
+    "watchlist",
+  );
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(true);
   const [config, setConfig] = useState<WorkbenchConfig | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [historyErrorMessage, setHistoryErrorMessage] = useState<string | null>(
@@ -243,7 +260,7 @@ export function Workbench({ api }: WorkbenchProps) {
   }, [boundedPage, currentPage]);
 
   useEffect(() => {
-    if (activeSymbols.length === 0) {
+    if (activePage !== "watchlist" || activeSymbols.length === 0) {
       return;
     }
 
@@ -294,10 +311,14 @@ export function Workbench({ api }: WorkbenchProps) {
       isStale = true;
       window.clearInterval(intervalId);
     };
-  }, [api, activeSymbols, intervalSeconds]);
+  }, [api, activeSymbols, intervalSeconds, activePage]);
 
   useEffect(() => {
-    if (!config || spanSymbolsForHistory.length === 0) {
+    if (
+      activePage !== "watchlist" ||
+      !config ||
+      spanSymbolsForHistory.length === 0
+    ) {
       return;
     }
 
@@ -355,6 +376,7 @@ export function Workbench({ api }: WorkbenchProps) {
     spanMetricsByKey,
     spanSymbolsForHistory,
     spanSymbolsForHistoryKey,
+    activePage,
   ]);
 
   useEffect(() => {
@@ -444,6 +466,7 @@ export function Workbench({ api }: WorkbenchProps) {
   }, [selectedSymbol]);
 
   function handleWatchlistSelect(nextWatchlistId: string) {
+    setActivePage("watchlist");
     setSelectedWatchlistId(nextWatchlistId);
     setSelectedSymbol(null);
     setHistorySeries(null);
@@ -480,7 +503,9 @@ export function Workbench({ api }: WorkbenchProps) {
   }
 
   return (
-    <main className={`workbench ${selectedSymbol ? "has-selection" : ""}`}>
+    <main
+      className={`workbench ${activePage === "analytics" ? "analytics-workbench" : selectedSymbol ? "has-selection" : ""}`}
+    >
       <header className="brand-bar">
         <div className="brand">
           <span className="brand-mark">
@@ -494,119 +519,179 @@ export function Workbench({ api }: WorkbenchProps) {
       </header>
       <div className="workspace-heading">
         <div>
-          <p className="eyebrow">WATCHLIST / MARKET OVERVIEW</p>
-          <h2>{watchlist.name}</h2>
-          <p>
-            {activeSymbols.length} symbols <span aria-hidden="true">·</span> USD{" "}
-            <span aria-hidden="true">·</span> {watchlist.description}
+          <p className="eyebrow">
+            {activePage === "analytics"
+              ? "ANALYTICS / SECTORS"
+              : "WATCHLIST / MARKET OVERVIEW"}
           </p>
+          <h2>{activePage === "analytics" ? "板块资金流" : watchlist.name}</h2>
+          {activePage === "analytics" ? (
+            <p>11 只板块 ETF · USD · 指标与计算口径</p>
+          ) : (
+            <p>
+              {activeSymbols.length} symbols <span aria-hidden="true">·</span>{" "}
+              USD <span aria-hidden="true">·</span> {watchlist.description}
+            </p>
+          )}
         </div>
         <span className="market-note">Source timing shown per symbol</span>
       </div>
-      <header
-        className="workbench-topbar"
-        role="toolbar"
-        aria-label="Table controls"
-      >
-        <span className="quote-refresh-status" aria-live="polite">
-          {lastQuoteRefreshAt
-            ? `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}`
-            : "Refresh pending"}
-        </span>
-
-        <div className="control-field">
-          <label htmlFor="time-span">Time span</label>
-          <select
-            id="time-span"
-            value={selectedRange}
-            onChange={(event) =>
-              setSelectedRange(event.target.value as PriceSeries["range"])
-            }
-          >
-            {TIME_SPAN_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="control-field">
-          <RefreshControls
-            intervalSeconds={intervalSeconds}
-            disabledIntervals={ratePlan.disabledIntervals}
-            onChange={setIntervalSeconds}
-          />
-        </div>
-        <div className="control-field">
-          <label htmlFor="sort-mode">Sort by</label>
-          <select
-            id="sort-mode"
-            value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as SortMode)}
-          >
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="control-field">
-          <label htmlFor="page-size">Rows</label>
-          <select
-            id="page-size"
-            value={pageSize}
-            onChange={(event) => setPageSize(Number(event.target.value))}
-          >
-            {PAGE_SIZE_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          className="columns-toggle"
-          type="button"
-          aria-pressed={expandedColumns}
-          onClick={() => setExpandedColumns(!expandedColumns)}
+      {activePage === "watchlist" && (
+        <header
+          className="workbench-topbar"
+          role="toolbar"
+          aria-label="Table controls"
         >
-          {expandedColumns ? "Essential columns" : "All columns"}
-        </button>
-      </header>
+          <span className="quote-refresh-status" aria-live="polite">
+            {lastQuoteRefreshAt
+              ? `Last refreshed ${formatUpdatedAt(lastQuoteRefreshAt)}`
+              : "Refresh pending"}
+          </span>
+
+          <div className="control-field">
+            <label htmlFor="time-span">Time span</label>
+            <select
+              id="time-span"
+              value={selectedRange}
+              onChange={(event) =>
+                setSelectedRange(event.target.value as PriceSeries["range"])
+              }
+            >
+              {TIME_SPAN_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="control-field">
+            <RefreshControls
+              intervalSeconds={intervalSeconds}
+              disabledIntervals={ratePlan.disabledIntervals}
+              onChange={setIntervalSeconds}
+            />
+          </div>
+          <div className="control-field">
+            <label htmlFor="sort-mode">Sort by</label>
+            <select
+              id="sort-mode"
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as SortMode)}
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="control-field">
+            <label htmlFor="page-size">Rows</label>
+            <select
+              id="page-size"
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            className="columns-toggle"
+            type="button"
+            aria-pressed={expandedColumns}
+            onClick={() => setExpandedColumns(!expandedColumns)}
+          >
+            {expandedColumns ? "Essential columns" : "All columns"}
+          </button>
+        </header>
+      )}
 
       <aside className="watchlist-rail" aria-label="Watchlists">
-        <p className="eyebrow rail-title">
-          <Layers size={14} aria-hidden="true" /> WATCHLISTS
-        </p>
-        <label className="mobile-watchlist" htmlFor="mobile-watchlist">
-          Watchlist
-          <select
-            id="mobile-watchlist"
-            aria-label="Watchlist"
-            value={watchlist.id}
-            onChange={(event) => handleWatchlistSelect(event.target.value)}
+        <nav aria-label="Workspace navigation">
+          <button
+            type="button"
+            className="rail-menu-toggle"
+            aria-expanded={watchlistOpen}
+            aria-controls="watchlist-menu"
+            onClick={() => setWatchlistOpen(!watchlistOpen)}
           >
-            {watchlists.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="watchlist-buttons">
-          {watchlists.map((watchlistOption) => (
+            <Layers size={17} aria-hidden="true" />
+            <span>Watchlist</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+          <div
+            id="watchlist-menu"
+            className="rail-submenu"
+            hidden={!watchlistOpen}
+          >
+            <label className="mobile-watchlist" htmlFor="mobile-watchlist">
+              Watchlist
+              <select
+                id="mobile-watchlist"
+                aria-label="Watchlist"
+                value={activePage === "watchlist" ? watchlist.id : ""}
+                onChange={(event) => handleWatchlistSelect(event.target.value)}
+              >
+                <option value="" disabled>
+                  选择 Watchlist
+                </option>
+                {watchlists.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="watchlist-buttons">
+              {watchlists.map((watchlistOption) => (
+                <button
+                  key={watchlistOption.id}
+                  type="button"
+                  aria-pressed={
+                    activePage === "watchlist" &&
+                    watchlistOption.id === watchlist.id
+                  }
+                  className="watchlist-button"
+                  onClick={() => handleWatchlistSelect(watchlistOption.id)}
+                >
+                  {watchlistOption.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="rail-menu-toggle"
+            aria-expanded={analyticsOpen}
+            aria-controls="analytics-menu"
+            onClick={() => setAnalyticsOpen(!analyticsOpen)}
+          >
+            <ChartNoAxesCombined size={17} aria-hidden="true" />
+            <span>Analytics</span>
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+          <div
+            id="analytics-menu"
+            className="rail-submenu"
+            hidden={!analyticsOpen}
+          >
             <button
-              key={watchlistOption.id}
               type="button"
-              aria-pressed={watchlistOption.id === watchlist.id}
               className="watchlist-button"
-              onClick={() => handleWatchlistSelect(watchlistOption.id)}
+              aria-pressed={activePage === "analytics"}
+              onClick={() => {
+                setActivePage("analytics");
+                handleCloseDetails();
+              }}
             >
-              {watchlistOption.name}
+              板块
             </button>
-          ))}
-        </div>
+          </div>
+        </nav>
         <details className="connection-details">
           <summary>Data connection</summary>
           <table className="usage-table" aria-label="API usage summary">
@@ -635,216 +720,235 @@ export function Workbench({ api }: WorkbenchProps) {
         </details>
       </aside>
 
-      <section
-        className="watchlist-main"
-        aria-label={`${watchlist.name} dashboard`}
-      >
-        {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
-        <section
-          className={`watchlist-row sector-table-panel ${expandedColumns ? "expanded-columns" : "essential-columns"}`}
-        >
-          <table
-            className="quote-table sector-table"
-            aria-label={`${watchlist.name} quotes`}
-          >
-            <thead>
-              <tr>
-                <th scope="col">Symbol</th>
-                <th scope="col">Name</th>
-                <th scope="col">Business</th>
-                <th scope="col">Price</th>
-                <th scope="col">Session Chg</th>
-                <th scope="col">Session Chg %</th>
-                <th scope="col">Span Chg</th>
-                <th scope="col">Span Chg %</th>
-                <th scope="col">Volume</th>
-                <th scope="col">Dollar Volume</th>
-                <th scope="col">Timeframe</th>
-                <th scope="col">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pageSymbols.map((symbol) => {
-                const snapshot = snapshotsBySymbol[symbol];
-                const spanMetric = spanMetricsBySymbol[symbol];
-                const sessionChange =
-                  snapshot?.sessionChange ?? snapshot?.change;
-                const sessionChangePercent =
-                  snapshot?.sessionChangePercent ?? snapshot?.changePercent;
-
-                return (
-                  <tr
-                    key={symbol}
-                    className={
-                      selectedSymbol === symbol ? "selected-row" : undefined
-                    }
-                  >
-                    <td>
-                      <button
-                        type="button"
-                        className="symbol-button"
-                        aria-label={symbol}
-                        aria-pressed={selectedSymbol === symbol}
-                        onClick={() => handleSymbolSelect(symbol)}
-                      >
-                        <span>{symbol}</span>
-                        {!expandedColumns ? (
-                          <small>{snapshot?.name ?? "Quote unavailable"}</small>
-                        ) : null}
-                      </button>
-                    </td>
-                    <td>{snapshot?.name ?? "--"}</td>
-                    <td>{symbolDescriptions[symbol] ?? "--"}</td>
-                    <td>
-                      {formatPrice(snapshot?.price)}
-                      {!expandedColumns ? (
-                        <small className="quote-timing">
-                          {snapshot?.timeframe ?? "Pending"}
-                        </small>
-                      ) : null}
-                    </td>
-                    <td className={formatChangeClass(sessionChange)}>
-                      {formatChange(sessionChange)}
-                    </td>
-                    <td className={formatChangeClass(sessionChangePercent)}>
-                      {formatChangePercent(sessionChangePercent)}
-                    </td>
-                    <td className={formatChangeClass(spanMetric?.change)}>
-                      {formatChange(spanMetric?.change)}
-                    </td>
-                    <td
-                      className={formatChangeClass(spanMetric?.changePercent)}
-                    >
-                      {formatChangePercent(spanMetric?.changePercent)}
-                    </td>
-                    <td>{formatVolume(snapshot?.volume)}</td>
-                    <td>{formatDollarVolume(snapshot)}</td>
-                    <td>{snapshot?.timeframe ?? "--"}</td>
-                    <td>{formatUpdatedAt(snapshot?.updatedAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </section>
-
-        <nav className="pagination-controls" aria-label="Table pagination">
-          <button
-            type="button"
-            disabled={boundedPage <= 1}
-            onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-          >
-            Previous page
-          </button>
-          <span>{`Page ${boundedPage} of ${totalPages}`}</span>
-          <button
-            type="button"
-            disabled={boundedPage >= totalPages}
-            onClick={() =>
-              setCurrentPage((page) => Math.min(totalPages, page + 1))
-            }
-          >
-            Next page
-          </button>
-        </nav>
-      </section>
-
-      {selectedSymbol ? (
-        <aside
-          ref={detailRef}
-          role="complementary"
-          aria-label={`${selectedSymbol} details`}
-          className="symbol-detail-drawer"
-        >
-          <header className="symbol-detail-header">
-            <div>
-              <h2>{selectedSymbol}</h2>
-              <span>{selectedSnapshot?.name ?? selectedSymbol}</span>
-            </div>
-            <button type="button" onClick={handleCloseDetails}>
-              Close details
-            </button>
-          </header>
-
-          <div className="detail-price">
-            <strong>{formatPrice(selectedSnapshot?.price)}</strong>
-            <span
-              className={formatChangeClass(
-                selectedSnapshot?.sessionChangePercent ??
-                  selectedSnapshot?.changePercent,
-              )}
-            >
-              {formatChangePercent(
-                selectedSnapshot?.sessionChangePercent ??
-                  selectedSnapshot?.changePercent,
-              )}{" "}
-              <small>session</small>
-            </span>
-            <p>
-              {selectedSnapshot?.timeframe ?? "Timing unavailable"} · Quote as
-              of {formatUpdatedAt(selectedSnapshot?.updatedAt)}
-            </p>
-          </div>
-          <div className="chart-region">
-            {historyErrorMessage ? (
-              <ErrorAlert message={historyErrorMessage} />
-            ) : null}
-            {historySeries ? (
-              <SymbolChart
-                symbol={selectedSymbol}
-                series={historySeries}
-                range={selectedRange}
-                onRangeChange={setSelectedRange}
-              />
-            ) : null}
-            {!historySeries && !historyErrorMessage ? (
-              <p className="loading-copy">Loading chart...</p>
-            ) : null}
-          </div>
-          {selectedDetailRows.length > 0 ? (
-            <section
-              className="symbol-detail-summary"
-              aria-label={`${selectedSymbol} summary`}
-            >
-              <details>
-                <summary>Quote & range details</summary>
-                <table
-                  className="detail-summary-table"
-                  aria-label={`${selectedSymbol} detail summary`}
-                >
-                  <tbody>
-                    {selectedDetailRows.map((row) => (
-                      <tr key={row.label}>
-                        <th scope="row">{row.label}</th>
-                        <td className={row.className}>{row.value}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </details>
-            </section>
-          ) : null}
-        </aside>
+      {activePage === "analytics" ? (
+        <SectorAnalytics />
       ) : (
-        <aside
-          className="symbol-detail-drawer detail-empty"
-          aria-label="Stock analysis"
-        >
-          <ChartNoAxesCombined size={36} aria-hidden="true" />
-          <p className="eyebrow">FOCUS VIEW</p>
-          <h2>A closer look.</h2>
-          <p>
-            Select a symbol to explore its price history and quote details
-            alongside your watchlist.
-          </p>
-          <button
-            type="button"
-            disabled={!pageSymbols[0]}
-            onClick={() => handleSymbolSelect(pageSymbols[0])}
+        <>
+          <section
+            className="watchlist-main"
+            aria-label={`${watchlist.name} dashboard`}
           >
-            Explore {pageSymbols[0] ?? "a symbol"}
-          </button>
-        </aside>
+            {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
+            <section
+              className={`watchlist-row sector-table-panel ${expandedColumns ? "expanded-columns" : "essential-columns"}`}
+            >
+              <table
+                className="quote-table sector-table"
+                aria-label={`${watchlist.name} quotes`}
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">Symbol</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Business</th>
+                    <th scope="col">Price</th>
+                    <th scope="col">Session Chg</th>
+                    <th scope="col">Session Chg %</th>
+                    <th scope="col">Span Chg</th>
+                    <th scope="col" aria-label="Span Chg %">
+                      <span className="metric-label">
+                        Span Chg %<MetricHelp metric={spanChange} />
+                      </span>
+                    </th>
+                    <th scope="col">Volume</th>
+                    <th scope="col" aria-label="Dollar Volume">
+                      <span className="metric-label">
+                        Dollar Volume
+                        <MetricHelp metric={dollarVolumeHelp} />
+                      </span>
+                    </th>
+                    <th scope="col">Timeframe</th>
+                    <th scope="col">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pageSymbols.map((symbol) => {
+                    const snapshot = snapshotsBySymbol[symbol];
+                    const spanMetric = spanMetricsBySymbol[symbol];
+                    const sessionChange =
+                      snapshot?.sessionChange ?? snapshot?.change;
+                    const sessionChangePercent =
+                      snapshot?.sessionChangePercent ?? snapshot?.changePercent;
+
+                    return (
+                      <tr
+                        key={symbol}
+                        className={
+                          selectedSymbol === symbol ? "selected-row" : undefined
+                        }
+                      >
+                        <td>
+                          <button
+                            type="button"
+                            className="symbol-button"
+                            aria-label={symbol}
+                            aria-pressed={selectedSymbol === symbol}
+                            onClick={() => handleSymbolSelect(symbol)}
+                          >
+                            <span>{symbol}</span>
+                            {!expandedColumns ? (
+                              <small>
+                                {snapshot?.name ?? "Quote unavailable"}
+                              </small>
+                            ) : null}
+                          </button>
+                        </td>
+                        <td>{snapshot?.name ?? "--"}</td>
+                        <td>{symbolDescriptions[symbol] ?? "--"}</td>
+                        <td>
+                          {formatPrice(snapshot?.price)}
+                          {!expandedColumns ? (
+                            <small className="quote-timing">
+                              {snapshot?.timeframe ?? "Pending"}
+                            </small>
+                          ) : null}
+                        </td>
+                        <td className={formatChangeClass(sessionChange)}>
+                          {formatChange(sessionChange)}
+                        </td>
+                        <td className={formatChangeClass(sessionChangePercent)}>
+                          {formatChangePercent(sessionChangePercent)}
+                        </td>
+                        <td className={formatChangeClass(spanMetric?.change)}>
+                          {formatChange(spanMetric?.change)}
+                        </td>
+                        <td
+                          className={formatChangeClass(
+                            spanMetric?.changePercent,
+                          )}
+                        >
+                          {formatChangePercent(spanMetric?.changePercent)}
+                        </td>
+                        <td>{formatVolume(snapshot?.volume)}</td>
+                        <td>{formatDollarVolume(snapshot)}</td>
+                        <td>{snapshot?.timeframe ?? "--"}</td>
+                        <td>{formatUpdatedAt(snapshot?.updatedAt)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </section>
+
+            <nav className="pagination-controls" aria-label="Table pagination">
+              <button
+                type="button"
+                disabled={boundedPage <= 1}
+                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              >
+                Previous page
+              </button>
+              <span>{`Page ${boundedPage} of ${totalPages}`}</span>
+              <button
+                type="button"
+                disabled={boundedPage >= totalPages}
+                onClick={() =>
+                  setCurrentPage((page) => Math.min(totalPages, page + 1))
+                }
+              >
+                Next page
+              </button>
+            </nav>
+          </section>
+
+          {selectedSymbol ? (
+            <aside
+              ref={detailRef}
+              role="complementary"
+              aria-label={`${selectedSymbol} details`}
+              className="symbol-detail-drawer"
+            >
+              <header className="symbol-detail-header">
+                <div>
+                  <h2>{selectedSymbol}</h2>
+                  <span>{selectedSnapshot?.name ?? selectedSymbol}</span>
+                </div>
+                <button type="button" onClick={handleCloseDetails}>
+                  Close details
+                </button>
+              </header>
+
+              <div className="detail-price">
+                <strong>{formatPrice(selectedSnapshot?.price)}</strong>
+                <span
+                  className={formatChangeClass(
+                    selectedSnapshot?.sessionChangePercent ??
+                      selectedSnapshot?.changePercent,
+                  )}
+                >
+                  {formatChangePercent(
+                    selectedSnapshot?.sessionChangePercent ??
+                      selectedSnapshot?.changePercent,
+                  )}{" "}
+                  <small>session</small>
+                </span>
+                <p>
+                  {selectedSnapshot?.timeframe ?? "Timing unavailable"} · Quote
+                  as of {formatUpdatedAt(selectedSnapshot?.updatedAt)}
+                </p>
+              </div>
+              <div className="chart-region">
+                {historyErrorMessage ? (
+                  <ErrorAlert message={historyErrorMessage} />
+                ) : null}
+                {historySeries ? (
+                  <SymbolChart
+                    symbol={selectedSymbol}
+                    series={historySeries}
+                    range={selectedRange}
+                    onRangeChange={setSelectedRange}
+                  />
+                ) : null}
+                {!historySeries && !historyErrorMessage ? (
+                  <p className="loading-copy">Loading chart...</p>
+                ) : null}
+              </div>
+              {selectedDetailRows.length > 0 ? (
+                <section
+                  className="symbol-detail-summary"
+                  aria-label={`${selectedSymbol} summary`}
+                >
+                  <details>
+                    <summary>Quote & range details</summary>
+                    <table
+                      className="detail-summary-table"
+                      aria-label={`${selectedSymbol} detail summary`}
+                    >
+                      <tbody>
+                        {selectedDetailRows.map((row) => (
+                          <tr key={row.label}>
+                            <th scope="row">{row.label}</th>
+                            <td className={row.className}>{row.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </details>
+                </section>
+              ) : null}
+            </aside>
+          ) : (
+            <aside
+              className="symbol-detail-drawer detail-empty"
+              aria-label="Stock analysis"
+            >
+              <ChartNoAxesCombined size={36} aria-hidden="true" />
+              <p className="eyebrow">FOCUS VIEW</p>
+              <h2>A closer look.</h2>
+              <p>
+                Select a symbol to explore its price history and quote details
+                alongside your watchlist.
+              </p>
+              <button
+                type="button"
+                disabled={!pageSymbols[0]}
+                onClick={() => handleSymbolSelect(pageSymbols[0])}
+              >
+                Explore {pageSymbols[0] ?? "a symbol"}
+              </button>
+            </aside>
+          )}
+        </>
       )}
     </main>
   );

@@ -191,9 +191,9 @@ describe("Workbench", () => {
 
     await user.selectOptions(screen.getByLabelText("Sort by"), "heat");
 
-    expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent(
-      "NVDA",
-    );
+    expect(
+      within(quoteTable).getAllByRole("button", { name: /^[A-Z]+$/ })[0],
+    ).toHaveTextContent("NVDA");
     expect(screen.getByText("Page 1 of 2")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Next page" }));
@@ -230,9 +230,9 @@ describe("Workbench", () => {
     await user.selectOptions(screen.getByLabelText("Sort by"), "heat");
 
     await waitFor(() =>
-      expect(within(quoteTable).getAllByRole("button")[0]).toHaveTextContent(
-        "AMD",
-      ),
+      expect(
+        within(quoteTable).getAllByRole("button", { name: /^[A-Z]+$/ })[0],
+      ).toHaveTextContent("AMD"),
     );
   });
 
@@ -343,6 +343,9 @@ describe("Workbench", () => {
       expect(fetchSnapshots).toHaveBeenCalledWith(sectorSymbols),
     );
 
+    await user.click(
+      screen.getByRole("button", { name: "Watchlist" }),
+    );
     await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
 
     await waitFor(() =>
