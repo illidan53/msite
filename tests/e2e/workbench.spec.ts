@@ -356,6 +356,137 @@ test("keeps other ETFs usable when one history request fails, and retries it", a
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
+for (const width of [1440, 375]) {
+  test(`explores rotation history across all ETFs at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const mocks = await mockWorkbenchApis(page);
+    await page.goto("/");
+    await page
+      .getByRole("button", { name: "Sectors & ETFs", exact: true })
+      .click();
+    await page.getByRole("button", { name: /^Overview/ }).click();
+    await expect(
+      page.getByRole("heading", { name: "Rotation overview", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Refresh data", exact: true }),
+    ).toBeEnabled();
+    const history = page.getByRole("table", { name: /^Rotation history/ });
+    await expect(
+      history.getByRole("button", { name: /^Explore / }),
+    ).toHaveCount(23);
+    await expect(
+      page.getByRole("img", { name: "Cumulative price change chart" }),
+    ).toBeVisible();
+    const calls = mocks.historyRequests.length;
+    await page
+      .getByLabel("Heatmap metric", { exact: true })
+      .selectOption("rvol");
+    await expect(
+      history.getByRole("row", { name: /Explore SOXX/ }),
+    ).toContainText("2.00");
+    await page
+      .getByLabel("Heatmap metric", { exact: true })
+      .selectOption("cmf");
+    await page
+      .getByRole("button", { name: "About CMF (20)", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "not measured capital inflow",
+    );
+    await page.keyboard.press("Escape");
+    await page.getByLabel("Lookback", { exact: true }).selectOption("120");
+    await expect(
+      page.getByText("69 sessions available", { exact: false }),
+    ).toBeVisible();
+    const slider = page.getByRole("slider");
+    await slider.focus();
+    await page.keyboard.press("Home");
+    const legend = page.getByRole("list", {
+      name: "Price changes on selected date",
+    });
+    await expect(legend.getByText("0.00%", { exact: true })).toHaveCount(5);
+    await page.keyboard.press("End");
+    await expect(legend.getByText("+69.00%", { exact: true })).toHaveCount(4);
+    await page.getByText("Choose ETFs", { exact: false }).click();
+    await page
+      .getByRole("checkbox", { name: /SMH/ })
+      .isDisabled()
+      .then((disabled) => expect(disabled).toBe(true));
+    await page.getByRole("checkbox", { name: /SOXX/ }).uncheck();
+    await page.getByRole("checkbox", { name: /SMH/ }).check();
+    await expect(legend.getByText("SMH", { exact: true })).toBeVisible();
+    await expect(legend.getByText("SOXX", { exact: true })).toHaveCount(0);
+    await page.getByText("Choose ETFs", { exact: false }).click();
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(
+      page.getByRole("heading", { name: "板块轮动总览", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel("热力图指标", { exact: true })).toHaveValue(
+      "cmf",
+    );
+    await page
+      .getByRole("button", { name: "了解同起点价格走势", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText("缺失日期处断线");
+    await page.keyboard.press("Escape");
+    expect(mocks.historyRequests.length).toBe(calls);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.getByRole("button", { name: "查看 IGV", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "IGV · 软件", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^行业细分/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+  });
+}
+
+test("keeps overview usable when the shared benchmark is unavailable", async ({
+  page,
+}) => {
+  await mockWorkbenchApis(page);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/market/history?**", async (route) => {
+    if (new URL(route.request().url()).searchParams.get("symbol") === "SPY")
+      await route.fulfill({ status: 503, json: { error: "unavailable" } });
+    else await route.fallback();
+  });
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Sectors & ETFs", exact: true })
+    .click();
+  await page.getByRole("button", { name: /^Overview/ }).click();
+  await expect(
+    page.getByRole("button", { name: "Refresh data", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText(
+      "SPY history is unavailable. Refresh data to build comparable charts.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("slider")).toBeDisabled();
+  await expect(
+    page
+      .getByRole("list", { name: "Price changes on selected date" })
+      .getByText("—", { exact: true }),
+  ).toHaveCount(5);
+  await page.getByRole("button", { name: "Explore IGV", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "IGV · Software", exact: true }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];

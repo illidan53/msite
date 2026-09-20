@@ -33,6 +33,14 @@ export function calculateMetrics(
 ): ActivityMetrics {
   const bars = completedBars(input, now);
   const benchmark = completedBars(benchmarkInput, now);
+  return calculateCompletedMetrics(bars, benchmark);
+}
+
+// Inputs are already sorted, deduplicated and exclude the current NY date.
+export function calculateCompletedMetrics(
+  bars: PriceBar[],
+  benchmark: PriceBar[],
+): ActivityMetrics {
   const asOf = bars.at(-1)?.timestamp.slice(0, 10) ?? null;
   const reference = benchmark.filter(
     (bar) => bar.timestamp.slice(0, 10) <= (asOf ?? ""),

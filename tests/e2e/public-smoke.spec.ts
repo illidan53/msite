@@ -39,10 +39,29 @@ test("public deployment serves the workbench shell and health endpoint", async (
     page.getByRole("dialog", { name: "5D price return", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^Overview/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Rotation overview", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("table", { name: /^Rotation history/ })
+      .getByRole("button", { name: /^Explore / }),
+  ).toHaveCount(23);
+  await page
+    .getByRole("button", { name: "About Rebased price paths", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Missing dates break the line",
+  );
+  await page.keyboard.press("Escape");
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
   await expect(
     page.getByRole("heading", { name: "板块与 ETF", exact: true }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(
+    page.getByRole("heading", { name: "板块轮动总览", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });

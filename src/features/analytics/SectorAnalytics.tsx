@@ -13,6 +13,7 @@ import { useLocale } from "../../shared/locale";
 import { activityExplanations } from "./metrics";
 import { calculateMetrics } from "./calculateMetrics";
 import { etfs, groups, type EtfGroup } from "./catalog";
+import { SectorOverview } from "./SectorOverview";
 
 export function SectorAnalytics({
   api,
@@ -22,7 +23,7 @@ export function SectorAnalytics({
   onHistoryRequests: Dispatch<SetStateAction<number>>;
 }) {
   const { locale, t } = useLocale();
-  const [group, setGroup] = useState<EtfGroup>("industry");
+  const [group, setGroup] = useState<EtfGroup | "overview">("industry");
   const [symbol, setSymbol] = useState("SOXX");
   const [records, setRecords] = useState<Record<string, PriceSeries>>({});
   const [errors, setErrors] = useState<string[]>([]);
@@ -30,7 +31,8 @@ export function SectorAnalytics({
   const [reload, setReload] = useState(0);
   const cache = useRef<Record<string, PriceSeries>>({});
   const members = useMemo(
-    () => etfs.filter((etf) => etf.group === group),
+    () =>
+      group === "overview" ? etfs : etfs.filter((etf) => etf.group === group),
     [group],
   );
   const explanations = activityExplanations(locale);
@@ -148,6 +150,17 @@ export function SectorAnalytics({
         className="analytics-group-controls"
         aria-label={t("ETF groups", "ETF 分组")}
       >
+        <button
+          type="button"
+          aria-pressed={group === "overview"}
+          onClick={() => {
+            if (group === "overview") return;
+            setLoading(true);
+            setGroup("overview");
+          }}
+        >
+          {t("Overview", "总览")} <span>{etfs.length}</span>
+        </button>
         {groups.map((item) => (
           <button
             type="button"
@@ -166,25 +179,30 @@ export function SectorAnalytics({
         ))}
       </div>
       <p className="analytics-group-note">
-        {group === "sector"
+        {group === "overview"
           ? t(
-              "The 11 S&P 500 sectors provide a top-level view.",
-              "11 个标普 500 标准板块，提供市场的一级视角。",
+              "Compare all groups on a shared timeline. Price strength and trading activity are separate lenses.",
+              "在统一时间轴上观察全部分组，分别看价格强弱与成交活跃程度。",
             )
-          : group === "industry"
+          : group === "sector"
             ? t(
-                "Industries reveal differences hidden inside broad sectors. SOXX and SMH both track semiconductors with different portfolios.",
-                "行业细分揭示大板块内部的差异。SOXX 和 SMH 都观察半导体，但持仓与权重不同。",
+                "The 11 S&P 500 sectors provide a top-level view.",
+                "11 个标普 500 标准板块，提供市场的一级视角。",
               )
-            : group === "theme"
+            : group === "industry"
               ? t(
-                  "Themes can span multiple industries and overlap with sector ETFs.",
-                  "主题可以跨越多个行业，并与板块 ETF 持仓重叠。",
+                  "Industries reveal differences hidden inside broad sectors. SOXX and SMH both track semiconductors with different portfolios.",
+                  "行业细分揭示大板块内部的差异。SOXX 和 SMH 都观察半导体，但持仓与权重不同。",
                 )
-              : t(
-                  "QQQ tracks the Nasdaq-100: large Nasdaq-listed non-financial companies, not a pure technology sector.",
-                  "QQQ 跟踪纳斯达克 100：纳斯达克上市的大型非金融企业，并非纯科技板块。",
-                )}
+              : group === "theme"
+                ? t(
+                    "Themes can span multiple industries and overlap with sector ETFs.",
+                    "主题可以跨越多个行业，并与板块 ETF 持仓重叠。",
+                  )
+                : t(
+                    "QQQ tracks the Nasdaq-100: large Nasdaq-listed non-financial companies, not a pure technology sector.",
+                    "QQQ 跟踪纳斯达克 100：纳斯达克上市的大型非金融企业，并非纯科技板块。",
+                  )}
       </p>
       {errors.length > 0 && (
         <p className="workbench-error" role="alert">
@@ -208,94 +226,110 @@ export function SectorAnalytics({
           "各 ETF 分别显示截至日期；— 表示数据缺失或不足。",
         )}
       </p>
-      <p className="mobile-table-hint">
-        {t(
-          "Swipe the table to see all metrics →",
-          "横向滑动表格，查看其余指标 →",
-        )}
-      </p>
-      <div
-        className="activity-table-scroll"
-        role="region"
-        aria-label={t("Scrollable ETF comparison", "可横向滚动的 ETF 对比")}
-        tabIndex={0}
-      >
-        <table
-          className="activity-table"
-          aria-label={t("ETF comparison", "ETF 对比")}
-        >
-          <thead>
-            <tr>
-              <th>{t("ETF / exposure", "ETF / 观察范围")}</th>
-              {[
-                explanations.priceReturn(20),
-                explanations.relative,
-                explanations.rvol,
-                explanations.cmf,
-              ].map((metric) => (
-                <th key={metric.title}>
-                  <span className="metric-label">
-                    {metric.title}
-                    <MetricHelp metric={metric} />
-                  </span>
-                </th>
-              ))}
-              <th>{t("As of", "截至日期")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((etf) => {
-              const m = metrics[etf.symbol];
-              return (
-                <tr
-                  key={etf.symbol}
-                  className={symbol === etf.symbol ? "selected-row" : undefined}
-                >
-                  <th scope="row">
-                    <button
-                      type="button"
-                      className="symbol-button"
-                      aria-label={etf.symbol}
-                      aria-pressed={symbol === etf.symbol}
-                      onClick={() => setSymbol(etf.symbol)}
-                    >
-                      <span>{etf.symbol}</span>
-                      <small>{etf[locale]}</small>
-                    </button>
-                  </th>
-                  <td>{format(m?.return20)}</td>
-                  <td>{format(m?.relative20, t(" pp", " 个百分点"))}</td>
-                  <td>{m?.rvol == null ? "—" : `${m.rvol.toFixed(2)}×`}</td>
-                  <td>{format(m?.cmf, "")}</td>
-                  <td>{m?.asOf ?? "—"}</td>
+      {group === "overview" ? (
+        <SectorOverview
+          records={records}
+          loading={loading}
+          onExplore={(nextGroup, nextSymbol) => {
+            setLoading(true);
+            setGroup(nextGroup);
+            setSymbol(nextSymbol);
+          }}
+        />
+      ) : (
+        <>
+          <p className="mobile-table-hint">
+            {t(
+              "Swipe the table to see all metrics →",
+              "横向滑动表格，查看其余指标 →",
+            )}
+          </p>
+          <div
+            className="activity-table-scroll"
+            role="region"
+            aria-label={t("Scrollable ETF comparison", "可横向滚动的 ETF 对比")}
+            tabIndex={0}
+          >
+            <table
+              className="activity-table"
+              aria-label={t("ETF comparison", "ETF 对比")}
+            >
+              <thead>
+                <tr>
+                  <th>{t("ETF / exposure", "ETF / 观察范围")}</th>
+                  {[
+                    explanations.priceReturn(20),
+                    explanations.relative,
+                    explanations.rvol,
+                    explanations.cmf,
+                  ].map((metric) => (
+                    <th key={metric.title}>
+                      <span className="metric-label">
+                        {metric.title}
+                        <MetricHelp metric={metric} />
+                      </span>
+                    </th>
+                  ))}
+                  <th>{t("As of", "截至日期")}</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <div className="analytics-selection">
-        <h3>
-          {symbol} · {selected[locale]}
-        </h3>
-        <a href={selected.source} target="_blank" rel="noreferrer">
-          {t("Issuer details", "发行商资料")}
-        </a>
-      </div>
-      <div className="analytics-metrics">
-        {metricCard(explanations.priceReturn(5), current?.return5)}
-        {metricCard(explanations.priceReturn(20), current?.return20)}
-        {metricCard(explanations.priceReturn(60), current?.return60)}
-      </div>
-      <div className="analytics-secondary">
-        {metricCard(
-          explanations.relative,
-          current?.relative20,
-          t(" pp", " 个百分点"),
-        )}
-        {metricCard(explanations.rvol, current?.rvol, "×")}
-        {metricCard(explanations.cmf, current?.cmf, "")}
-      </div>
+              </thead>
+              <tbody>
+                {members.map((etf) => {
+                  const m = metrics[etf.symbol];
+                  return (
+                    <tr
+                      key={etf.symbol}
+                      className={
+                        symbol === etf.symbol ? "selected-row" : undefined
+                      }
+                    >
+                      <th scope="row">
+                        <button
+                          type="button"
+                          className="symbol-button"
+                          aria-label={etf.symbol}
+                          aria-pressed={symbol === etf.symbol}
+                          onClick={() => setSymbol(etf.symbol)}
+                        >
+                          <span>{etf.symbol}</span>
+                          <small>{etf[locale]}</small>
+                        </button>
+                      </th>
+                      <td>{format(m?.return20)}</td>
+                      <td>{format(m?.relative20, t(" pp", " 个百分点"))}</td>
+                      <td>{m?.rvol == null ? "—" : `${m.rvol.toFixed(2)}×`}</td>
+                      <td>{format(m?.cmf, "")}</td>
+                      <td>{m?.asOf ?? "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="analytics-selection">
+            <h3>
+              {symbol} · {selected[locale]}
+            </h3>
+            <a href={selected.source} target="_blank" rel="noreferrer">
+              {t("Issuer details", "发行商资料")}
+            </a>
+          </div>
+          <div className="analytics-metrics">
+            {metricCard(explanations.priceReturn(5), current?.return5)}
+            {metricCard(explanations.priceReturn(20), current?.return20)}
+            {metricCard(explanations.priceReturn(60), current?.return60)}
+          </div>
+          <div className="analytics-secondary">
+            {metricCard(
+              explanations.relative,
+              current?.relative20,
+              t(" pp", " 个百分点"),
+            )}
+            {metricCard(explanations.rvol, current?.rvol, "×")}
+            {metricCard(explanations.cmf, current?.cmf, "")}
+          </div>
+        </>
+      )}
       <p className="analytics-footnote">
         {t(
           "Holdings overlap across these groups, so ETF volumes are not added into a market-wide capital-flow total. Daily metrics exclude the current New York calendar date; check as-of dates for stale data. Click ⓘ for formulas and examples.",
