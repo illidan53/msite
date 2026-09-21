@@ -21,11 +21,13 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   });
   if (!response.ok)
     throw new Error(
-      response.status === 429
-        ? "LIMIT"
-        : response.status === 404
-          ? "NOT_FOUND"
-          : "REQUEST_FAILED",
+      response.status === 403
+        ? "FORBIDDEN"
+        : response.status === 429
+          ? "LIMIT"
+          : response.status === 404
+            ? "NOT_FOUND"
+            : "REQUEST_FAILED",
     );
   return response.json() as Promise<T>;
 }
@@ -94,6 +96,10 @@ export function Research() {
     [history, setHistory] = useState<Summary[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [access, setAccess] = useState<{
+    canRun: boolean;
+    clientIp: string | null;
+  } | null>(null);
   const generation = useRef(0);
   const refreshHistory = () =>
     request<Summary[]>("")
@@ -101,6 +107,13 @@ export function Research() {
       .catch(() => {});
   useEffect(() => {
     let active = true;
+    void request<{ canRun: boolean; clientIp: string | null }>("/access")
+      .then((value) => {
+        if (active) setAccess(value);
+      })
+      .catch(() => {
+        if (active) setAccess({ canRun: false, clientIp: null });
+      });
     void request<Summary[]>("")
       .then((v) => {
         if (active) setHistory(v);
@@ -140,6 +153,10 @@ export function Research() {
   }, [report?.id, report?.status]);
   const running = busy || report?.status === "running";
   async function run(module: ResearchModule = "all") {
+    if (!access?.canRun) {
+      setError("FORBIDDEN");
+      return;
+    }
     const token = ++generation.current;
     setBusy(true);
     setError("");
@@ -213,7 +230,7 @@ export function Research() {
           </div>
           <button
             type="button"
-            disabled={running}
+            disabled={running || !access?.canRun}
             onClick={() => void run(module)}
             aria-label={t(
               `Refresh ${labels[module][0]}`,
@@ -245,6 +262,20 @@ export function Research() {
       className="research-page"
       aria-label={t("Dig Deep research", "深度研究")}
     >
+      {access && !access.canRun && (
+        <p className="research-notice" role="status">
+          {t(
+            "Only authorized IP addresses may run or refresh research. Saved reports remain available.",
+            "仅白名单 IP 可运行或刷新分析，仍可查看已有报告。",
+          )}
+          {access.clientIp && (
+            <>
+              {" "}
+              {t("Your IP:", "当前 IP：")} {access.clientIp}
+            </>
+          )}
+        </p>
+      )}
       <form
         className="research-toolbar"
         onSubmit={(e) => {
@@ -261,7 +292,7 @@ export function Research() {
             pattern="[A-Za-z0-9.\-]+"
             maxLength={20}
             required
-            disabled={running}
+            disabled={running || !access?.canRun}
             autoCapitalize="characters"
             spellCheck={false}
           />
@@ -274,11 +305,15 @@ export function Research() {
             pattern="[A-Za-z0-9.\-]+"
             maxLength={20}
             required
-            disabled={running}
+            disabled={running || !access?.canRun}
             spellCheck={false}
           />
         </label>
-        <button className="research-run" type="submit" disabled={running}>
+        <button
+          className="research-run"
+          type="submit"
+          disabled={running || !access?.canRun}
+        >
           <Play size={16} aria-hidden="true" />
           {running
             ? t("Running…", "运行中…")
@@ -312,25 +347,30 @@ export function Research() {
       </form>
       {error && (
         <p role="alert" className="research-notice">
-          {error === "LIMIT"
+          {error === "FORBIDDEN"
             ? t(
-                "Analysis capacity reached (2 simultaneous, 12/hour, 60/day). Please retry later.",
-                "达到分析运行上限（同时 2 个、每小时 12 次、每日 60 次），请稍后重试。",
+                "Your IP is not authorized to run research.",
+                "当前 IP 无权运行分析。",
               )
-            : error === "POLL_FAILED"
+            : error === "LIMIT"
               ? t(
-                  "Connection interrupted. Reconnecting to the running report…",
-                  "连接中断，正在重新连接运行中的报告…",
+                  "Analysis capacity reached (2 simultaneous, 12/hour, 60/day). Please retry later.",
+                  "达到分析运行上限（同时 2 个、每小时 12 次、每日 60 次），请稍后重试。",
                 )
-              : error === "HISTORY_FAILED"
+              : error === "POLL_FAILED"
                 ? t(
-                    "Could not load report history. Reload the page to retry.",
-                    "历史报告加载失败，请刷新页面重试。",
+                    "Connection interrupted. Reconnecting to the running report…",
+                    "连接中断，正在重新连接运行中的报告…",
                   )
-                : t(
-                    "The request failed. Please try again.",
-                    "请求失败，请重试。",
-                  )}
+                : error === "HISTORY_FAILED"
+                  ? t(
+                      "Could not load report history. Reload the page to retry.",
+                      "历史报告加载失败，请刷新页面重试。",
+                    )
+                  : t(
+                      "The request failed. Please try again.",
+                      "请求失败，请重试。",
+                    )}
         </p>
       )}
       {!report ? (

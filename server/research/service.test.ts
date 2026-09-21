@@ -96,7 +96,13 @@ async function setup(kind = "CS", denied = false) {
   const service = new ResearchService(market, client, dir);
   const app = express();
   app.use(express.json());
-  app.use("/api", createResearchRoutes(service));
+  app.use(
+    "/api",
+    createResearchRoutes(service, {
+      allowedIps: ["127.0.0.1", "::1"],
+      trustedProxyIps: [],
+    }),
+  );
   app.use(apiErrorHandler);
   return { service, market, client, getJson, dir, app };
 }
@@ -249,7 +255,7 @@ describe("research job lifecycle", () => {
       client,
       dir,
       "private-api-key",
-      "configured-model",
+      "gpt-5.6-sol",
       fetcher,
     );
     const report = await done(service, (await service.start(input)).id);
@@ -258,6 +264,13 @@ describe("research job lifecycle", () => {
     expect(JSON.stringify(report)).not.toContain("private-api-key");
     expect(JSON.parse(fetcher.mock.calls[0]![1]!.body as string).store).toBe(
       false,
+    );
+    expect(JSON.parse(fetcher.mock.calls[0]![1]!.body as string)).toMatchObject(
+      {
+        model: "gpt-5.6-sol",
+        reasoning: { effort: "low" },
+        max_output_tokens: 6000,
+      },
     );
   });
   it("allows only safe public links", () => {

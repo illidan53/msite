@@ -121,6 +121,9 @@ jobs:
           aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry"
           docker pull "$image_uri"
 
+          proxy_ip="$(docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}')"
+          test -n "$proxy_ip"
+
           install -d -o 1000 -g 1000 -m 700 /var/lib/msite/research
 
           cat > /etc/systemd/system/msite.service <<SERVICE
@@ -134,7 +137,7 @@ jobs:
           Restart=always
           RestartSec=5
           ExecStartPre=-/usr/bin/docker rm -f msite-finance
-          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -e RESEARCH_DATA_DIR=/app/data/research -v /var/lib/msite/research:/app/data/research -p 127.0.0.1:8787:8787 $image_uri
+          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -e OPENAI_MODEL=gpt-5.6-sol -e RESEARCH_ALLOWED_IPS=70.111.76.119 -e RESEARCH_TRUSTED_PROXY_IPS=$proxy_ip -e RESEARCH_DATA_DIR=/app/data/research -v /var/lib/msite/research:/app/data/research -p 127.0.0.1:8787:8787 $image_uri
           ExecStop=/usr/bin/docker stop msite-finance
 
           [Install]

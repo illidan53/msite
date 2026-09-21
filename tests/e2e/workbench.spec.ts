@@ -1113,7 +1113,11 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   const bodies: Record<string, unknown>[] = [];
   await page.route("**/api/research**", async (route) => {
     const req = route.request();
-    if (req.method() === "POST") {
+    if (new URL(req.url()).pathname === "/api/research/access") {
+      await route.fulfill({
+        json: { canRun: true, clientIp: "70.111.76.119" },
+      });
+    } else if (req.method() === "POST") {
       posts++;
       bodies.push(req.postDataJSON());
       await route.fulfill({
@@ -1188,4 +1192,37 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     path: "test-results/research-desktop.png",
     fullPage: true,
   });
+});
+
+test("keeps research read-only for visitors outside the IP allowlist", async ({
+  page,
+}) => {
+  await mockWorkbenchApis(page);
+  let posts = 0;
+  await page.route("**/api/research**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === "POST") {
+      posts++;
+      await route.fulfill({
+        status: 403,
+        json: { code: "RESEARCH_IP_FORBIDDEN" },
+      });
+    } else if (path === "/api/research/access")
+      await route.fulfill({
+        json: { canRun: false, clientIp: "198.51.100.7" },
+      });
+    else await route.fulfill({ json: [] });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Dig Deep", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Run analysis", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("Only authorized IP addresses", { exact: false }),
+  ).toContainText("198.51.100.7");
+  await expect(page.getByLabel("Saved reports")).toBeEnabled();
+  await page.getByLabel("Language", { exact: true }).selectOption("zh");
+  await expect(page.getByText("仅白名单 IP", { exact: false })).toBeVisible();
+  expect(posts).toBe(0);
 });

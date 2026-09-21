@@ -1,4 +1,9 @@
 import { Router } from "express";
+import {
+  researchAccess,
+  parseIps,
+  type ResearchAccessOptions,
+} from "../research/access";
 import { z } from "zod";
 import { ApiError } from "../http/apiError";
 import type { ResearchService } from "../research/service";
@@ -20,10 +25,20 @@ const schema = z
     baseId: z.string().uuid().optional(),
   })
   .strict();
-export function createResearchRoutes(service: ResearchService) {
+export function createResearchRoutes(
+  service: ResearchService,
+  options: ResearchAccessOptions = {
+    allowedIps: parseIps(process.env.RESEARCH_ALLOWED_IPS),
+    trustedProxyIps: parseIps(process.env.RESEARCH_TRUSTED_PROXY_IPS),
+  },
+) {
+  const access = researchAccess(options);
   const router = Router();
   router.get("/research", async (_req, res) => {
     res.set("Cache-Control", "no-store").json(await service.list());
+  });
+  router.get("/research/access", (req, res) => {
+    res.set("Cache-Control", "no-store").json(access(req));
   });
   router.get("/research/:id", async (req, res) => {
     if (!z.string().uuid().safeParse(req.params.id).success)
@@ -31,6 +46,15 @@ export function createResearchRoutes(service: ResearchService) {
     res.set("Cache-Control", "no-store").json(await service.get(req.params.id));
   });
   router.post("/research", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!access(req).canRun) {
+      throw new ApiError(
+        403,
+        "RESEARCH_IP_FORBIDDEN",
+        "This IP address is not allowed to run research",
+        { source: "research" },
+      );
+    }
     const input = schema.safeParse(req.body);
     if (!input.success)
       throw new ApiError(

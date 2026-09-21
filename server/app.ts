@@ -59,7 +59,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
         process.env.RESEARCH_DATA_DIR ??
           resolve(process.cwd(), "data/research"),
         process.env.OPENAI_API_KEY,
-        process.env.OPENAI_MODEL,
+        process.env.OPENAI_MODEL?.trim() || "gpt-5.6-sol",
       ),
     ),
   );

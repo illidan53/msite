@@ -130,3 +130,40 @@ test("public deployment serves stock and ETF research", async ({
     page.getByRole("heading", { name: "深度研究", exact: true }),
   ).toBeVisible();
 });
+
+test("public research authorization resists spoofed source headers", async ({
+  request,
+}) => {
+  const baseline = await request.get("/api/research/access");
+  expect(baseline.ok()).toBe(true);
+  const access = (await baseline.json()) as {
+    canRun: boolean;
+    clientIp: string | null;
+  };
+  expect(access.clientIp).toBeTruthy();
+  expect(access.clientIp).not.toMatch(
+    /^(172\.(1[6-9]|2\d|3[01])\.|127\.|10\.|192\.168\.|::1$)/,
+  );
+  expect(access.canRun).toBe(access.clientIp === "70.111.76.119");
+  for (const spoof of [
+    "70.111.76.119",
+    "198.51.100.7",
+    "70.111.76.119, 198.51.100.7",
+  ]) {
+    const headers = {
+      "X-Forwarded-For": spoof,
+      "X-Real-IP": spoof,
+      Forwarded: `for=${spoof}`,
+    };
+    const result = await request.get("/api/research/access", { headers });
+    expect(await result.json()).toEqual(access);
+    // Invalid input checks authorization without running jobs or spending tokens.
+    const denied = await request.post("/api/research", {
+      headers,
+      data: { symbol: "../invalid" },
+    });
+    expect(denied.status()).toBe(access.canRun ? 400 : 403);
+    if (!access.canRun)
+      expect((await denied.json()).code).toBe("RESEARCH_IP_FORBIDDEN");
+  }
+});
