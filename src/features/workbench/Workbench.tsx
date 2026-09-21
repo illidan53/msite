@@ -570,7 +570,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
         <div>
           <p className="eyebrow">
             {activePage === "research"
-              ? t("ANALYTICS / RESEARCH", "分析 / 个股研究")
+              ? t("ANALYTICS / DIG DEEP", "分析 / 深度研究")
               : activePage === "analytics"
                 ? t("ANALYTICS / SECTORS")
                 : t("WATCHLIST / MARKET OVERVIEW")}
@@ -578,7 +578,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           <div className="watchlist-heading-line">
             <h2>
               {activePage === "research"
-                ? t("Stock / ETF", "个股 / ETF")
+                ? t("Dig Deep", "深度研究")
                 : activePage === "analytics"
                   ? t("Sectors & ETFs")
                   : t(watchlist.name)}
@@ -916,7 +916,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                 handleCloseDetails();
               }}
             >
-              {t("Stock / ETF", "个股 / ETF")}
+              {t("Dig Deep", "深度研究")}
             </button>
           </div>
         </nav>

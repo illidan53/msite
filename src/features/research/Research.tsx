@@ -243,7 +243,7 @@ export function Research() {
   return (
     <section
       className="research-page"
-      aria-label={t("Stock / ETF research", "个股 / ETF 分析")}
+      aria-label={t("Dig Deep research", "深度研究")}
     >
       <form
         className="research-toolbar"

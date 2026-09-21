@@ -77,9 +77,9 @@ MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e
 
 Wave-theory analysis remains documented in the MVP spec and is not implemented in this MVP.
 
-## Stock / ETF research
+## Dig Deep research
 
-Analytics → Stock / ETF provides on-demand research. Run creates a durable background job; the browser polls progress and saved reports can be reopened. Module refreshes create a new snapshot while retaining the other modules' data timestamps. AI interpretation is invalidated and regenerated whenever evidence changes.
+Analytics → Dig Deep provides on-demand research. Run creates a durable background job; the browser polls progress and saved reports can be reopened. Module refreshes create a new snapshot while retaining the other modules' data timestamps. AI interpretation is invalidated and regenerated whenever evidence changes.
 
 - Quantitative calculations use completed, split-adjusted daily bars (up to five years, with a one-year fallback when access is denied). These are **price returns, not dividend-inclusive total returns**. The current New York trading day is excluded. The UI documents lookbacks, benchmark alignment and the zero risk-free-rate assumption. Missing history or zero denominators produce unavailable values.
 - Profile/news data comes from Polygon / Massive. News covers up to 20 articles from the previous 30 days, with source links and publication dates. Financial statements and ratios use `/stocks/financials/v1/` endpoints and may require additional entitlement. Stocks and ETFs use separate templates. ETF holdings, NAV, expenses and AUM need an additional feed; unavailable fields are labeled explicitly. Historical valuation percentiles, ROIC, cash-flow growth, spreads and ETF tracking error are not currently calculated.

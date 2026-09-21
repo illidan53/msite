@@ -1128,9 +1128,9 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     } else await route.fulfill({ json: complete });
   });
   await page.goto("/");
-  await page.getByRole("button", { name: "Stock / ETF", exact: true }).click();
+  await page.getByRole("button", { name: "Dig Deep", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Stock / ETF", exact: true }),
+    page.getByRole("heading", { name: "Dig Deep", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("One symbol. A complete research snapshot."),
@@ -1155,14 +1155,14 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     page.getByRole("button", { name: "Run analysis", exact: true }),
   ).toBeEnabled();
   await page.reload();
-  await page.getByRole("button", { name: "Stock / ETF", exact: true }).click();
+  await page.getByRole("button", { name: "Dig Deep", exact: true }).click();
   await page.getByLabel("Saved reports").selectOption(complete.id);
   await expect(page.getByText("12.34%", { exact: true })).toBeVisible();
   expect(posts).toBe(2);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
   await expect(
-    page.getByRole("heading", { name: "个股 / ETF", exact: true }),
+    page.getByRole("heading", { name: "深度研究", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("1 年价格收益", { exact: true })).toBeVisible();
   await expect
@@ -1173,7 +1173,7 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     )
     .toBe(true);
   const headingTop = await page
-    .getByRole("heading", { name: "个股 / ETF", exact: true })
+    .getByRole("heading", { name: "深度研究", exact: true })
     .evaluate((el) => el.getBoundingClientRect().top);
   const formTop = await page
     .locator(".research-toolbar")

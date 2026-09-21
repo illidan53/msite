@@ -117,9 +117,9 @@ test("public deployment serves stock and ETF research", async ({
   expect(response.ok()).toBe(true);
   expect(Array.isArray(await response.json())).toBe(true);
   await page.goto("/");
-  await page.getByRole("button", { name: "Stock / ETF", exact: true }).click();
+  await page.getByRole("button", { name: "Dig Deep", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Stock / ETF", exact: true }),
+    page.getByRole("heading", { name: "Dig Deep", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Run analysis", exact: true }),
@@ -127,6 +127,6 @@ test("public deployment serves stock and ETF research", async ({
   await expect(page.getByLabel("Saved reports")).toBeVisible();
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
   await expect(
-    page.getByRole("heading", { name: "个股 / ETF", exact: true }),
+    page.getByRole("heading", { name: "深度研究", exact: true }),
   ).toBeVisible();
 });
