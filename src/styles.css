@@ -1257,3 +1257,12 @@ body:has(.metric-help-dialog[open]) {
   margin: 6px 0;
   overflow-wrap: anywhere;
 }
+
+.watchlist-selection-sources a {
+  color: var(--accent);
+  display: inline-block;
+  min-height: 44px;
+  padding-block: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

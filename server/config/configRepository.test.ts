@@ -87,13 +87,22 @@ describe("ConfigRepository", () => {
     expect(watchlists.watchlists.filter((item) => item.navigationGroup === "other")).toHaveLength(9);
     const semiconductorSymbols = watchlists.watchlists[0].rows.flatMap((row) => row.symbols);
     expect(semiconductorSymbols).toEqual(expect.arrayContaining(["LITE", "NOK", "CRDO", "ALAB"]));
-    for (const item of watchlists.watchlists.filter((item) => item.navigationGroup === "primary")) {
+    for (const item of watchlists.watchlists.filter((item) => item.id !== "close-watch")) {
       const members = item.rows.flatMap((row) => row.symbols);
       expect(new Set(members).size).toBe(members.length);
       expect(members).not.toContain("GOOG");
       expect(item.selectionNote).toBeTruthy();
+      expect(item.selectionReviewedAt).toBe("2026-09-20");
+      expect(item.selectionSources?.some((source) => source.kind === "company")).toBe(true);
+      expect(item.selectionSources?.some((source) => source.kind === "discussion" && source.publishedAt)).toBe(true);
+      expect(item.pinnedSymbols.every((symbol) => members.includes(symbol))).toBe(true);
     }
     expect(symbols.size).toBeGreaterThan(200);
+    for (const obsolete of ["PSTG", "HES", "MRO", "PARA", "IPG", "GOOG"]) expect(symbols.has(obsolete)).toBe(false);
+    const cloud = watchlists.watchlists.find((item) => item.id === "ai-cloud-infrastructure")!;
+    expect(cloud.rows.find((row) => row.name === "GPU cloud operators")?.symbols).toEqual(["CRWV", "NBIS", "IREN"]);
+    expect(cloud.rows.flatMap((row) => row.symbols)).toContain("P");
+    expect(cloud.rows.flatMap((row) => row.symbols)).not.toContain("AMT");
     expect(closeWatch).toMatchObject({
       name: "close watch",
       symbolDescriptions: {

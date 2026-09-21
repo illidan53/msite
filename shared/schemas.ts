@@ -30,6 +30,29 @@ const symbolDescriptionsSchema = z
 const watchlistSchema = z.object({
   navigationGroup: z.enum(["primary", "other"]).optional(),
   selectionNote: z.string().optional(),
+  selectionReviewedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  selectionSources: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        url: z
+          .string()
+          .url()
+          .refine(
+            (value) => value.startsWith("https://"),
+            "Source links must use HTTPS",
+          ),
+        kind: z.enum(["company", "discussion"]),
+        publishedAt: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .optional(),
+      }),
+    )
+    .optional(),
   id: z.string().min(1),
   name: z.string().min(1),
   description: z.string().optional(),

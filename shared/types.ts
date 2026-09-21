@@ -20,6 +20,13 @@ export interface WatchlistRow {
 export interface Watchlist {
   navigationGroup?: "primary" | "other";
   selectionNote?: string;
+  selectionReviewedAt?: string;
+  selectionSources?: Array<{
+    label: string;
+    url: string;
+    kind: "company" | "discussion";
+    publishedAt?: string;
+  }>;
   id: string;
   name: string;
   description?: string;

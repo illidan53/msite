@@ -667,6 +667,20 @@ for (const width of [1440, 390]) {
                 id: "software",
                 name: "Software & SaaS",
                 selectionNote: "Software coverage",
+                selectionReviewedAt: "2026-09-20",
+                selectionSources: [
+                  {
+                    label: "Company reference",
+                    url: "https://example.com/company",
+                    kind: "company",
+                  },
+                  {
+                    label: "Dated discussion",
+                    url: "https://x.com/example/status/123",
+                    kind: "discussion",
+                    publishedAt: "2026-03-13",
+                  },
+                ],
               },
               {
                 ...focus,
@@ -716,7 +730,22 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByText("Software coverage", { exact: true }),
     ).toBeVisible();
+    await expect(page.locator(".watchlist-selection-policy")).toContainText(
+      "not a current popularity ranking",
+    );
+    await expect(
+      page.getByRole("link", { name: "Dated discussion" }),
+    ).toHaveAttribute("href", "https://x.com/example/status/123");
+    await expect(page.locator(".watchlist-selection-sources time")).toHaveText(
+      "2026-03-13",
+    );
     await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(page.locator(".watchlist-selection-policy")).toContainText(
+      "不代表当前热度排名",
+    );
+    await expect(page.locator(".watchlist-selection-sources")).toContainText(
+      "X 讨论样本",
+    );
     if (width > 600) {
       await expect(
         page.getByRole("button", { name: "其他", exact: true }),

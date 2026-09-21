@@ -1,4 +1,135 @@
 export const chineseMessages: Record<string, string> = {
+  "Semiconductors, memory, equipment and adjacent photonics; includes the user focus list":
+    "半导体、存储、设备及相邻光通信，保留你的重点关注标的",
+  "Retain chip and equipment anchors; add SNDK, AAOI, MTSI and NVTS for memory, photonics and power-semiconductor coverage. LITE, NOK, CRDO and ALAB are explicit user priorities. NOK supplies network equipment and is adjacent exposure, not a pure chip company. Indexed discussion samples identify candidates, not a popularity order.":
+    "保留芯片与设备核心企业，补入 SNDK、AAOI、MTSI、NVTS，覆盖存储、光通信及功率半导体。LITE、NOK、CRDO、ALAB 为你的明确关注标的；NOK 属于相邻网络设备业务，并非纯芯片公司。公开讨论样本用于发现候选，不构成热度排序。",
+  "Staples anchors plus energy drinks and fresh pet food":
+    "必需消费核心企业，以及能量饮料和鲜食宠物食品",
+  "Keep retail, household, beverage and tobacco anchors; add CELH and FRPT for distinct consumer-growth businesses. X evidence here is sparse and includes older portfolio and earnings-calendar samples. The retained staples anchors are business-coverage choices, not verified social-media leaders.":
+    "保留零售、日用品、饮料和烟草核心企业，补入 CELH 与 FRPT，观察消费成长方向。本板块的 X 证据较少，包含较旧的组合讨论与财报日历；保留核心企业是为了业务覆盖，不能据此称为社交媒体热度领先者。",
+  "Cross-sector technology platforms and AI capital-spending anchors":
+    "跨板块科技平台及 AI 资本开支核心企业",
+  "Retain ten cross-sector platform leaders after review. GOOGL represents Alphabet once. This deliberately overlaps semiconductor, cloud and software lists to compare major platforms; it is neither a top-ten market-cap screen nor an X popularity ranking.":
+    "复核后保留十家跨板块核心平台，Alphabet 仅用 GOOGL 表示。与半导体、云及软件名单有意重叠，便于对照平台公司；这不是市值前十筛选或 X 热度排名。",
+  "Enterprise software, SaaS, security, AI applications and advertising platforms":
+    "企业软件、SaaS、安全、AI 应用及广告平台",
+  "Combine enterprise-software anchors with AI applications, operations software and advertising platforms. Add IOT, SOUN, PATH, APP, ZETA, TTD and DUOL; retain SHOP. APP, ZETA and TTD are advertising software; DUOL is learning software. IGV is a reference, not a replicated portfolio, and not every member is pure SaaS.":
+    "将企业软件核心与 AI 应用、运营软件及广告平台结合，补入 IOT、SOUN、PATH、APP、ZETA、TTD、DUOL，保留 SHOP。APP、ZETA、TTD 属于广告软件，DUOL 属于学习软件。IGV 仅作覆盖参考，不复制其持仓，也不把所有公司视为纯 SaaS。",
+  "GPU clouds, data-center operators, servers, networking, cooling and storage":
+    "GPU 云、数据中心运营、服务器、网络、散热及存储",
+  "CRWV and NBIS are direct AI-cloud exposures. IREN combines AI cloud with a transition from mining. Separate APLD, WULF, CIFR, CORZ and HUT as data-center developers and mixed-compute businesses; hosting power capacity is not the same as renting GPUs. Keep supply-chain peers in distinct groups. Move power generators to Power & Energy Transition; remove tower REITs and duplicate chip exposure here. P is Everpure, formerly PSTG.":
+    "CRWV、NBIS 是直接 AI 云业务；IREN 兼具 AI 云与矿业转型。APLD、WULF、CIFR、CORZ、HUT 单列为数据中心开发及混合算力业务，机房托管与 GPU 出租并不等同。服务器、网络、散热及存储分别分组；发电企业集中到电力与能源转型，此处移除通信塔 REIT 和重复芯片覆盖。P 是原 PSTG，现名 Everpure。",
+  "Pharma anchors, metabolic health, digital care, precision medicine and medtech":
+    "医药核心、代谢健康、数字医疗、精准医疗及医疗器械",
+  "Add HIMS, TEM, RXRX, CRSP, VKTX, TMDX and OSCR while retaining pharma and medtech anchors. Separate care delivery, diagnostic AI, drug development and medical devices: using AI does not make a healthcare company a general-purpose software business. Clinical-stage companies are identified by their business descriptions, not assumed to have approved products.":
+    "补入 HIMS、TEM、RXRX、CRSP、VKTX、TMDX、OSCR，保留医药及器械核心企业。将诊疗服务、诊断 AI、药物研发和器械分开；使用 AI 不等于通用软件公司。临床开发企业按其业务阶段理解，不假定已拥有获批产品。",
+  "Banks and market infrastructure alongside fintech and digital assets":
+    "银行与市场基础设施，以及金融科技和数字资产",
+  "Add HOOD, SOFI, COIN, CRCL, NU, AFRM, XYZ and PYPL to the bank and exchange anchors. Brokerage, lending, payment processing, crypto exchange and stablecoin infrastructure are different business models. Discussion samples are incomplete; core banks remain comparison anchors. XYZ is the current Block ticker.":
+    "在银行和交易所核心企业之外加入 HOOD、SOFI、COIN、CRCL、NU、AFRM、XYZ、PYPL。券商、借贷、支付、加密交易所及稳定币基础设施分别理解。讨论样本不完整，传统银行作为对照保留；Block 使用当前代码 XYZ。",
+  "Oil, natural gas, LNG, pipelines, services and refining":
+    "原油、天然气、LNG、管道、油服及炼化",
+  "Focus the list on oil and gas business drivers, with EXE and EQT for gas and LNG for liquefaction. Remove obsolete HES and MRO symbols rather than carrying stale quotes. X samples are limited and old; this is business-grounded coverage with discussion inputs, not a measured energy popularity league table.":
+    "按油气业务驱动精简名单，以 EXE、EQT 观察天然气，以 LNG 观察液化出口。移除旧 HES、MRO 代码，避免延续过期行情。X 样本有限且较旧，这里是结合讨论线索的业务观察池，不能称为实测能源热度榜。",
+  "E-commerce, mobility, restaurants, travel and consumer brands":
+    "电商、出行、餐饮、旅行及消费品牌",
+  "Add MELI, BABA, PDD, UBER, CAVA and ABNB to established consumer anchors. Classify CAVA as restaurants, not staples simply because it sells food. Commerce platforms may also have payments or cloud businesses; grouping follows the exposure being observed here.":
+    "补入 MELI、BABA、PDD、UBER、CAVA、ABNB，与消费核心企业对照。CAVA 按餐饮分类，不能因为卖食品就归为必需消费。电商平台可能兼有支付或云业务，此处按所观察的消费业务分组。",
+  "Social media, streaming, gaming and terrestrial or satellite telecom":
+    "社交媒体、流媒体、游戏及地面与卫星通信",
+  "Add RDDT and ASTS; keep streaming, gaming and telecom comparison anchors. ASTS is satellite-to-phone connectivity, whereas launch vehicles belong with space industrials. Move TTD to advertising software with APP and ZETA. Remove duplicate GOOG and old PARA/IPG entries.":
+    "补入 RDDT、ASTS，保留流媒体、游戏与通信核心对照。ASTS 是卫星直连手机通信，运载火箭则归航天工业。TTD 移至软件，与 APP、ZETA 的广告软件业务放在一起；移除重复 GOOG 与旧 PARA、IPG 条目。",
+  "Industrial anchors, space systems, defense technology and advanced aviation":
+    "工业核心、航天系统、国防技术及新型航空",
+  "Add RKLB, LUNR, RDW, PL, AVAV, KTOS, RCAT, JOBY and ACHR. Separate launch and space systems, defense and drones, and advanced aviation from mature industrial anchors. POWL is retained for electrical distribution equipment. These are thematic exposures, not all traditional defense contractors.":
+    "补入 RKLB、LUNR、RDW、PL、AVAV、KTOS、RCAT、JOBY、ACHR，将发射与航天系统、国防无人机及新型航空分开，并保留成熟工业企业作为对照。POWL 对应配电设备。此处是主题覆盖，并非所有公司都是传统军工承包商。",
+  "Power generation, nuclear technology, grid equipment and storage":
+    "发电、核能技术、电网设备及储能",
+  "Add TLN, OKLO, SMR, CCJ, BWXT, BE and EOSE. Separate operating utilities from reactor developers, uranium supply, fuel cells and battery storage. The broader name reflects the actual universe: CCJ and SMR are not regulated utilities, and development-stage nuclear exposure is different from operating generation.":
+    "补入 TLN、OKLO、SMR、CCJ、BWXT、BE、EOSE。将运营公用事业与反应堆开发、铀供应、燃料电池及储能分开；扩大名称以符合实际覆盖，CCJ、SMR 并非受监管公用事业，核能开发阶段也不同于已投运发电业务。",
+  "Industrials, Space & Defense": "工业、航天与国防",
+  "Power & Energy Transition": "电力与能源转型",
+  "Food & pet nutrition": "食品与宠物营养",
+  "AI applications & automation": "AI 应用与自动化",
+  "Advertising software": "广告软件",
+  "Consumer learning software": "消费学习软件",
+  "GPU cloud operators": "GPU 云运营商",
+  "Data-center developers & mixed compute": "数据中心开发与混合算力",
+  "Hyperscale cloud platforms": "大型云平台",
+  "AI servers & manufacturing": "AI 服务器与制造",
+  "Networks & optical transport": "网络与光传输",
+  "Cooling & electrical infrastructure": "散热与电气基础设施",
+  "Data-center REITs": "数据中心 REIT",
+  "Storage systems & drives": "存储系统与硬盘",
+  "Metabolic health & care platforms": "代谢健康与诊疗平台",
+  "Precision medicine & drug discovery": "精准医疗与药物研发",
+  "Medical technology": "医疗器械与技术",
+  "Healthcare providers & insurers": "医疗服务与保险",
+  "Pharma & biotech leaders": "医药与生物技术核心",
+  "Digital finance & crypto infrastructure": "数字金融与加密基础设施",
+  "Banks & diversified finance": "银行与综合金融",
+  "Payments & market infrastructure": "支付与市场基础设施",
+  "Oil producers & integrated energy": "原油生产与综合能源",
+  "Natural gas & LNG": "天然气与 LNG",
+  "Midstream infrastructure": "中游管道基础设施",
+  "Oilfield services & refining": "油田服务与炼化",
+  "Commerce platforms": "电商平台",
+  "Autos & mobility": "汽车与出行",
+  "Restaurants & travel": "餐饮与旅行",
+  "Retail & consumer brands": "零售与消费品牌",
+  "Social platforms & digital advertising": "社交平台与数字广告",
+  "Streaming & entertainment": "流媒体与娱乐",
+  "Gaming platforms": "游戏平台",
+  "Telecom & satellite connectivity": "电信与卫星通信",
+  "Space launch & systems": "航天发射与系统",
+  "Defense & autonomous systems": "国防与自主系统",
+  "Advanced aviation": "新型航空",
+  "Aerospace & industrial leaders": "航空与工业核心",
+  "Industrial technology & infrastructure": "工业技术与基础设施",
+  "Power producers": "发电企业",
+  "Regulated utilities": "受监管公用事业",
+  "Nuclear technology & fuel": "核能技术与燃料",
+  "Grid & generation equipment": "电网与发电设备",
+  "Storage & solar": "储能与太阳能",
+  "GPU cloud infrastructure for AI training and inference":
+    "面向 AI 训练与推理的 GPU 云基础设施",
+  "AI cloud platform and GPU clusters": "AI 云平台与 GPU 集群",
+  "AI cloud and data centers transitioning from bitcoin mining":
+    "AI 云与数据中心，从比特币挖矿转型",
+  "Data-center development and HPC hosting": "数据中心开发与高性能计算托管",
+  "Power-backed data-center infrastructure for AI and HPC":
+    "依托电力资源的 AI 与 HPC 数据中心基础设施",
+  "HPC data-center development and operations": "HPC 数据中心开发与运营",
+  "High-density colocation and digital asset mining transition":
+    "高密度托管与数字资产挖矿转型",
+  "Power, digital infrastructure and mixed compute businesses":
+    "电力、数字基础设施及混合算力业务",
+  "Everpure storage and data management; formerly PSTG":
+    "Everpure 存储与数据管理，原代码 PSTG",
+  "NAND flash memory and solid-state storage": "NAND 闪存与固态存储",
+  "Optical transceivers and fiber networking products":
+    "光收发模块及光纤网络产品",
+  "GaN and SiC power semiconductors": "氮化镓与碳化硅功率半导体",
+  "Functional energy drinks": "功能性能量饮料",
+  "Fresh pet food": "鲜食宠物食品",
+  "AI-enabled precision medicine and diagnostics": "AI 精准医疗与诊断",
+  "Personalized digital healthcare": "个性化数字医疗",
+  "AI-enabled drug discovery and development": "AI 药物发现与开发",
+  "Clinical-stage metabolic drug development": "临床阶段代谢药物开发",
+  "Stablecoin and digital payments infrastructure": "稳定币与数字支付基础设施",
+  "Block merchant payments and Cash App": "Block 商户支付与 Cash App",
+  "Satellite-to-phone broadband connectivity": "卫星直连手机宽带通信",
+  "Launch vehicles and space systems": "运载火箭与航天系统",
+  "Advanced nuclear technology under development": "开发中的先进核能技术",
+  "Small modular reactor technology": "小型模块化反应堆技术",
+  "Uranium and nuclear fuel exposure": "铀资源与核燃料业务",
+  "Zinc-based stationary battery storage": "锌基固定式电池储能",
+  "Conversational and voice AI software": "对话与语音 AI 软件",
+  "Connected operations software": "互联运营管理软件",
+  "Advertising technology platform": "广告技术平台",
+  "Programmatic advertising software": "程序化广告软件",
+  "Marketing data and automation software": "营销数据与自动化软件",
+  "Digital language-learning software": "数字语言学习软件",
   "Software & SaaS": "软件",
   Other: "其他",
   "AI compute & chip platforms": "AI 计算与芯片平台",

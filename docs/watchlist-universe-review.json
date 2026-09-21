@@ -1,0 +1,4145 @@
+{
+  "reviewedAt": "2026-09-20",
+  "method": "Business descriptions from existing Polygon ticker reference data, selected official company pages, and manually reviewed indexed X samples. No complete social feed, mention count, sentiment score or current popularity rank. Discussion link matching is conservative and uses explicitly labelled symbols only.",
+  "records": [
+    {
+      "symbol": "AAOI",
+      "name": "Applied Optoelectronics, Inc.",
+      "companyWebsite": "https://www.ao-inc.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/crux_capital_/status/2026104927072973240/photo/1",
+          "publishedAt": "2026-02-23"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 753307261
+    },
+    {
+      "symbol": "AAPL",
+      "name": "Apple Inc.",
+      "companyWebsite": "https://www.apple.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Platforms & ecosystems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 14069252606
+    },
+    {
+      "symbol": "ABBV",
+      "name": "ABBVIE INC.",
+      "companyWebsite": "https://www.abbvie.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Pharma & biotech leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1124538039
+    },
+    {
+      "symbol": "ABNB",
+      "name": "Airbnb, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.airbnb.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Restaurants & travel"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 811677952
+    },
+    {
+      "symbol": "ACHR",
+      "name": "Archer Aviation Inc.",
+      "companyWebsite": "https://www.archer.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Advanced aviation"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/rklb_invest/status/1993172923180523624",
+          "publishedAt": "2025-11-24"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 141625264
+    },
+    {
+      "symbol": "ADBE",
+      "name": "Adobe Inc.",
+      "companyWebsite": "https://www.adobe.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1458839970
+    },
+    {
+      "symbol": "ADI",
+      "name": "Analog Devices, Inc.",
+      "companyWebsite": "https://www.analog.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Analog, power & embedded"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1327643905
+    },
+    {
+      "symbol": "AEP",
+      "name": "American Electric Power Company, Inc.",
+      "companyWebsite": "https://www.aep.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Regulated utilities"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 448934949
+    },
+    {
+      "symbol": "AFRM",
+      "name": "Affirm Holdings, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.affirm.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 437986649
+    },
+    {
+      "symbol": "ALAB",
+      "name": "Astera Labs, Inc. Common Stock",
+      "companyWebsite": "https://www.asteralabs.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1038830964
+    },
+    {
+      "symbol": "AMAT",
+      "name": "Applied Materials Inc",
+      "companyWebsite": "https://www.appliedmaterials.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Equipment & testing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2939590173
+    },
+    {
+      "symbol": "AMD",
+      "name": "Advanced Micro Devices",
+      "companyWebsite": "https://www.amd.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "AI compute & chip platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 9483491708
+    },
+    {
+      "symbol": "AMZN",
+      "name": "Amazon.Com Inc",
+      "companyWebsite": "https://www.amazon.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Platforms & ecosystems"
+        },
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Hyperscale cloud platforms"
+        },
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Commerce platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 8420530969
+    },
+    {
+      "symbol": "ANET",
+      "name": "Arista Networks",
+      "companyWebsite": "https://www.arista.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Networks & optical transport"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1012497485
+    },
+    {
+      "symbol": "APLD",
+      "name": "Applied Digital Corporation Common Stock",
+      "companyWebsite": "https://www.applieddigital.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center developers & mixed compute"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Nice_Stock_/status/2032613282960519295",
+          "publishedAt": "2026-03-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 413483919
+    },
+    {
+      "symbol": "APP",
+      "name": "Applovin Corporation Class A Common Stock",
+      "companyWebsite": "https://www.applovin.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Advertising software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1521255070
+    },
+    {
+      "symbol": "ARM",
+      "name": "Arm Holdings plc American Depositary Shares",
+      "companyWebsite": "https://www.arm.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "AI compute & chip platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1025013199
+    },
+    {
+      "symbol": "ASML",
+      "name": "ASML Holding NV",
+      "companyWebsite": "https://www.asml.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Equipment & testing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2114852850
+    },
+    {
+      "symbol": "ASTS",
+      "name": "AST SpaceMobile, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.ast-science.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Telecom & satellite connectivity"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/2052160043857170626",
+          "publishedAt": "2026-05-06"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 601635863
+    },
+    {
+      "symbol": "AVAV",
+      "name": "AeroVironment, Inc.",
+      "companyWebsite": "https://www.avinc.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Defense & autonomous systems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 345145549
+    },
+    {
+      "symbol": "AVGO",
+      "name": "Broadcom Inc. Common Stock",
+      "companyWebsite": "https://www.broadcom.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "AI compute & chip platforms"
+        },
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "AI chips & enterprise infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 9628909919
+    },
+    {
+      "symbol": "AXON",
+      "name": "Axon Enterprise, Inc. Common Stock",
+      "companyWebsite": "https://www.axon.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Industrial technology & infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 494995663
+    },
+    {
+      "symbol": "BA",
+      "name": "Boeing Company",
+      "companyWebsite": "https://www.boeing.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Aerospace & industrial leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1221156362
+    },
+    {
+      "symbol": "BABA",
+      "name": "Alibaba Group Holding Limited American Depositary Shares, each represents eight Ordinary Shares",
+      "companyWebsite": "https://www.alibabagroup.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Commerce platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1284093132
+    },
+    {
+      "symbol": "BAC",
+      "name": "Bank of America Corporation",
+      "companyWebsite": "https://www.bankofamerica.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Banks & diversified finance"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2197319146
+    },
+    {
+      "symbol": "BE",
+      "name": "Bloom Energy Corporation",
+      "companyWebsite": "https://www.bloomenergy.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Grid & generation equipment"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/TheOneLanceB/status/1989069769824260221",
+          "publishedAt": "2025-11-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 4071216978
+    },
+    {
+      "symbol": "BKNG",
+      "name": "Booking Holdings Inc. Common Stock",
+      "companyWebsite": "https://www.bookingholdings.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Restaurants & travel"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1305305571
+    },
+    {
+      "symbol": "BKR",
+      "name": "Baker Hughes Company",
+      "companyWebsite": "https://www.bakerhughes.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oilfield services & refining"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 483503843
+    },
+    {
+      "symbol": "BLK",
+      "name": "Blackrock, Inc.",
+      "companyWebsite": "https://www.blackrock.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 653692458
+    },
+    {
+      "symbol": "BRK.B",
+      "name": "BERKSHIRE HATHAWAY Class B",
+      "companyWebsite": "https://www.berkshirehathaway.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Banks & diversified finance"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2337230388
+    },
+    {
+      "symbol": "BSX",
+      "name": "Boston Scientific Corp.",
+      "companyWebsite": "https://www.bostonscientific.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Medical technology"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1044076436
+    },
+    {
+      "symbol": "BWXT",
+      "name": "BWX Technologies, Inc.",
+      "companyWebsite": "https://www.bwxt.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Nuclear technology & fuel"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 180378604
+    },
+    {
+      "symbol": "CAT",
+      "name": "Caterpillar Inc.",
+      "companyWebsite": "https://www.caterpillar.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Aerospace & industrial leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1917077592
+    },
+    {
+      "symbol": "CAVA",
+      "name": "CAVA Group, Inc.",
+      "companyWebsite": "https://www.cava.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Restaurants & travel"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/stutimes/status/2025423960817451163",
+          "publishedAt": "2026-02-21"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 186420768
+    },
+    {
+      "symbol": "CCJ",
+      "name": "Cameco Corporation",
+      "companyWebsite": "https://www.cameco.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Nuclear technology & fuel"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 293384751
+    },
+    {
+      "symbol": "CDNS",
+      "name": "Cadence Design Systems",
+      "companyWebsite": "https://www.cadence.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Development & engineering software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 778801379
+    },
+    {
+      "symbol": "CEG",
+      "name": "Constellation Energy Corporation Common Stock",
+      "companyWebsite": "https://www.constellation.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Power producers"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Nice_Stock_/status/2032613282960519295",
+          "publishedAt": "2026-03-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 775208984
+    },
+    {
+      "symbol": "CELH",
+      "name": "Celsius Holdings, Inc. Common Stock",
+      "companyWebsite": "https://www.celsius.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Beverages"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/1809948600518234244",
+          "publishedAt": "2024-07-07"
+        },
+        {
+          "url": "https://x.com/stutimes/status/2025423960817451163",
+          "publishedAt": "2026-02-21"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 238712225
+    },
+    {
+      "symbol": "CIEN",
+      "name": "Ciena Corporation",
+      "companyWebsite": "https://www.ciena.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Networks & optical transport"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 916012458
+    },
+    {
+      "symbol": "CIFR",
+      "name": "Cipher Digital Inc. Common Stock",
+      "companyWebsite": "https://www.cipherdigital.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center developers & mixed compute"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 578638757
+    },
+    {
+      "symbol": "CL",
+      "name": "Colgate-Palmolive Company",
+      "companyWebsite": "https://www.colgatepalmolive.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Household & personal care"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 426515561
+    },
+    {
+      "symbol": "CLS",
+      "name": "Celestica, Inc.",
+      "companyWebsite": "https://www.celestica.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "AI servers & manufacturing"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 658406122
+    },
+    {
+      "symbol": "CME",
+      "name": "CME Group Inc.",
+      "companyWebsite": "https://www.cmegroup.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 541025870
+    },
+    {
+      "symbol": "CMG",
+      "name": "Chipotle Mexican Grill, Inc.",
+      "companyWebsite": "https://www.chipotle.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Restaurants & travel"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 465559554
+    },
+    {
+      "symbol": "COHR",
+      "name": "Coherent Corp.",
+      "companyWebsite": "https://www.coherent.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/crux_capital_/status/2026104927072973240/photo/1",
+          "publishedAt": "2026-02-23"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1766254173
+    },
+    {
+      "symbol": "COIN",
+      "name": "Coinbase Global, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.coinbase.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2011237287
+    },
+    {
+      "symbol": "COP",
+      "name": "ConocoPhillips",
+      "companyWebsite": "https://www.conocophillips.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 936694863
+    },
+    {
+      "symbol": "CORZ",
+      "name": "Core Scientific, Inc. Common Stock",
+      "companyWebsite": "https://www.corescientific.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center developers & mixed compute"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 198591004
+    },
+    {
+      "symbol": "COST",
+      "name": "Costco Wholesale Corp",
+      "companyWebsite": "https://www.costco.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Staples retail & distribution"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1933361653
+    },
+    {
+      "symbol": "CRCL",
+      "name": "Circle Internet Group, Inc.",
+      "companyWebsite": "https://www.circle.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/TheOneLanceB/status/1989069769824260221",
+          "publishedAt": "2025-11-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1545809403
+    },
+    {
+      "symbol": "CRDO",
+      "name": "Credo Technology Group Holding Ltd Ordinary Shares",
+      "companyWebsite": "https://www.credosemi.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/crux_capital_/status/2026104927072973240/photo/1",
+          "publishedAt": "2026-02-23"
+        },
+        {
+          "url": "https://x.com/Marlin_Capital/status/2036822209444852182",
+          "publishedAt": "2026-03-25"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1469356885
+    },
+    {
+      "symbol": "CRM",
+      "name": "Salesforce, Inc.",
+      "companyWebsite": "https://www.salesforce.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 4135385499
+    },
+    {
+      "symbol": "CRSP",
+      "name": "CRISPR Therapeutics AG",
+      "companyWebsite": "https://www.crisprtx.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Precision medicine & drug discovery"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 87920330
+    },
+    {
+      "symbol": "CRWD",
+      "name": "CrowdStrike Holdings, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.crowdstrike.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Cybersecurity"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2805167179
+    },
+    {
+      "symbol": "CRWV",
+      "name": "CoreWeave, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.coreweave.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "GPU cloud operators"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Nice_Stock_/status/2032613282960519295",
+          "publishedAt": "2026-03-13"
+        },
+        {
+          "url": "https://x.com/ilzmcfly/status/2039046755459715359",
+          "publishedAt": "2026-03-31"
+        },
+        {
+          "url": "https://x.com/ShanghaoJin/status/2060127678590767321",
+          "publishedAt": "2026-05-28"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2224547839
+    },
+    {
+      "symbol": "CVS",
+      "name": "CVS HEALTH CORPORATION",
+      "companyWebsite": "https://www.cvshealth.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Healthcare providers & insurers"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 617079837
+    },
+    {
+      "symbol": "CVX",
+      "name": "Chevron Corporation",
+      "companyWebsite": "https://www.chevron.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2048460637
+    },
+    {
+      "symbol": "DDOG",
+      "name": "Datadog, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.datadog.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Data, AI & cloud operations"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 828039498
+    },
+    {
+      "symbol": "DE",
+      "name": "Deere & Company",
+      "companyWebsite": "https://www.deere.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Aerospace & industrial leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 914864359
+    },
+    {
+      "symbol": "DECK",
+      "name": "Deckers Outdoor Corp",
+      "companyWebsite": "https://www.deckers.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Retail & consumer brands"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 275113499
+    },
+    {
+      "symbol": "DELL",
+      "name": "Dell Technologies Inc.",
+      "companyWebsite": "https://www.dell.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "AI servers & manufacturing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 5224346559
+    },
+    {
+      "symbol": "DIS",
+      "name": "The Walt Disney Company",
+      "companyWebsite": "https://www.thewaltdisneycompany.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Streaming & entertainment"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 892356511
+    },
+    {
+      "symbol": "DLR",
+      "name": "Digital Realty Trust, Inc.",
+      "companyWebsite": "https://www.digitalrealty.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center REITs"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 399834815
+    },
+    {
+      "symbol": "DUK",
+      "name": "Duke Energy Corporation",
+      "companyWebsite": "https://www.duke-energy.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Regulated utilities"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 453098830
+    },
+    {
+      "symbol": "DUOL",
+      "name": "Duolingo, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.duolingo.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Consumer learning software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 168277678
+    },
+    {
+      "symbol": "DXCM",
+      "name": "DexCom, Inc.",
+      "companyWebsite": "https://www.dexcom.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Medical technology"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 354268011
+    },
+    {
+      "symbol": "ENPH",
+      "name": "Enphase Energy, Inc.",
+      "companyWebsite": "https://www.enphase.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Storage & solar"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 158642212
+    },
+    {
+      "symbol": "EOG",
+      "name": "EOG Resources, Inc.",
+      "companyWebsite": "https://www.eogresources.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 494338988
+    },
+    {
+      "symbol": "EOSE",
+      "name": "Eos Energy Enterprises, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.eose.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Storage & solar"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 96073759
+    },
+    {
+      "symbol": "EQIX",
+      "name": "Equinix, Inc. Common Stock REIT",
+      "companyWebsite": "https://www.equinix.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center REITs"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 549935763
+    },
+    {
+      "symbol": "EQPT",
+      "name": "EquipmentShare.com Inc Class A Common Stock",
+      "companyWebsite": "https://www.equipmentshare.com",
+      "memberships": [
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 47850457
+    },
+    {
+      "symbol": "EQT",
+      "name": "EQT CORP",
+      "companyWebsite": "https://www.eqt.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Natural gas & LNG"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 379142687
+    },
+    {
+      "symbol": "ETN",
+      "name": "Eaton Corporation, plc Ordinary Shares",
+      "companyWebsite": "https://www.eaton.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Cooling & electrical infrastructure"
+        },
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Industrial technology & infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 839832296
+    },
+    {
+      "symbol": "EXE",
+      "name": "Expand Energy Corporation Common Stock",
+      "companyWebsite": "https://www.expandenergy.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Natural gas & LNG"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 283816454
+    },
+    {
+      "symbol": "FANG",
+      "name": "Diamondback Energy, Inc.",
+      "companyWebsite": "https://www.diamondbackenergy.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 612365348
+    },
+    {
+      "symbol": "FLNC",
+      "name": "Fluence Energy, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.fluenceenergy.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Storage & solar"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 73009770
+    },
+    {
+      "symbol": "FORM",
+      "name": "FormFactor Inc.",
+      "companyWebsite": "https://www.formfactor.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Equipment & testing"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 123268437
+    },
+    {
+      "symbol": "FRPT",
+      "name": "Freshpet, Inc.",
+      "companyWebsite": "https://www.freshpet.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Food & pet nutrition"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/stutimes/status/2025423960817451163",
+          "publishedAt": "2026-02-21"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 76156070
+    },
+    {
+      "symbol": "FSLR",
+      "name": "First Solar, Inc.",
+      "companyWebsite": "https://www.firstsolar.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Storage & solar"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 414093339
+    },
+    {
+      "symbol": "FTNT",
+      "name": "Fortinet, Inc.",
+      "companyWebsite": "https://www.fortinet.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Cybersecurity"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 772389389
+    },
+    {
+      "symbol": "GE",
+      "name": "GE Aerospace",
+      "companyWebsite": "https://www.geaerospace.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Aerospace & industrial leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1345068874
+    },
+    {
+      "symbol": "GEV",
+      "name": "GE Vernova Inc.",
+      "companyWebsite": "https://www.gevernova.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Grid & generation equipment"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2084998374
+    },
+    {
+      "symbol": "GFS",
+      "name": "GlobalFoundries Inc. Ordinary Shares",
+      "companyWebsite": "https://www.gf.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Foundries & manufacturing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 181854508
+    },
+    {
+      "symbol": "GILD",
+      "name": "Gilead Sciences Inc",
+      "companyWebsite": "https://www.gilead.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Pharma & biotech leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 868135584
+    },
+    {
+      "symbol": "GLW",
+      "name": "Corning Incorporated",
+      "companyWebsite": "https://www.corning.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Networks & optical transport"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1354115977
+    },
+    {
+      "symbol": "GM",
+      "name": "General Motors Company",
+      "companyWebsite": "https://www.gm.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Autos & mobility"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 603323646
+    },
+    {
+      "symbol": "GOOGL",
+      "name": "Alphabet Inc. Class A Common Stock",
+      "companyWebsite": "https://www.abc.xyz",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Platforms & ecosystems"
+        },
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Hyperscale cloud platforms"
+        },
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Social platforms & digital advertising"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 8692529744
+    },
+    {
+      "symbol": "GS",
+      "name": "Goldman Sachs Group Inc.",
+      "companyWebsite": "https://www.goldmansachs.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Banks & diversified finance"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2075305496
+    },
+    {
+      "symbol": "GTLB",
+      "name": "GitLab Inc. Class A Common Stock",
+      "companyWebsite": "https://www.about.gitlab.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Development & engineering software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 277395848
+    },
+    {
+      "symbol": "HD",
+      "name": "Home Depot, Inc.",
+      "companyWebsite": "https://www.homedepot.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Retail & consumer brands"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1243519474
+    },
+    {
+      "symbol": "HIMS",
+      "name": "Hims & Hers Health, Inc.",
+      "companyWebsite": "https://www.forhims.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Metabolic health & care platforms"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/1944031923090993155",
+          "publishedAt": "2025-07-12"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 283902127
+    },
+    {
+      "symbol": "HOOD",
+      "name": "Robinhood Markets, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.robinhood.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/DataDInvesting/status/1930330429405704529",
+          "publishedAt": "2025-06-04"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2772664730
+    },
+    {
+      "symbol": "HPE",
+      "name": "Hewlett Packard Enterprise Company",
+      "companyWebsite": "https://www.hpe.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "AI servers & manufacturing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1466096314
+    },
+    {
+      "symbol": "HSY",
+      "name": "The Hershey Company",
+      "companyWebsite": "https://www.thehersheycompany.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Food & pet nutrition"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 241236011
+    },
+    {
+      "symbol": "HUT",
+      "name": "Hut 8 Corp. Common Stock",
+      "companyWebsite": "https://www.hut8.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center developers & mixed compute"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 434606124
+    },
+    {
+      "symbol": "IBKR",
+      "name": "Interactive Brokers Group, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.interactivebrokers.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 369717500
+    },
+    {
+      "symbol": "ICE",
+      "name": "Intercontinental Exchange  Inc.",
+      "companyWebsite": "https://www.theice.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 515022644
+    },
+    {
+      "symbol": "INTC",
+      "name": "Intel Corp",
+      "companyWebsite": "https://www.intel.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Foundries & manufacturing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 9541765919
+    },
+    {
+      "symbol": "INTU",
+      "name": "Intuit Inc",
+      "companyWebsite": "https://www.intuit.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1401649595
+    },
+    {
+      "symbol": "IOT",
+      "name": "Samsara Inc.",
+      "companyWebsite": "https://www.samsara.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Data, AI & cloud operations"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/1809948600518234244",
+          "publishedAt": "2024-07-07"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 312293255
+    },
+    {
+      "symbol": "IREN",
+      "name": "IREN Limited Ordinary Shares",
+      "companyWebsite": "https://www.iren.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "GPU cloud operators"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/ilzmcfly/status/2039046755459715359",
+          "publishedAt": "2026-03-31"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1712881490
+    },
+    {
+      "symbol": "ISRG",
+      "name": "Intuitive Surgical Inc.",
+      "companyWebsite": "https://www.intuitive.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Medical technology"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 864106565
+    },
+    {
+      "symbol": "JNJ",
+      "name": "Johnson & Johnson",
+      "companyWebsite": "https://www.jnj.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Pharma & biotech leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1760111225
+    },
+    {
+      "symbol": "JOBY",
+      "name": "Joby Aviation, Inc.",
+      "companyWebsite": "https://www.jobyaviation.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Advanced aviation"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/rklb_invest/status/1993172923180523624",
+          "publishedAt": "2025-11-24"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 171729952
+    },
+    {
+      "symbol": "JPM",
+      "name": "JPMorgan Chase & Co.",
+      "companyWebsite": "https://www.jpmorganchase.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Banks & diversified finance"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2451012246
+    },
+    {
+      "symbol": "KDP",
+      "name": "Keurig Dr Pepper Inc.",
+      "companyWebsite": "https://www.keurigdrpepper.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Beverages"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 307180737
+    },
+    {
+      "symbol": "KLAC",
+      "name": "KLA Corporation Common Stock",
+      "companyWebsite": "https://www.kla.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Equipment & testing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1693498529
+    },
+    {
+      "symbol": "KMB",
+      "name": "Kimberly-Clark Corp.",
+      "companyWebsite": "https://www.kimberly-clark.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Household & personal care"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 471169316
+    },
+    {
+      "symbol": "KMI",
+      "name": "Kinder Morgan, Inc.",
+      "companyWebsite": "https://www.kindermorgan.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Midstream infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 410445283
+    },
+    {
+      "symbol": "KO",
+      "name": "Coca-Cola Company",
+      "companyWebsite": "https://www.coca-colacompany.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Beverages"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1394469108
+    },
+    {
+      "symbol": "KR",
+      "name": "The Kroger Co.",
+      "companyWebsite": "https://www.thekrogerco.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Staples retail & distribution"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 414615948
+    },
+    {
+      "symbol": "KTOS",
+      "name": "Kratos Defense & Security Solutions, Inc.",
+      "companyWebsite": "https://www.kratosdefense.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Defense & autonomous systems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 165244367
+    },
+    {
+      "symbol": "LITE",
+      "name": "Lumentum Holdings Inc. Common Stock",
+      "companyWebsite": "https://www.lumentum.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Marlin_Capital/status/2036822209444852182",
+          "publishedAt": "2026-03-25"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 3966091836
+    },
+    {
+      "symbol": "LLY",
+      "name": "Eli Lilly & Co.",
+      "companyWebsite": "https://www.lilly.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Metabolic health & care platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2766408900
+    },
+    {
+      "symbol": "LMT",
+      "name": "Lockheed Martin Corp.",
+      "companyWebsite": "https://www.lockheedmartin.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Defense & autonomous systems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 624956848
+    },
+    {
+      "symbol": "LNG",
+      "name": "Cheniere Energy Inc",
+      "companyWebsite": "https://www.cheniere.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Natural gas & LNG"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 589871495
+    },
+    {
+      "symbol": "LRCX",
+      "name": "Lam Research Corp",
+      "companyWebsite": "https://www.lamresearch.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Equipment & testing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2499305705
+    },
+    {
+      "symbol": "LULU",
+      "name": "lululemon athletica inc.",
+      "companyWebsite": "https://www.lululemon.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Retail & consumer brands"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 847756324
+    },
+    {
+      "symbol": "LUNR",
+      "name": "Intuitive Machines, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.intuitivemachines.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Space launch & systems"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/invest_us_jp/status/2039869131185676799",
+          "publishedAt": "2026-04-02"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 99173685
+    },
+    {
+      "symbol": "MA",
+      "name": "Mastercard Incorporated",
+      "companyWebsite": "https://www.mastercard.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1529369545
+    },
+    {
+      "symbol": "MCD",
+      "name": "McDonald's Corporation",
+      "companyWebsite": "https://www.mcdonalds.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Restaurants & travel"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1233262719
+    },
+    {
+      "symbol": "MDB",
+      "name": "MongoDB, Inc. Class A",
+      "companyWebsite": "https://www.mongodb.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Data, AI & cloud operations"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 776780560
+    },
+    {
+      "symbol": "MDLZ",
+      "name": "Mondelez International, Inc. Class A",
+      "companyWebsite": "https://www.mondelezinternational.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Food & pet nutrition"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 487025339
+    },
+    {
+      "symbol": "MELI",
+      "name": "Mercado Libre, Inc",
+      "companyWebsite": "https://www.mercadolibre.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Commerce platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 936267636
+    },
+    {
+      "symbol": "META",
+      "name": "Meta Platforms, Inc. Class A Common Stock",
+      "companyWebsite": "https://about.meta.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Platforms & ecosystems"
+        },
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Social platforms & digital advertising"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 11585418365
+    },
+    {
+      "symbol": "MNST",
+      "name": "Monster Beverage Corporation",
+      "companyWebsite": "https://www.monsterbevcorp.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Beverages"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 435457289
+    },
+    {
+      "symbol": "MO",
+      "name": "Altria Group, Inc.",
+      "companyWebsite": "https://www.altria.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Tobacco"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 575482692
+    },
+    {
+      "symbol": "MOD",
+      "name": "Modine Manufacturing Co",
+      "companyWebsite": "https://www.modine.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Cooling & electrical infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 231361277
+    },
+    {
+      "symbol": "MPC",
+      "name": "MARATHON PETROLEUM CORPORATION",
+      "companyWebsite": "https://www.marathonpetroleum.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oilfield services & refining"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1113452662
+    },
+    {
+      "symbol": "MPWR",
+      "name": "Monolithic Power Systems, Inc.",
+      "companyWebsite": "https://www.monolithicpower.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Analog, power & embedded"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 800551065
+    },
+    {
+      "symbol": "MRK",
+      "name": "Merck & Co., Inc.",
+      "companyWebsite": "https://www.merck.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Pharma & biotech leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1580153105
+    },
+    {
+      "symbol": "MRVL",
+      "name": "Marvell Technology, Inc. Common Stock",
+      "companyWebsite": "https://www.marvell.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 5062411258
+    },
+    {
+      "symbol": "MS",
+      "name": "Morgan Stanley",
+      "companyWebsite": "https://www.morganstanley.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Banks & diversified finance"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 969782815
+    },
+    {
+      "symbol": "MSFT",
+      "name": "Microsoft Corp",
+      "companyWebsite": "https://www.microsoft.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Platforms & ecosystems"
+        },
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        },
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Hyperscale cloud platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 10493912620
+    },
+    {
+      "symbol": "MTSI",
+      "name": "MACOM Technology Solutions Holdings, Inc",
+      "companyWebsite": "https://www.macom.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 347369413
+    },
+    {
+      "symbol": "MU",
+      "name": "Micron Technology, Inc.",
+      "companyWebsite": "https://www.micron.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Memory & interfaces"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 23895044561
+    },
+    {
+      "symbol": "NBIS",
+      "name": "Nebius Group N.V. Class A Ordinary Shares",
+      "companyWebsite": "https://www.group.nebius.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "GPU cloud operators"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Nice_Stock_/status/2032613282960519295",
+          "publishedAt": "2026-03-13"
+        },
+        {
+          "url": "https://x.com/ilzmcfly/status/2039046755459715359",
+          "publishedAt": "2026-03-31"
+        },
+        {
+          "url": "https://x.com/ShanghaoJin/status/2060127678590767321",
+          "publishedAt": "2026-05-28"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 3297494916
+    },
+    {
+      "symbol": "NEE",
+      "name": "NextEra Energy, Inc.",
+      "companyWebsite": "https://www.nexteraenergy.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Regulated utilities"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 902397939
+    },
+    {
+      "symbol": "NET",
+      "name": "Cloudflare, Inc. Class A common stock, par value $0.001 per share",
+      "companyWebsite": "https://www.cloudflare.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Data, AI & cloud operations"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/1809948600518234244",
+          "publishedAt": "2024-07-07"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 950989653
+    },
+    {
+      "symbol": "NFLX",
+      "name": "NetFlix Inc",
+      "companyWebsite": "https://www.netflix.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Consumer technology & media"
+        },
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Streaming & entertainment"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2404497982
+    },
+    {
+      "symbol": "NKE",
+      "name": "Nike, Inc.",
+      "companyWebsite": "https://www.nike.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Retail & consumer brands"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1146103387
+    },
+    {
+      "symbol": "NOC",
+      "name": "Northrop Grumman Corp.",
+      "companyWebsite": "https://www.northropgrumman.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Defense & autonomous systems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 410534992
+    },
+    {
+      "symbol": "NOK",
+      "name": "Nokia Corporation",
+      "companyWebsite": "https://www.nokia.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/crux_capital_/status/2026104927072973240/photo/1",
+          "publishedAt": "2026-02-23"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 823326578
+    },
+    {
+      "symbol": "NOW",
+      "name": "SERVICENOW, INC.",
+      "companyWebsite": "https://www.servicenow.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2163110307
+    },
+    {
+      "symbol": "NRG",
+      "name": "NRG Energy, Inc.",
+      "companyWebsite": "https://www.nrg.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Power producers"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 311986192
+    },
+    {
+      "symbol": "NU",
+      "name": "Nu Holdings Ltd.",
+      "companyWebsite": "https://www.nubank.com.br",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1015920180
+    },
+    {
+      "symbol": "NVDA",
+      "name": "Nvidia Corp",
+      "companyWebsite": "https://www.nvidia.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "AI compute & chip platforms"
+        },
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "AI chips & enterprise infrastructure"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Nice_Stock_/status/2032613282960519295",
+          "publishedAt": "2026-03-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 29571382020
+    },
+    {
+      "symbol": "NVO",
+      "name": "Novo-Nordisk A/S",
+      "companyWebsite": "https://www.novonordisk.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Metabolic health & care platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 451043137
+    },
+    {
+      "symbol": "NVTS",
+      "name": "Navitas Semiconductor Corporation Common Stock",
+      "companyWebsite": "https://www.navitassemi.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Analog, power & embedded"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 140454321
+    },
+    {
+      "symbol": "OKLO",
+      "name": "Oklo Inc.",
+      "companyWebsite": "https://www.oklo.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Nuclear technology & fuel"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/TheOneLanceB/status/1989069769824260221",
+          "publishedAt": "2025-11-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 432014568
+    },
+    {
+      "symbol": "ORCL",
+      "name": "Oracle Corp",
+      "companyWebsite": "https://www.oracle.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "AI chips & enterprise infrastructure"
+        },
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        },
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Hyperscale cloud platforms"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/ShanghaoJin/status/2060127678590767321",
+          "publishedAt": "2026-05-28"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 4544479133
+    },
+    {
+      "symbol": "OSCR",
+      "name": "Oscar Health, Inc.",
+      "companyWebsite": "https://www.hioscar.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Healthcare providers & insurers"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 160226642
+    },
+    {
+      "symbol": "OXY",
+      "name": "Occidental Petroleum Corporation",
+      "companyWebsite": "https://www.oxy.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/felixprotocol/status/2033896711291023809",
+          "publishedAt": "2026-03-17"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 475329552
+    },
+    {
+      "symbol": "P",
+      "name": "Everpure, Inc.",
+      "companyWebsite": "https://www.purestorage.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Storage systems & drives"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 679850998
+    },
+    {
+      "symbol": "PANW",
+      "name": "Palo Alto Networks, Inc. Common Stock",
+      "companyWebsite": "https://www.paloaltonetworks.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Cybersecurity"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2504246646
+    },
+    {
+      "symbol": "PATH",
+      "name": "UiPath, Inc.",
+      "companyWebsite": "https://www.uipath.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "AI applications & automation"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 972131028
+    },
+    {
+      "symbol": "PDD",
+      "name": "PDD Holdings Inc. American Depositary Shares",
+      "companyWebsite": "https://www.pddholdings.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Commerce platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 615205700
+    },
+    {
+      "symbol": "PEP",
+      "name": "PepsiCo, Inc.",
+      "companyWebsite": "https://www.pepsico.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Beverages"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1184850010
+    },
+    {
+      "symbol": "PG",
+      "name": "Procter & Gamble Company",
+      "companyWebsite": "https://us.pg.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Household & personal care"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1249940160
+    },
+    {
+      "symbol": "PINS",
+      "name": "Pinterest, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.pinterest.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Social platforms & digital advertising"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 289636104
+    },
+    {
+      "symbol": "PL",
+      "name": "Planet Labs PBC",
+      "companyWebsite": "https://www.planet.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Space launch & systems"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/invest_us_jp/status/2039869131185676799",
+          "publishedAt": "2026-04-02"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 201406844
+    },
+    {
+      "symbol": "PLTR",
+      "name": "Palantir Technologies Inc. Class A Common Stock",
+      "companyWebsite": "https://www.palantir.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Data, AI & cloud operations"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/1809948600518234244",
+          "publishedAt": "2024-07-07"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 5093865104
+    },
+    {
+      "symbol": "PM",
+      "name": "Philip Morris International Inc.",
+      "companyWebsite": "https://www.pmi.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Tobacco"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 763167821
+    },
+    {
+      "symbol": "POWL",
+      "name": "Powell Industries Inc",
+      "companyWebsite": "https://www.powellind.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Industrial technology & infrastructure"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 100865368
+    },
+    {
+      "symbol": "PWR",
+      "name": "Quanta Services, Inc.",
+      "companyWebsite": "https://www.quantaservices.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Industrial technology & infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 601589133
+    },
+    {
+      "symbol": "PYPL",
+      "name": "PayPal Holdings, Inc. Common Stock",
+      "companyWebsite": "https://www.paypal.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 729476012
+    },
+    {
+      "symbol": "QCOM",
+      "name": "Qualcomm Inc",
+      "companyWebsite": "https://www.qualcomm.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Analog, power & embedded"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2440691720
+    },
+    {
+      "symbol": "RBLX",
+      "name": "Roblox Corporation",
+      "companyWebsite": "https://www.corp.roblox.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Gaming platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 436112758
+    },
+    {
+      "symbol": "RCAT",
+      "name": "Red Cat Holdings, Inc. Common Stock",
+      "companyWebsite": "https://www.redcat.red",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Defense & autonomous systems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 62388441
+    },
+    {
+      "symbol": "RDDT",
+      "name": "Reddit, Inc.",
+      "companyWebsite": "https://www.reddit.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Social platforms & digital advertising"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 719297163
+    },
+    {
+      "symbol": "RDW",
+      "name": "Redwire Corporation",
+      "companyWebsite": "https://www.rdw.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Space launch & systems"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/invest_us_jp/status/2039869131185676799",
+          "publishedAt": "2026-04-02"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 129232572
+    },
+    {
+      "symbol": "REGN",
+      "name": "Regeneron Pharmaceuticals Inc",
+      "companyWebsite": "https://www.regeneron.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Pharma & biotech leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 565798524
+    },
+    {
+      "symbol": "RIVN",
+      "name": "Rivian Automotive, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.rivian.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Autos & mobility"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 347207910
+    },
+    {
+      "symbol": "RKLB",
+      "name": "Rocket Lab Corporation Common Stock",
+      "companyWebsite": "https://www.rocketlabusa.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Space launch & systems"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/invest_us_jp/status/2039869131185676799",
+          "publishedAt": "2026-04-02"
+        },
+        {
+          "url": "https://x.com/rklb_invest/status/1993172923180523624",
+          "publishedAt": "2025-11-24"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1152153229
+    },
+    {
+      "symbol": "RMBS",
+      "name": "Rambus Inc",
+      "companyWebsite": "https://www.rambus.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Memory & interfaces"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 202056065
+    },
+    {
+      "symbol": "ROKU",
+      "name": "Roku, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.roku.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Streaming & entertainment"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 359345264
+    },
+    {
+      "symbol": "RTX",
+      "name": "RTX Corporation",
+      "companyWebsite": "https://www.rtx.com",
+      "memberships": [
+        {
+          "watchlist": "industrials-defense",
+          "businessGroup": "Defense & autonomous systems"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 809892882
+    },
+    {
+      "symbol": "RXRX",
+      "name": "Recursion Pharmaceuticals, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.recursion.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Precision medicine & drug discovery"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 58952779
+    },
+    {
+      "symbol": "SBUX",
+      "name": "Starbucks Corp",
+      "companyWebsite": "https://www.starbucks.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Restaurants & travel"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 652688955
+    },
+    {
+      "symbol": "SCHW",
+      "name": "The Charles Schwab Corporation",
+      "companyWebsite": "https://www.aboutschwab.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 906834083
+    },
+    {
+      "symbol": "SHEL",
+      "name": "Shell plc American Depositary Shares (Each represents two Ordinary shares)",
+      "companyWebsite": "https://www.shell.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 601956611
+    },
+    {
+      "symbol": "SHOP",
+      "name": "Shopify Inc. Class A subordinate voting shares",
+      "companyWebsite": "https://www.shopify.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Enterprise applications & SaaS"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1093702435
+    },
+    {
+      "symbol": "SLB",
+      "name": "SLB Limited",
+      "companyWebsite": "https://www.slb.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oilfield services & refining"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 819299119
+    },
+    {
+      "symbol": "SMCI",
+      "name": "Super Micro Computer, Inc. Common Stock",
+      "companyWebsite": "https://www.supermicro.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "AI servers & manufacturing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1440921501
+    },
+    {
+      "symbol": "SMR",
+      "name": "NuScale Power Corporation",
+      "companyWebsite": "https://www.nuscalepower.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Nuclear technology & fuel"
+        },
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 371843725
+    },
+    {
+      "symbol": "SMTC",
+      "name": "Semtech Corp",
+      "companyWebsite": "https://www.semtech.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Photonics & AI interconnect"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 563373880
+    },
+    {
+      "symbol": "SNAP",
+      "name": "Snap Inc.",
+      "companyWebsite": "https://www.snap.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Social platforms & digital advertising"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 202731457
+    },
+    {
+      "symbol": "SNDK",
+      "name": "Sandisk Corporation Common Stock",
+      "companyWebsite": "https://www.sandisk.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Memory & interfaces"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/Marlin_Capital/status/2036822209444852182",
+          "publishedAt": "2026-03-25"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 17233081992
+    },
+    {
+      "symbol": "SNOW",
+      "name": "Snowflake Inc.",
+      "companyWebsite": "https://www.snowflake.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Data, AI & cloud operations"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1842241893
+    },
+    {
+      "symbol": "SNPS",
+      "name": "Synopsys Inc",
+      "companyWebsite": "https://www.synopsys.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Development & engineering software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 844106909
+    },
+    {
+      "symbol": "SO",
+      "name": "The Southern Company",
+      "companyWebsite": "https://www.southerncompany.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Regulated utilities"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 554332463
+    },
+    {
+      "symbol": "SOFI",
+      "name": "SoFi Technologies, Inc. Common Stock",
+      "companyWebsite": "https://www.sofi.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/DataDInvesting/status/1930330429405704529",
+          "publishedAt": "2025-06-04"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 708983254
+    },
+    {
+      "symbol": "SOUN",
+      "name": "SoundHound AI, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.soundhound.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "AI applications & automation"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/stutimes/status/2025423960817451163",
+          "publishedAt": "2026-02-21"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 157371991
+    },
+    {
+      "symbol": "SPOT",
+      "name": "Spotify Technology S.A.",
+      "companyWebsite": "https://www.spotify.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Streaming & entertainment"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 779498729
+    },
+    {
+      "symbol": "STX",
+      "name": "Seagate Technology Holdings PLC Ordinary Shares (Ireland)",
+      "companyWebsite": "https://www.seagate.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Storage systems & drives"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 3004536342
+    },
+    {
+      "symbol": "T",
+      "name": "AT&T Inc.",
+      "companyWebsite": "https://www.att.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Telecom & satellite connectivity"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/TheOneLanceB/status/1989069769824260221",
+          "publishedAt": "2025-11-13"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 938182929
+    },
+    {
+      "symbol": "TEAM",
+      "name": "Atlassian Corporation Class A Common Stock",
+      "companyWebsite": "https://www.atlassian.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Development & engineering software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 690617482
+    },
+    {
+      "symbol": "TECK",
+      "name": "Teck Resources Limited",
+      "companyWebsite": "https://www.teck.com",
+      "memberships": [
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 209684910
+    },
+    {
+      "symbol": "TEM",
+      "name": "Tempus AI, Inc. Class A Common Stock",
+      "companyWebsite": "https://www.tempus.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Precision medicine & drug discovery"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/StockSavvyShay/status/1944031923090993155",
+          "publishedAt": "2025-07-12"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 525765750
+    },
+    {
+      "symbol": "TER",
+      "name": "Teradyne, Inc. Common Stock",
+      "companyWebsite": "https://www.teradyne.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Equipment & testing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 898791144
+    },
+    {
+      "symbol": "TLN",
+      "name": "Talen Energy Corporation Common Stock",
+      "companyWebsite": "https://www.talenenergy.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Power producers"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 232889451
+    },
+    {
+      "symbol": "TMDX",
+      "name": "TransMedics Group, Inc. Common Stock",
+      "companyWebsite": "https://www.transmedics.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Medical technology"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 63954739
+    },
+    {
+      "symbol": "TMUS",
+      "name": "T-Mobile US, Inc.",
+      "companyWebsite": "https://www.t-mobile.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Telecom & satellite connectivity"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 803336897
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla, Inc. Common Stock",
+      "companyWebsite": "https://www.tesla.com",
+      "memberships": [
+        {
+          "watchlist": "mega-cap-tech",
+          "businessGroup": "Consumer technology & media"
+        },
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Autos & mobility"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 14605535404
+    },
+    {
+      "symbol": "TSM",
+      "name": "Taiwan Semiconductor Manufacturing Company Ltd.",
+      "companyWebsite": "https://www.tsmc.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Foundries & manufacturing"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 4150564882
+    },
+    {
+      "symbol": "TTD",
+      "name": "The Trade Desk, Inc.",
+      "companyWebsite": "https://www.thetradedesk.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Advertising software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 336152600
+    },
+    {
+      "symbol": "TTWO",
+      "name": "Take-Two Interactive Software Inc",
+      "companyWebsite": "https://www.take2games.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Gaming platforms"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 624726723
+    },
+    {
+      "symbol": "TXN",
+      "name": "Texas Instruments Incorporated",
+      "companyWebsite": "https://www.ti.com",
+      "memberships": [
+        {
+          "watchlist": "semiconductors",
+          "businessGroup": "Analog, power & embedded"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1546045715
+    },
+    {
+      "symbol": "UBER",
+      "name": "Uber Technologies, Inc.",
+      "companyWebsite": "https://www.uber.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-discretionary",
+          "businessGroup": "Autos & mobility"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1303956936
+    },
+    {
+      "symbol": "UNH",
+      "name": "UNITEDHEALTH GROUP INCORPORATED (Delaware)",
+      "companyWebsite": "https://www.unitedhealthgroup.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Healthcare providers & insurers"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1929128931
+    },
+    {
+      "symbol": "V",
+      "name": "VISA Inc.",
+      "companyWebsite": "https://www.visa.com",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Payments & market infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2350750318
+    },
+    {
+      "symbol": "VKTX",
+      "name": "Viking Therapeutics, Inc",
+      "companyWebsite": "https://www.vikingtherapeutics.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Precision medicine & drug discovery"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 63029011
+    },
+    {
+      "symbol": "VLO",
+      "name": "Valero Energy Corporation",
+      "companyWebsite": "https://www.valero.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oilfield services & refining"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1197478658
+    },
+    {
+      "symbol": "VRT",
+      "name": "Vertiv Holdings Co Class A Common Stock",
+      "companyWebsite": "https://www.vertiv.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Cooling & electrical infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1361050192
+    },
+    {
+      "symbol": "VRTX",
+      "name": "Vertex Pharmaceuticals Inc",
+      "companyWebsite": "https://www.vrtx.com",
+      "memberships": [
+        {
+          "watchlist": "healthcare-biotech",
+          "businessGroup": "Pharma & biotech leaders"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 529859290
+    },
+    {
+      "symbol": "VST",
+      "name": "Vistra Corp.",
+      "companyWebsite": "https://www.vistracorp.com",
+      "memberships": [
+        {
+          "watchlist": "utilities-power",
+          "businessGroup": "Power producers"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 630165596
+    },
+    {
+      "symbol": "VZ",
+      "name": "Verizon Communications",
+      "companyWebsite": "https://www.verizon.com",
+      "memberships": [
+        {
+          "watchlist": "communication-media",
+          "businessGroup": "Telecom & satellite connectivity"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 1020668236
+    },
+    {
+      "symbol": "WDC",
+      "name": "Western Digital Corp.",
+      "companyWebsite": "https://www.westerndigital.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Storage systems & drives"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2772674869
+    },
+    {
+      "symbol": "WMB",
+      "name": "Williams Companies Inc.",
+      "companyWebsite": "https://www.williams.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Midstream infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 623581502
+    },
+    {
+      "symbol": "WMT",
+      "name": "Walmart Inc. Common Stock",
+      "companyWebsite": "https://stock.walmart.com",
+      "memberships": [
+        {
+          "watchlist": "consumer-staples",
+          "businessGroup": "Staples retail & distribution"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2687012274
+    },
+    {
+      "symbol": "WULF",
+      "name": "TeraWulf Inc. Common Stock",
+      "companyWebsite": "https://www.terawulf.com",
+      "memberships": [
+        {
+          "watchlist": "ai-cloud-infrastructure",
+          "businessGroup": "Data-center developers & mixed compute"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 470594285
+    },
+    {
+      "symbol": "XOM",
+      "name": "ExxonMobil Holdings Corporation",
+      "companyWebsite": "https://www.corporate.exxonmobil.com",
+      "memberships": [
+        {
+          "watchlist": "energy",
+          "businessGroup": "Oil producers & integrated energy"
+        }
+      ],
+      "discussionSamples": [
+        {
+          "url": "https://x.com/felixprotocol/status/2033896711291023809",
+          "publishedAt": "2026-03-17"
+        }
+      ],
+      "attentionEvidence": "dated-indexed-sample-not-current-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 2408832215
+    },
+    {
+      "symbol": "XYL",
+      "name": "Xylem Inc",
+      "companyWebsite": "https://www.xylem.com",
+      "memberships": [
+        {
+          "watchlist": "close-watch",
+          "businessGroup": "Core"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 275972607
+    },
+    {
+      "symbol": "XYZ",
+      "name": "Block, Inc.",
+      "companyWebsite": "https://www.block.xyz",
+      "memberships": [
+        {
+          "watchlist": "financials",
+          "businessGroup": "Digital finance & crypto infrastructure"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 331001559
+    },
+    {
+      "symbol": "ZETA",
+      "name": "Zeta Global Holdings Corp.",
+      "companyWebsite": "https://www.zetaglobal.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Advertising software"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 201773837
+    },
+    {
+      "symbol": "ZS",
+      "name": "Zscaler, Inc. Common Stock",
+      "companyWebsite": "https://www.zscaler.com",
+      "memberships": [
+        {
+          "watchlist": "software",
+          "businessGroup": "Cybersecurity"
+        }
+      ],
+      "discussionSamples": [],
+      "attentionEvidence": "business-coverage-or-user-focus-no-measured-X-rank",
+      "active": true,
+      "historySessions": 20,
+      "lastSession": "2026-09-18",
+      "estimatedAverageDailyDollarVolume": 650042668
+    }
+  ]
+}

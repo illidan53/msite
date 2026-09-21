@@ -59,6 +59,32 @@ describe("shared config schemas", () => {
     });
   });
 
+  it("rejects unsafe source links while preserving dated provenance", () => {
+    const config = {
+      watchlists: [
+        {
+          id: "cloud",
+          name: "Cloud",
+          rows: [{ id: "core", name: "Core", symbols: ["CRWV"] }],
+          selectionSources: [
+            {
+              label: "Source",
+              url: "https://x.com/example/status/123",
+              kind: "discussion",
+              publishedAt: "2026-03-13",
+            },
+          ],
+        },
+      ],
+    };
+    expect(
+      parseWatchlistsConfig(config).watchlists[0].selectionSources?.[0]
+        .publishedAt,
+    ).toBe("2026-03-13");
+    config.watchlists[0].selectionSources[0].url = "javascript:alert(1)";
+    expect(() => parseWatchlistsConfig(config)).toThrow(/HTTPS/);
+  });
+
   it("defaults Polygon to paid Stocks Starter", () => {
     const parsed = parseSettingsConfig({
       polygon: {},

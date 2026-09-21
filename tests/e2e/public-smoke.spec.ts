@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import type { WatchlistsConfig } from "../../shared/types";
 
 test.skip(
   !process.env.MSITE_PUBLIC_BASE_URL,
@@ -16,6 +17,22 @@ test("public deployment serves the workbench shell and health endpoint", async (
     ok: true,
     service: "stock-workbench-api",
   });
+
+  const configResponse = await request.get("/api/watchlists");
+  expect(configResponse.ok()).toBe(true);
+  const config = (await configResponse.json()) as WatchlistsConfig;
+  const cloud = config.watchlists.find(
+    (list) => list.id === "ai-cloud-infrastructure",
+  );
+  expect(
+    cloud?.rows.find((row) => row.name === "GPU cloud operators")?.symbols,
+  ).toEqual(["CRWV", "NBIS", "IREN"]);
+  expect(cloud?.rows.flatMap((row) => row.symbols)).toContain("P");
+  expect(
+    cloud?.selectionSources?.some(
+      (source) => source.kind === "discussion" && source.publishedAt,
+    ),
+  ).toBe(true);
 
   await page.goto("/");
 

@@ -33,13 +33,7 @@ interface WorkbenchProps {
 }
 
 type SortMode =
-  | "config"
-  | "size"
-  | "heat"
-  | "volume"
-  | "changePercent"
-  | "price"
-  | "updated";
+  "config" | "size" | "heat" | "volume" | "changePercent" | "price" | "updated";
 interface SpanMetric {
   change: number | null;
   changePercent: number | null;
@@ -646,12 +640,15 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                 {t("Selection criteria & coverage", "入选标准与覆盖")}
               </summary>
               <p>{t(watchlist.selectionNote)}</p>
-              <p>
-                {t(
-                  "Reviewed 2026-09-20: US-listed symbols with 20 available daily bars through 2026-09-18 and estimated average daily traded value above $20 million. This is a reviewed watchlist, not an automatic ranking or an ETF portfolio. Cross-list overlap is intentional.",
-                  "2026-09-20 核验：美股上市标的，截至 2026-09-18 有 20 根可用日线，估算日均成交额超过 2,000 万美元。这是经核验的观察名单，不是自动排名或 ETF 持仓；不同列表之间允许重叠。",
-                )}
-              </p>
+              {watchlist.selectionReviewedAt && (
+                <p>
+                  {t("Reviewed", "核验日期")} {watchlist.selectionReviewedAt} ·{" "}
+                  {t(
+                    "Company business descriptions and indexed X discussion samples inform this manual selection. Samples may be old; no complete X feed or comparable mention counts are available. This is not a current popularity ranking. Cross-list overlap is intentional.",
+                    "结合公司业务介绍与公开索引的 X 讨论样本人工选取。样本可能较旧，未取得完整 X 数据或可比提及次数，因此不代表当前热度排名。不同列表之间允许业务重叠。",
+                  )}
+                </p>
+              )}
               <ul>
                 {watchlist.rows.map((row) => (
                   <li key={row.id}>
@@ -659,6 +656,42 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                   </li>
                 ))}
               </ul>
+              {!!watchlist.selectionSources?.length && (
+                <>
+                  <p>
+                    {t(
+                      "Business references & discussion samples",
+                      "业务依据与讨论样本",
+                    )}
+                  </p>
+                  <ul className="watchlist-selection-sources">
+                    {watchlist.selectionSources.map((source) => (
+                      <li key={source.url}>
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          {source.label}
+                        </a>
+                        {" · "}
+                        {source.kind === "company"
+                          ? t("Company source", "公司资料")
+                          : t("X discussion sample", "X 讨论样本")}
+                        {source.publishedAt && (
+                          <>
+                            {" "}
+                            ·{" "}
+                            <time dateTime={source.publishedAt}>
+                              {source.publishedAt}
+                            </time>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </details>
           )}
         </div>
