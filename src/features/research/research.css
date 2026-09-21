@@ -613,3 +613,68 @@
   padding: 10px 0;
   cursor: pointer;
 }
+
+.research-symbol-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.research-symbol-control {
+  position: relative;
+}
+.research-toolbar .research-symbol-control input {
+  width: 190px;
+  max-width: 100%;
+  padding-right: 48px;
+}
+.research-page .research-symbol-toggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  padding: 0;
+}
+.research-symbol-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  min-width: 190px;
+  z-index: 10;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px #222a3b20;
+}
+.research-symbol-dropdown p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 8px 12px;
+  margin: 0;
+}
+.research-symbol-dropdown ul {
+  padding: 0;
+  margin: 0;
+  max-height: 264px;
+  overflow-y: auto;
+  list-style: none;
+}
+.research-symbol-dropdown li {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.research-symbol-dropdown li:hover,
+.research-symbol-dropdown li.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

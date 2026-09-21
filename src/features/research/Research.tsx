@@ -8,6 +8,7 @@ import type {
 } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 import "./research.css";
+import { SymbolPicker } from "./SymbolPicker";
 import { DecisionSection } from "./DecisionSection";
 import { MetricHistory } from "./MetricHistory";
 import { MetricHelp } from "../../shared/MetricHelp";
@@ -290,20 +291,12 @@ export function Research() {
           void run();
         }}
       >
-        <label>
-          {t("Symbol", "标的代码")}
-          <input
-            aria-label={t("Symbol", "标的代码")}
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-            pattern="[A-Za-z0-9.\-]+"
-            maxLength={20}
-            required
-            disabled={running || !access?.canRun}
-            autoCapitalize="characters"
-            spellCheck={false}
-          />
-        </label>
+        <SymbolPicker
+          value={symbol}
+          onChange={setSymbol}
+          reports={history}
+          disabled={running || !access?.canRun}
+        />
         <label>
           {t("Benchmark", "对比基准")}
           <input
