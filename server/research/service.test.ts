@@ -120,7 +120,10 @@ const input = {
 };
 describe("research job lifecycle", () => {
   it("rebuilds a legacy snapshot only through its cutoff, deduplicates, persists and never invokes AI", async () => {
-    const { service, market, client, dir } = await setup();
+    const { service, market, client } = await setup();
+    // Fixture mutations must not race a live service writing its final snapshot.
+    const dir = await mkdtemp(join(tmpdir(), "research-fixture-"));
+    dirs.push(dir);
     const original = await done(service, (await service.start(input)).id);
     delete original.metricHistory;
     await writeFile(join(dir, "reports.json"), JSON.stringify([original]));
@@ -244,7 +247,10 @@ describe("research job lifecycle", () => {
     );
   });
   it("marks interrupted tasks as failed after restart", async () => {
-    const { service, market, client, dir } = await setup();
+    const { service, market, client } = await setup();
+    // Fixture mutations must not race a live service writing its final snapshot.
+    const dir = await mkdtemp(join(tmpdir(), "research-fixture-"));
+    dirs.push(dir);
     const report = await done(service, (await service.start(input)).id);
     report.status = "running";
     report.sections.news = { status: "running" };
@@ -255,7 +261,10 @@ describe("research job lifecycle", () => {
     );
   });
   it("enforces the persisted hourly budget", async () => {
-    const { service, market, client, dir } = await setup();
+    const { service, market, client } = await setup();
+    // Fixture mutations must not race a live service writing its final snapshot.
+    const dir = await mkdtemp(join(tmpdir(), "research-fixture-"));
+    dirs.push(dir);
     const report = await done(service, (await service.start(input)).id);
     await writeFile(
       join(dir, "reports.json"),
