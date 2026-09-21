@@ -1205,6 +1205,16 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     /research-tone-caution/,
   );
   await expect(page.locator('[data-metric="rsi"]')).toContainText("Hot · ≥70");
+  const decision = page.locator("#research-decision");
+  await expect(
+    decision.getByRole("heading", { name: "Buy / sell decision reference" }),
+  ).toBeVisible();
+  await expect(decision.locator(".decision-verdict")).toContainText(
+    "No final grade",
+  );
+  await expect(decision.locator(".decision-table")).toHaveCount(3);
+  await expect(decision).toContainText("MACD histogram / close");
+
   const rsiHelp = page.getByRole("button", {
     name: "About RSI (14)",
     exact: true,
@@ -1329,6 +1339,17 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     .locator(".research-toolbar")
     .evaluate((el) => el.getBoundingClientRect().top);
   expect(headingTop).toBeLessThan(formTop);
+  await expect(page.locator("#research-decision")).toContainText(
+    "买卖决策参考",
+  );
+  const scoreTable = page.locator(".decision-table-wrap").first();
+  await scoreTable.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "test-results/decision-mobile.png" });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+    )
+    .toBe(true);
   await page.screenshot({
     path: "test-results/research-mobile.png",
     fullPage: true,

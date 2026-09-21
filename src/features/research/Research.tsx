@@ -8,6 +8,7 @@ import type {
 } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 import "./research.css";
+import { DecisionSection } from "./DecisionSection";
 import { MetricHistory } from "./MetricHistory";
 import { MetricHelp } from "../../shared/MetricHelp";
 import { metricAssessment, researchMetricGuide } from "./metricGuides";
@@ -447,6 +448,10 @@ export function Research() {
             className="research-progress"
             aria-label={t("Analysis progress", "分析进度")}
           >
+            <a href="#research-decision">
+              <span>{t("Buy / sell reference", "买卖决策参考")}</span>
+              <small>{t("Rule model", "规则模型")}</small>
+            </a>
             {Object.entries(labels).map(([key, label]) => (
               <a key={key} href={`#research-${key}`}>
                 <span>{tr(label)}</span>
@@ -456,6 +461,7 @@ export function Research() {
               </a>
             ))}
           </nav>
+          <DecisionSection report={report} />
           <section id="research-quant" className="research-panel">
             {sectionHeader("quant")}
             <p className="research-metric-legend">
