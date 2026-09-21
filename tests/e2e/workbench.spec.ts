@@ -1077,6 +1077,24 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     },
     metrics: [
       {
+        id: "rsi",
+        en: "RSI (14)",
+        zh: "RSI（14 日）",
+        value: 78,
+        unit: "number",
+        group: "trend",
+        note: "Wilder smoothing",
+      },
+      {
+        id: "drawdown",
+        en: "Current drawdown",
+        zh: "当前回撤",
+        value: -25,
+        unit: "percent",
+        group: "risk",
+        note: "Closing peaks",
+      },
+      {
         id: "return252",
         en: "1Y price return",
         zh: "1 年价格收益",
@@ -1144,6 +1162,35 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     page.getByRole("button", { name: "Running…", exact: true }),
   ).toBeDisabled();
   await expect(page.getByText("12.34%", { exact: true })).toBeVisible();
+  await expect(page.locator('[data-metric="return252"]')).toHaveClass(
+    /research-tone-positive/,
+  );
+  await expect(page.locator('[data-metric="drawdown"]')).toHaveClass(
+    /research-tone-negative/,
+  );
+  await expect(page.locator('[data-metric="rsi"]')).toHaveClass(
+    /research-tone-caution/,
+  );
+  await expect(page.locator('[data-metric="rsi"]')).toContainText("Hot · ≥70");
+  const rsiHelp = page.getByRole("button", {
+    name: "About RSI (14)",
+    exact: true,
+  });
+  await rsiHelp.click();
+  const guide = page.getByRole("dialog");
+  await expect(guide).toContainText(
+    "Compares recent upward and downward price changes",
+  );
+  await expect(guide).toContainText("≥70 hot, ≤30 cold");
+  await page.keyboard.press("Escape");
+  await expect(guide).not.toBeVisible();
+  await expect(rsiHelp).toBeFocused();
+  await page
+    .getByRole("button", { name: "About Sharpe (1Y, rf=0)", exact: true })
+    .click();
+  await expect(guide).toContainText("Current label: No data");
+  await page.getByRole("button", { name: "Got it", exact: true }).click();
+
   await expect(
     page.getByText("AI interpretation will be available", { exact: false }),
   ).toBeVisible();
@@ -1168,7 +1215,21 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await expect(
     page.getByRole("heading", { name: "深度研究", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("1 年价格收益", { exact: true })).toBeVisible();
+  await expect(
+    page.locator('[data-metric="return252"] dt > span'),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "了解RSI（14 日）", exact: true })
+    .click();
+  await expect(guide).toContainText("它告诉你什么");
+  await expect(guide).toContainText("偏热");
+  await expect(guide).toContainText("举个例子");
+  await page.screenshot({ path: "test-results/research-guide-mobile.png" });
+  expect(await guide.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  await page.getByRole("button", { name: "明白了", exact: true }).click();
+
   await expect
     .poll(() =>
       page.evaluate(

@@ -8,6 +8,8 @@ import type {
 } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 import "./research.css";
+import { MetricHelp } from "../../shared/MetricHelp";
+import { metricAssessment, researchMetricGuide } from "./metricGuides";
 type Summary = Pick<
   ResearchReport,
   "id" | "symbol" | "benchmark" | "createdAt" | "status" | "module"
@@ -452,6 +454,12 @@ export function Research() {
           </nav>
           <section id="research-quant" className="research-panel">
             {sectionHeader("quant")}
+            <p className="research-metric-legend">
+              {t(
+                "Green: positive direction · Red: negative direction / high risk · Amber: review. Reference ranges, not trading signals. Tap ⓘ for guidance.",
+                "绿：正向读数 · 红：负向读数 / 高风险 · 琥珀：需留意。区间仅供参考，不是买卖信号；点击 ⓘ 查看新手说明。",
+              )}
+            </p>
             <p className="research-meta">
               {t(
                 "Split-adjusted daily prices, excluding dividends and the current trading day. Risk uses up to 252 sessions; drawdowns use available history (up to 5 years). All values describe historical observations.",
@@ -484,6 +492,12 @@ export function Research() {
           <div className="research-columns">
             <section id="research-fundamentals" className="research-panel">
               {sectionHeader("fundamentals")}
+              <p className="research-metric-legend">
+                {t(
+                  "Green: positive direction · Red: negative direction / high risk · Amber: review. Reference ranges, not trading signals. Tap ⓘ for guidance.",
+                  "绿：正向读数 · 红：负向读数 / 高风险 · 琥珀：需留意。区间仅供参考，不是买卖信号；点击 ⓘ 查看新手说明。",
+                )}
+              </p>
               {report.description && (
                 <details>
                   <summary>
@@ -574,12 +588,20 @@ function MetricGroup({
   return (
     <div className="research-metric-group">
       {title && <h4>{title}</h4>}
+
       <dl className="research-metrics">
         {metrics.map((m) => (
-          <div key={m.id}>
-            <dt>{m[locale]}</dt>
+          <div
+            key={m.id}
+            data-metric={m.id}
+            className={`research-tone-${metricAssessment(m).tone}`}
+          >
+            <dt>
+              <span>{m[locale]}</span>
+              <MetricHelp metric={researchMetricGuide(m, locale)} />
+            </dt>
             <dd>
-              {m.value === null ? (
+              {m.value === null || !Number.isFinite(m.value) ? (
                 <span className="research-unavailable">
                   {t("Unavailable", "暂无数据")}
                 </span>
@@ -600,10 +622,9 @@ function MetricGroup({
                       : "")
               )}
             </dd>
-            <details>
-              <summary>{t("Method", "口径")}</summary>
-              <p>{m.note}</p>
-            </details>
+            <dd className="research-metric-reading">
+              {metricAssessment(m).label[locale === "zh" ? 1 : 0]}
+            </dd>
           </div>
         ))}
       </dl>

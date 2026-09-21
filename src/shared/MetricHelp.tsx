@@ -9,6 +9,7 @@ export interface MetricExplanation {
   formula: string;
   example: string;
   caveat: string;
+  reading?: string;
 }
 
 export function MetricHelp({ metric }: { metric: MetricExplanation }) {
@@ -73,6 +74,12 @@ export function MetricHelp({ metric }: { metric: MetricExplanation }) {
             </button>
           </header>
           <dl className="metric-help-content">
+            {metric.reading && (
+              <div>
+                <dt>{t("How to read it", "数值怎么读")}</dt>
+                <dd>{metric.reading}</dd>
+              </div>
+            )}
             <div>
               <dt>{t("What it means", "它告诉你什么")}</dt>
               <dd>{metric.meaning}</dd>

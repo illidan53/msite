@@ -330,3 +330,40 @@
     flex-shrink: 0;
   }
 }
+
+.research-metrics dt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+.research-metrics dt > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.research-metrics .metric-info-button {
+  margin: -8px -8px -8px 0;
+}
+.research-metrics .research-tone-positive > dd {
+  color: var(--positive);
+}
+.research-metrics .research-tone-negative > dd {
+  color: var(--negative);
+}
+.research-metrics .research-tone-caution > dd {
+  color: #925500;
+}
+.research-metrics dd.research-metric-reading {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 6px;
+}
+.research-metric-legend {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 8px 0 12px;
+}
+.metric-help-content dd {
+  white-space: pre-line;
+}
