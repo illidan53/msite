@@ -1,3 +1,4 @@
+import { Research } from "../research/Research";
 import {
   LocaleProvider,
   LanguageSwitcher,
@@ -81,9 +82,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   const { locale, t } = useLocale();
   const { span: spanChange, dollarVolume: dollarVolumeHelp } =
     activityExplanations(locale);
-  const [activePage, setActivePage] = useState<"watchlist" | "analytics">(
-    "watchlist",
-  );
+  const [activePage, setActivePage] = useState<
+    "watchlist" | "analytics" | "research"
+  >("watchlist");
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [otherWatchlistsOpen, setOtherWatchlistsOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(true);
@@ -562,21 +563,25 @@ function WorkbenchContent({ api }: WorkbenchProps) {
 
   return (
     <main
-      className={`workbench ${activePage === "analytics" ? "analytics-workbench" : selectedSymbol ? "has-selection" : ""}`}
+      className={`workbench ${activePage !== "watchlist" ? "analytics-workbench" : selectedSymbol ? "has-selection" : ""}`}
     >
       <BrandBar />
       <div className="workspace-heading">
         <div>
           <p className="eyebrow">
-            {activePage === "analytics"
-              ? t("ANALYTICS / SECTORS")
-              : t("WATCHLIST / MARKET OVERVIEW")}
+            {activePage === "research"
+              ? t("ANALYTICS / RESEARCH", "分析 / 个股研究")
+              : activePage === "analytics"
+                ? t("ANALYTICS / SECTORS")
+                : t("WATCHLIST / MARKET OVERVIEW")}
           </p>
           <div className="watchlist-heading-line">
             <h2>
-              {activePage === "analytics"
-                ? t("Sectors & ETFs")
-                : t(watchlist.name)}
+              {activePage === "research"
+                ? t("Stock / ETF", "个股 / ETF")
+                : activePage === "analytics"
+                  ? t("Sectors & ETFs")
+                  : t(watchlist.name)}
             </h2>
             {activePage === "watchlist" && (
               <>
@@ -617,7 +622,14 @@ function WorkbenchContent({ api }: WorkbenchProps) {
               )}
             </p>
           )}
-          {activePage === "analytics" ? (
+          {activePage === "research" ? (
+            <p>
+              {t(
+                "On-demand research · Quantitative data, fundamentals & news",
+                "按需研究 · 量化指标、基本面与新闻",
+              )}
+            </p>
+          ) : activePage === "analytics" ? (
             <p>
               {t(
                 "23 ETFs · Daily price and volume",
@@ -895,6 +907,17 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             >
               {t("Sectors & ETFs")}
             </button>
+            <button
+              type="button"
+              className="watchlist-button"
+              aria-pressed={activePage === "research"}
+              onClick={() => {
+                setActivePage("research");
+                handleCloseDetails();
+              }}
+            >
+              {t("Stock / ETF", "个股 / ETF")}
+            </button>
           </div>
         </nav>
         <details className="connection-details">
@@ -927,7 +950,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
         </details>
       </aside>
 
-      {activePage === "analytics" ? (
+      {activePage === "research" ? (
+        <Research />
+      ) : activePage === "analytics" ? (
         <SectorAnalytics api={api} onHistoryRequests={setHistoryRequestCount} />
       ) : (
         <>

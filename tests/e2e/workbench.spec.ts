@@ -1047,3 +1047,145 @@ function historyFor(symbol: string, range: PriceSeries["range"]): PriceSeries {
     ],
   };
 }
+
+test("runs stock research, refreshes news and restores saved reports on mobile", async ({
+  page,
+}) => {
+  await mockWorkbenchApis(page);
+  const complete = {
+    id: "84c70d36-2087-4b5c-b2e9-7ce3c411a188",
+    symbol: "AAPL",
+    benchmark: "SPY",
+    locale: "en",
+    module: "all",
+    createdAt: "2026-09-18T21:00:00Z",
+    status: "partial",
+    kind: "stock",
+    name: "Apple Inc.",
+    sections: {
+      quant: {
+        status: "complete",
+        asOf: "2026-09-18",
+        fetchedAt: "2026-09-18T21:00:00Z",
+      },
+      fundamentals: {
+        status: "unavailable",
+        message: "FINANCIALS_ENTITLEMENT",
+      },
+      news: { status: "complete", message: "NEWS_30D" },
+      ai: { status: "unavailable", message: "AI_NOT_CONFIGURED" },
+    },
+    metrics: [
+      {
+        id: "return252",
+        en: "1Y price return",
+        zh: "1 年价格收益",
+        value: 12.34,
+        unit: "percent",
+        group: "performance",
+        note: "Excludes dividends / 不含分红",
+      },
+      {
+        id: "sharpe",
+        en: "Sharpe (1Y, rf=0)",
+        zh: "Sharpe（1 年，rf=0）",
+        value: null,
+        unit: "number",
+        group: "risk",
+        note: "Zero risk-free-rate assumption",
+      },
+    ],
+    prices: [
+      { date: "2026-09-17", close: 100, drawdown: 0 },
+      { date: "2026-09-18", close: 112.34, drawdown: 0 },
+    ],
+    news: [
+      {
+        title: "Apple company announcement",
+        url: "https://example.com/apple",
+        publisher: "Example",
+        publishedAt: "2026-09-18T18:00:00Z",
+        description: "A company update with a source.",
+      },
+    ],
+  };
+  let posts = 0;
+  const bodies: Record<string, unknown>[] = [];
+  await page.route("**/api/research**", async (route) => {
+    const req = route.request();
+    if (req.method() === "POST") {
+      posts++;
+      bodies.push(req.postDataJSON());
+      await route.fulfill({
+        json: {
+          ...complete,
+          status: "running",
+          sections: { ...complete.sections, news: { status: "running" } },
+        },
+      });
+    } else if (new URL(req.url()).pathname === "/api/research") {
+      await route.fulfill({ json: posts ? [complete] : [] });
+    } else await route.fulfill({ json: complete });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Stock / ETF", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Stock / ETF", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("One symbol. A complete research snapshot."),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Run analysis", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Running…", exact: true }),
+  ).toBeDisabled();
+  await expect(page.getByText("12.34%", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("AI interpretation will be available", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Apple company announcement" }),
+  ).toHaveAttribute("href", "https://example.com/apple");
+  await page
+    .getByRole("button", { name: "Refresh News & catalysts", exact: true })
+    .click();
+  await expect.poll(() => posts).toBe(2);
+  expect(bodies[1]).toMatchObject({ module: "news", baseId: complete.id });
+  await expect(
+    page.getByRole("button", { name: "Run analysis", exact: true }),
+  ).toBeEnabled();
+  await page.reload();
+  await page.getByRole("button", { name: "Stock / ETF", exact: true }).click();
+  await page.getByLabel("Saved reports").selectOption(complete.id);
+  await expect(page.getByText("12.34%", { exact: true })).toBeVisible();
+  expect(posts).toBe(2);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.getByLabel("Language", { exact: true }).selectOption("zh");
+  await expect(
+    page.getByRole("heading", { name: "个股 / ETF", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("1 年价格收益", { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    )
+    .toBe(true);
+  const headingTop = await page
+    .getByRole("heading", { name: "个股 / ETF", exact: true })
+    .evaluate((el) => el.getBoundingClientRect().top);
+  const formTop = await page
+    .locator(".research-toolbar")
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(headingTop).toBeLessThan(formTop);
+  await page.screenshot({
+    path: "test-results/research-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: "test-results/research-desktop.png",
+    fullPage: true,
+  });
+});

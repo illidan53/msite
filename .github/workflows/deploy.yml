@@ -121,6 +121,8 @@ jobs:
           aws ecr get-login-password --region "$region" | docker login --username AWS --password-stdin "$registry"
           docker pull "$image_uri"
 
+          install -d -o 1000 -g 1000 -m 700 /var/lib/msite/research
+
           cat > /etc/systemd/system/msite.service <<SERVICE
           [Unit]
           Description=Stock Workbench
@@ -132,7 +134,7 @@ jobs:
           Restart=always
           RestartSec=5
           ExecStartPre=-/usr/bin/docker rm -f msite-finance
-          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -p 127.0.0.1:8787:8787 $image_uri
+          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -e RESEARCH_DATA_DIR=/app/data/research -v /var/lib/msite/research:/app/data/research -p 127.0.0.1:8787:8787 $image_uri
           ExecStop=/usr/bin/docker stop msite-finance
 
           [Install]

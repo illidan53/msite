@@ -14,9 +14,14 @@ export class PolygonClient {
   async getJson<T>(path: string, params: QueryParams = {}): Promise<T> {
     const apiKey = this.apiKey?.trim();
     if (!apiKey) {
-      throw new ApiError(503, "POLYGON_API_KEY_MISSING", "POLYGON_API_KEY is not configured", {
-        source: "polygon",
-      });
+      throw new ApiError(
+        503,
+        "POLYGON_API_KEY_MISSING",
+        "POLYGON_API_KEY is not configured",
+        {
+          source: "polygon",
+        },
+      );
     }
 
     const url = new URL(path, this.baseUrl);
@@ -27,13 +32,21 @@ export class PolygonClient {
     }
     url.searchParams.set("apiKey", apiKey);
 
-    const response = await this.fetcher(url.toString(), { headers: { accept: "application/json" } });
+    const response = await this.fetcher(url.toString(), {
+      headers: { accept: "application/json" },
+      signal: AbortSignal.timeout(20_000),
+    });
     if (!response.ok) {
       const retryAfter = response.headers.get("retry-after") ?? undefined;
-      throw new ApiError(response.status, "POLYGON_REQUEST_FAILED", "Polygon request failed", {
-        details: retryAfter === undefined ? undefined : { retryAfter },
-        source: "polygon",
-      });
+      throw new ApiError(
+        response.status,
+        "POLYGON_REQUEST_FAILED",
+        "Polygon request failed",
+        {
+          details: retryAfter === undefined ? undefined : { retryAfter },
+          source: "polygon",
+        },
+      );
     }
 
     return (await response.json()) as T;

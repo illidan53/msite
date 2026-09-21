@@ -1,4 +1,6 @@
 import express from "express";
+import { ResearchService } from "./research/service";
+import { createResearchRoutes } from "./routes/researchRoutes";
 import type { Express } from "express";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -19,11 +21,17 @@ export interface CreateAppOptions {
 
 export function createApp(options: CreateAppOptions = {}): Express {
   const app = express();
-  const configDir = options.configDir ?? process.env.CONFIG_DIR ?? defaultConfigDir();
+  const configDir =
+    options.configDir ?? process.env.CONFIG_DIR ?? defaultConfigDir();
   const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV ?? "production";
   const polygonApiKey = options.polygonApiKey ?? process.env.POLYGON_API_KEY;
-  const staticDir = options.staticDir ?? process.env.STATIC_DIR ?? resolve(process.cwd(), "dist");
-  const marketDataProvider = new MarketDataProvider(new PolygonClient(polygonApiKey));
+  const staticDir =
+    options.staticDir ??
+    process.env.STATIC_DIR ??
+    resolve(process.cwd(), "dist");
+  const marketDataProvider = new MarketDataProvider(
+    new PolygonClient(polygonApiKey),
+  );
   const indexHtml = resolve(staticDir, "index.html");
 
   app.use(express.json());
@@ -42,6 +50,19 @@ export function createApp(options: CreateAppOptions = {}): Express {
     }),
   );
   app.use("/api", createRateRoutes());
+  app.use(
+    "/api",
+    createResearchRoutes(
+      new ResearchService(
+        marketDataProvider,
+        new PolygonClient(polygonApiKey),
+        process.env.RESEARCH_DATA_DIR ??
+          resolve(process.cwd(), "data/research"),
+        process.env.OPENAI_API_KEY,
+        process.env.OPENAI_MODEL,
+      ),
+    ),
+  );
   app.use("/api", createMarketRoutes(marketDataProvider));
 
   if (nodeEnv === "production" && existsSync(indexHtml)) {

@@ -108,3 +108,25 @@ test("public deployment serves the workbench shell and health endpoint", async (
   ).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("public deployment serves stock and ETF research", async ({
+  page,
+  request,
+}) => {
+  const response = await request.get("/api/research");
+  expect(response.ok()).toBe(true);
+  expect(Array.isArray(await response.json())).toBe(true);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Stock / ETF", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Stock / ETF", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Run analysis", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Saved reports")).toBeVisible();
+  await page.getByLabel("Language", { exact: true }).selectOption("zh");
+  await expect(
+    page.getByRole("heading", { name: "个股 / ETF", exact: true }),
+  ).toBeVisible();
+});
