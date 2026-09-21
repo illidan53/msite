@@ -45,6 +45,18 @@ export function createResearchRoutes(
       throw new ApiError(400, "INVALID_ID", "Invalid report ID");
     res.set("Cache-Control", "no-store").json(await service.get(req.params.id));
   });
+  router.post("/research/:id/history", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!access(req).canRun)
+      throw new ApiError(
+        403,
+        "RESEARCH_IP_FORBIDDEN",
+        "This IP address is not allowed to generate history",
+      );
+    if (!z.string().uuid().safeParse(req.params.id).success)
+      throw new ApiError(400, "INVALID_ID", "Invalid report ID");
+    res.json(await service.buildHistory(req.params.id));
+  });
   router.post("/research", async (req, res) => {
     res.set("Cache-Control", "no-store");
     if (!access(req).canRun) {

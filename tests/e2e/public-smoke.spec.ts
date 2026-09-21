@@ -163,6 +163,10 @@ test("public research authorization resists spoofed source headers", async ({
       data: { symbol: "../invalid" },
     });
     expect(denied.status()).toBe(access.canRun ? 400 : 403);
+    const historyDenied = await request.post("/api/research/invalid/history", {
+      headers,
+    });
+    expect(historyDenied.status()).toBe(access.canRun ? 400 : 403);
     if (!access.canRun)
       expect((await denied.json()).code).toBe("RESEARCH_IP_FORBIDDEN");
   }

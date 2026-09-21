@@ -119,6 +119,55 @@ const input = {
   module: "all" as const,
 };
 describe("research job lifecycle", () => {
+  it("rebuilds a legacy snapshot only through its cutoff, deduplicates, persists and never invokes AI", async () => {
+    const { service, market, client, dir } = await setup();
+    const original = await done(service, (await service.start(input)).id);
+    delete original.metricHistory;
+    await writeFile(join(dir, "reports.json"), JSON.stringify([original]));
+    const ai = vi.fn();
+    const reopened = new ResearchService(
+      market,
+      client,
+      dir,
+      "test-key",
+      "test-model",
+      ai,
+    );
+    const source = await market.getHistory({ symbol: "AAPL", range: "5y" });
+    market.getHistory.mockImplementation(async ({ symbol, range }) => ({
+      ...source,
+      symbol,
+      range,
+      bars: [
+        ...source.bars,
+        {
+          ...source.bars[0],
+          timestamp: "2021-01-01T21:00:00Z",
+          close: 100000,
+          high: 100001,
+          low: 99999,
+        },
+      ],
+    }));
+    market.getHistory.mockClear();
+    const [a, b] = await Promise.all([
+      reopened.buildHistory(original.id),
+      reopened.buildHistory(original.id),
+    ]);
+    expect(a.metricHistory).toEqual(b.metricHistory);
+    expect(a.metricHistory?.basis).toBe("reconstructed");
+    expect(a.metricHistory?.asOf).toBe(original.sections.quant.asOf);
+    expect(a.metrics).toEqual(original.metrics);
+    expect(a.narrative).toEqual(original.narrative);
+    expect(market.getHistory).toHaveBeenCalledTimes(2);
+    expect(ai).not.toHaveBeenCalled();
+    expect(
+      (await new ResearchService(market, client, dir).get(original.id))
+        .metricHistory,
+    ).toEqual(a.metricHistory);
+    await reopened.buildHistory(original.id);
+    expect(market.getHistory).toHaveBeenCalledTimes(2);
+  });
   it("runs, persists and refreshes news without rerunning quantitative data", async () => {
     const { service, market, client, dir } = await setup();
     const initial = await service.start(input);
@@ -144,6 +193,7 @@ describe("research job lifecycle", () => {
     expect(market.getHistory).toHaveBeenCalledTimes(2);
     expect(refreshed.sections.quant).toEqual(report.sections.quant);
     expect(refreshed.metrics).toEqual(report.metrics);
+    expect(refreshed.metricHistory).toEqual(report.metricHistory);
     expect((await service.get(report.id)).sections.news).toEqual(
       report.sections.news,
     );

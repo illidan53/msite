@@ -10,6 +10,8 @@ import type { MarketDataProvider } from "../market/marketDataProvider";
 import type { PolygonClient } from "../market/polygonClient";
 import { ApiError } from "../http/apiError";
 import { calculateResearch, closedBars } from "./quant";
+import { calculateMetricHistory } from "./history";
+import { newYorkDate } from "../../shared/marketDate";
 
 type RecordData = Record<string, unknown>;
 interface Payload {
@@ -28,6 +30,8 @@ export class ResearchService {
   private loaded: Promise<void>;
   private writing: Promise<void> = Promise.resolve();
   private starting: Promise<unknown> = Promise.resolve();
+  private historyJobs = new Map<string, Promise<ResearchReport>>();
+  private historyAttempts: number[] = [];
   constructor(
     private market: Pick<MarketDataProvider, "getHistory">,
     private client: Pick<PolygonClient, "getJson">,
@@ -86,6 +90,74 @@ export class ResearchService {
     await this.loaded;
     const r = this.reports.find((r) => r.id === id);
     if (!r) throw new ApiError(404, "REPORT_NOT_FOUND", "Report not found");
+    return structuredClone(r);
+  }
+  async buildHistory(id: string): Promise<ResearchReport> {
+    await this.loaded;
+    const r = this.reports.find((r) => r.id === id);
+    if (!r) throw new ApiError(404, "REPORT_NOT_FOUND", "Report not found");
+    if (r.metricHistory) return structuredClone(r);
+    if (r.status === "running" || !r.sections.quant.asOf)
+      throw new ApiError(
+        409,
+        "HISTORY_NOT_READY",
+        "No completed quantitative snapshot",
+      );
+    const pending = this.historyJobs.get(id);
+    if (pending) return pending;
+    this.historyAttempts = this.historyAttempts.filter(
+      (time) => Date.now() - time < 3600_000,
+    );
+    if (this.historyJobs.size >= 2 || this.historyAttempts.length >= 12)
+      throw new ApiError(429, "HISTORY_LIMIT", "History capacity reached");
+    this.historyAttempts.push(Date.now());
+    const job = this.rebuildHistory(r).finally(() =>
+      this.historyJobs.delete(id),
+    );
+    this.historyJobs.set(id, job);
+    return job;
+  }
+  private async rebuildHistory(r: ResearchReport): Promise<ResearchReport> {
+    const asOf = r.sections.quant.asOf!;
+    const get = async (symbol: string) => {
+      let result;
+      try {
+        result = await this.market.getHistory({ symbol, range: "5y" });
+      } catch (e) {
+        if (!(e instanceof ApiError) || ![400, 403].includes(e.status)) throw e;
+        result = await this.market.getHistory({ symbol, range: "1y" });
+      }
+      return closedBars(result.bars).filter(
+        (b) => newYorkDate(b.timestamp)! <= asOf,
+      );
+    };
+    const bars = await get(r.symbol);
+    if (bars.length < 2 || newYorkDate(bars.at(-1)!.timestamp) !== asOf)
+      throw new ApiError(
+        422,
+        "HISTORY_UNAVAILABLE",
+        "Historical cutoff is outside available coverage",
+      );
+    let benchmark = bars;
+    if (r.symbol !== r.benchmark) {
+      // Do not fabricate relative values when benchmark history is unavailable.
+      try {
+        benchmark = await get(r.benchmark);
+      } catch {
+        benchmark = [];
+      }
+    }
+    r.metricHistory = await calculateMetricHistory(
+      bars,
+      benchmark,
+      "reconstructed",
+    );
+    try {
+      await this.save();
+    } catch (e) {
+      delete r.metricHistory;
+      throw e;
+    }
     return structuredClone(r);
   }
   start(input: ResearchInput): Promise<ResearchReport> {
@@ -168,6 +240,7 @@ export class ResearchService {
     if (input.module === "all" || input.module === "quant") {
       report.metrics = report.metrics.filter((m) => m.group === "fundamentals");
       report.prices = [];
+      delete report.metricHistory;
     }
     if (input.module === "all" || input.module === "fundamentals") {
       report.metrics = report.metrics.filter((m) => m.group !== "fundamentals");
@@ -267,6 +340,7 @@ export class ResearchService {
     r.metrics.push(...result.metrics);
     r.prices = result.prices;
     r.sections.quant.asOf = result.prices.at(-1)?.date;
+    r.metricHistory = await calculateMetricHistory(bars, benchmark);
   }
   private async news(r: ResearchReport) {
     const from = new Date(Date.now() - 30 * 86400_000).toISOString();

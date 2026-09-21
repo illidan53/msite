@@ -65,6 +65,7 @@ describe("research IP authorization", () => {
   it("blocks every run module before invoking the service but keeps reading public", async () => {
     const service = {
       start: vi.fn(),
+      buildHistory: vi.fn(),
       list: vi.fn(async () => []),
       get: vi.fn(async () => ({ id: "saved" })),
     };
@@ -86,6 +87,14 @@ describe("research IP authorization", () => {
       expect(response.status).toBe(403);
       expect(response.body.code).toBe("RESEARCH_IP_FORBIDDEN");
     }
+    expect(
+      (
+        await request(app)
+          .post("/api/research/84c70d36-2087-4b5c-b2e9-7ce3c411a188/history")
+          .set("X-Forwarded-For", allowed)
+      ).status,
+    ).toBe(403);
+    expect(service.buildHistory).not.toHaveBeenCalled();
     expect(service.start).not.toHaveBeenCalled();
     expect((await request(app).get("/api/research")).status).toBe(200);
     expect((await request(app).get("/api/research/access")).body.canRun).toBe(

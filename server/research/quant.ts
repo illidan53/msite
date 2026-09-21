@@ -2,10 +2,12 @@ import type { PriceBar } from "../../shared/types";
 import type { ResearchMetric } from "../../shared/research";
 import { newYorkDate } from "../../shared/marketDate";
 const mean = (a: number[]) => a.reduce((s, v) => s + v, 0) / a.length;
-const variance = (a: number[]) =>
-  a.length < 2
+const variance = (a: number[]) => {
+  const avg = mean(a);
+  return a.length < 2
     ? NaN
-    : a.reduce((s, v) => s + (v - mean(a)) ** 2, 0) / (a.length - 1);
+    : a.reduce((s, v) => s + (v - avg) ** 2, 0) / (a.length - 1);
+};
 const sd = (a: number[]) => Math.sqrt(variance(a));
 const ratio = (a: number, b: number) => (b > 0 ? a / b : NaN);
 export function closedBars(bars: PriceBar[], now = new Date()) {
@@ -35,7 +37,11 @@ export function closedBars(bars: PriceBar[], now = new Date()) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, bar]) => bar);
 }
-export function calculateResearch(bars: PriceBar[], benchmark: PriceBar[]) {
+export function calculateResearch(
+  bars: PriceBar[],
+  benchmark: PriceBar[],
+  dateFor = newYorkDate,
+) {
   const metrics: ResearchMetric[] = [];
   const add = (
     id: string,
@@ -99,7 +105,7 @@ export function calculateResearch(bars: PriceBar[], benchmark: PriceBar[]) {
     maxDrawdown = Math.min(maxDrawdown, drawdown);
     underwater = drawdown < 0 ? underwater + 1 : 0;
     longest = Math.max(longest, underwater);
-    return { date: newYorkDate(b.timestamp)!, close: b.close, drawdown };
+    return { date: dateFor(b.timestamp)!, close: b.close, drawdown };
   });
   add(
     "maxDrawdown",
@@ -191,29 +197,29 @@ export function calculateResearch(bars: PriceBar[], benchmark: PriceBar[]) {
     "risk",
     "1Y price return ÷ absolute 1Y max drawdown / 同期收益 ÷ 最大回撤绝对值",
   );
-  const bench = new Map(
-    benchmark.map((b) => [newYorkDate(b.timestamp), b.close]),
-  );
+  const bench = new Map(benchmark.map((b) => [dateFor(b.timestamp), b.close]));
   const pairs: [number, number][] = [];
   for (let i = Math.max(1, bars.length - 252); i < bars.length; i++) {
-    const p = bench.get(newYorkDate(bars[i - 1].timestamp)),
-      c = bench.get(newYorkDate(bars[i].timestamp));
+    const p = bench.get(dateFor(bars[i - 1].timestamp)),
+      c = bench.get(dateFor(bars[i].timestamp));
     if (p && c) pairs.push([returns[i - 1], c / p - 1]);
   }
   const x = pairs.map((p) => p[1]),
     y = pairs.map((p) => p[0]);
+  const meanX = mean(x),
+    meanY = mean(y);
   const covariance =
     pairs.length >= 60
-      ? (mean(pairs.map(([a, b]) => (a - mean(y)) * (b - mean(x)))) *
+      ? (mean(pairs.map(([a, b]) => (a - meanY) * (b - meanX))) *
           pairs.length) /
         (pairs.length - 1)
       : NaN;
   const beta = ratio(covariance, variance(x)),
     correlation = ratio(covariance, sd(x) * sd(y));
   const start = bars.at(-253),
-    bStart = start ? bench.get(newYorkDate(start.timestamp)) : undefined,
+    bStart = start ? bench.get(dateFor(start.timestamp)) : undefined,
     bLast = bars.at(-1)
-      ? bench.get(newYorkDate(bars.at(-1)!.timestamp))
+      ? bench.get(dateFor(bars.at(-1)!.timestamp))
       : undefined;
   add(
     "excess",

@@ -1077,6 +1077,15 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     },
     metrics: [
       {
+        id: "marketCap",
+        en: "Market capitalization",
+        zh: "总市值",
+        value: 123000000,
+        unit: "usd",
+        group: "fundamentals",
+        note: "Current profile",
+      },
+      {
         id: "rsi",
         en: "RSI (14)",
         zh: "RSI（14 日）",
@@ -1127,6 +1136,24 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
       },
     ],
   };
+  const metricHistory = {
+    dates: Array.from({ length: 130 }, (_, i) =>
+      new Date(Date.UTC(2026, 4, 12 + i)).toISOString().slice(0, 10),
+    ),
+    values: {
+      rsi: Array.from({ length: 130 }, (_, i) =>
+        i === 110 ? null : 40 + (i * 38) / 129,
+      ),
+      drawdown: Array.from({ length: 130 }, (_, i) => (-i * 25) / 129),
+      return252: Array.from({ length: 130 }, (_, i) => (i * 12.34) / 129),
+      sharpe: Array(130).fill(null),
+    },
+    dataStart: "2025-01-01",
+    asOf: "2026-09-18",
+    fetchedAt: "2026-09-20T12:00:00Z",
+    basis: "reconstructed",
+  };
+  let historyPosts = 0;
   let posts = 0;
   const bodies: Record<string, unknown>[] = [];
   await page.route("**/api/research**", async (route) => {
@@ -1135,6 +1162,9 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
       await route.fulfill({
         json: { canRun: true, clientIp: "70.111.76.119" },
       });
+    } else if (new URL(req.url()).pathname.endsWith("/history")) {
+      historyPosts++;
+      await route.fulfill({ json: { ...complete, metricHistory } });
     } else if (req.method() === "POST") {
       posts++;
       bodies.push(req.postDataJSON());
@@ -1147,7 +1177,10 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
       });
     } else if (new URL(req.url()).pathname === "/api/research") {
       await route.fulfill({ json: posts ? [complete] : [] });
-    } else await route.fulfill({ json: complete });
+    } else
+      await route.fulfill({
+        json: { ...complete, ...(historyPosts ? { metricHistory } : {}) },
+      });
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Dig Deep", exact: true }).click();
@@ -1190,6 +1223,44 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     .click();
   await expect(guide).toContainText("Current label: No data");
   await page.getByRole("button", { name: "Got it", exact: true }).click();
+  // Clicking the value itself activates the whole card, while the i button remains independent.
+  await page
+    .locator('[data-metric="rsi"]')
+    .click({ position: { x: 25, y: 65 } });
+  const chart = page.getByRole("dialog");
+  await expect(
+    chart.getByRole("img", { name: "RSI (14) historical chart" }),
+  ).toBeVisible();
+  expect(historyPosts).toBe(1);
+  await chart.getByRole("button", { name: "1M", exact: true }).click();
+  const slider = chart.getByRole("slider");
+  await expect(slider).toHaveAttribute("max", "20");
+  await slider.focus();
+  await page.keyboard.press("Home");
+  await expect(slider).toHaveAttribute("aria-valuetext", /2026-08-29/);
+  await page.keyboard.press("ArrowRight");
+  await expect(slider).toHaveAttribute("aria-valuetext", /Unavailable/);
+  await chart.getByText("View dated values", { exact: true }).click();
+  await expect(chart.locator("tbody tr")).toHaveCount(21);
+  await page.screenshot({ path: "test-results/research-history-desktop.png" });
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "History of RSI (14)", exact: true }),
+  ).toBeFocused();
+  await page
+    .getByRole("button", { name: "History of Sharpe (1Y, rf=0)", exact: true })
+    .click();
+  await expect(chart).toContainText("No valid observations in this range");
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", {
+      name: "History of Market capitalization",
+      exact: true,
+    })
+    .click();
+  await expect(chart).toContainText("Historical series not available");
+  await page.keyboard.press("Escape");
+  expect(historyPosts).toBe(1);
 
   await expect(
     page.getByText("AI interpretation will be available", { exact: false }),
@@ -1229,6 +1300,20 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     true,
   );
   await page.getByRole("button", { name: "明白了", exact: true }).click();
+  await page
+    .getByRole("button", { name: "RSI（14 日）的历史", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "每个日期只使用截至当天的价格",
+  );
+  await page.screenshot({ path: "test-results/research-history-mobile.png" });
+  expect(
+    await page
+      .getByRole("dialog")
+      .evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+  await page.getByRole("button", { name: "完成", exact: true }).click();
+  expect(historyPosts).toBe(1);
 
   await expect
     .poll(() =>

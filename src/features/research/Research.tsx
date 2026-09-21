@@ -8,6 +8,7 @@ import type {
 } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 import "./research.css";
+import { MetricHistory } from "./MetricHistory";
 import { MetricHelp } from "../../shared/MetricHelp";
 import { metricAssessment, researchMetricGuide } from "./metricGuides";
 type Summary = Pick<
@@ -91,6 +92,9 @@ const messages: Record<string, [string, string]> = {
 };
 export function Research() {
   const { t, locale } = useLocale();
+  const [selectedMetric, setSelectedMetric] = useState<ResearchMetric | null>(
+    null,
+  );
   const tr = (pair: readonly [string, string]) => t(pair[0], pair[1]);
   const [symbol, setSymbol] = useState("AAPL"),
     [benchmark, setBenchmark] = useState("SPY");
@@ -471,6 +475,7 @@ export function Research() {
               (group) => (
                 <MetricGroup
                   key={group}
+                  onSelect={setSelectedMetric}
                   metrics={report.metrics.filter((m) => m.group === group)}
                   title={tr(
                     (
@@ -520,6 +525,7 @@ export function Research() {
                 </p>
               )}
               <MetricGroup
+                onSelect={setSelectedMetric}
                 metrics={report.metrics.filter(
                   (m) => m.group === "fundamentals",
                 )}
@@ -573,15 +579,29 @@ export function Research() {
           </section>
         </>
       )}
+      {selectedMetric && report && (
+        <MetricHistory
+          key={`${report.id}-${selectedMetric.id}`}
+          metric={selectedMetric}
+          report={report}
+          canRun={Boolean(access?.canRun)}
+          onClose={() => setSelectedMetric(null)}
+          onLoaded={(next) =>
+            setReport((current) => (current?.id === next.id ? next : current))
+          }
+        />
+      )}
     </section>
   );
 }
 function MetricGroup({
   metrics,
   title,
+  onSelect,
 }: {
   metrics: ResearchMetric[];
   title?: string;
+  onSelect: (metric: ResearchMetric) => void;
 }) {
   const { locale, t } = useLocale();
   if (!metrics.length) return null;
@@ -624,6 +644,17 @@ function MetricGroup({
             </dd>
             <dd className="research-metric-reading">
               {metricAssessment(m).label[locale === "zh" ? 1 : 0]}
+            </dd>
+            <dd className="research-history-action">
+              <button
+                type="button"
+                aria-label={t(`History of ${m.en}`, `${m.zh}的历史`)}
+                aria-haspopup="dialog"
+                onClick={() => onSelect(m)}
+              >
+                {t("View history", "查看历史")}{" "}
+                <span aria-hidden="true">↗</span>
+              </button>
             </dd>
           </div>
         ))}

@@ -23,6 +23,14 @@ export interface ResearchSection {
   asOf?: string;
   message?: string;
 }
+export interface ResearchMetricHistory {
+  dates: string[];
+  values: Record<string, (number | null)[]>;
+  dataStart: string;
+  asOf: string;
+  fetchedAt: string;
+  basis: "snapshot" | "reconstructed";
+}
 export interface ResearchReport {
   id: string;
   baseId?: string;
@@ -41,6 +49,7 @@ export interface ResearchReport {
   metrics: ResearchMetric[];
   prices: { date: string; close: number; drawdown: number }[];
   news: ResearchNews[];
+  metricHistory?: ResearchMetricHistory;
   narrative?: string;
   model?: string;
   financialPeriod?: string;
