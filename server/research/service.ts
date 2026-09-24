@@ -100,7 +100,7 @@ export class ResearchService {
     await this.loaded;
     const r = this.reports.find((r) => r.id === id);
     if (!r) throw new ApiError(404, "REPORT_NOT_FOUND", "Report not found");
-    if (r.metricHistory && (!requireModel || r.ema200Study?.version === 1))
+    if (r.metricHistory && (!requireModel || r.ema200Study?.version === 2))
       return structuredClone(r);
     if (r.status === "running" || !r.sections.quant.asOf)
       throw new ApiError(

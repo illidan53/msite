@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { PriceBar } from "../../shared/types";
 import {
   ema200,
+  forwardPath,
   association,
   blockInterval,
   calculateEma200Study,
@@ -49,10 +50,10 @@ describe("EMA200 pullback study", () => {
     expect(result.events.some((e) => e.date === "2020-07-29")).toBe(false);
     expect(result.events[1].date).toBe("2020-08-09");
   });
-  it("does not treat a gap entirely below the line, or an approach from below, as a pullback touch", () => {
+  it("includes a gap below the line but rejects an approach from below", () => {
     const data = touches();
     data[200] = { ...data[200], open: 90, close: 90, high: 95, low: 89 };
-    expect(calculateEma200Study(data.slice(0, 201)).events).toHaveLength(0);
+    expect(calculateEma200Study(data.slice(0, 201)).events).toHaveLength(1);
     const below = bars(205).map((b) => ({ ...b, close: 100 }));
     below[199].close = 90;
     below[200].low = 99;
@@ -141,5 +142,105 @@ describe("EMA200 pullback study", () => {
     const data = touches();
     data[201].open = 0;
     expect(calculateEma200Study(data).events[0].returns["20"]).toBeNull();
+  });
+  it("widens the primary band to 3% and reports separate 1/3/5% samples", () => {
+    const data = touches(221);
+    data[200].low = 102;
+    const result = calculateEma200Study(data);
+    expect(result.version).toBe(2);
+    expect(result.bandPercent).toBe(3);
+    expect(result.events).toHaveLength(1);
+    expect(result.sensitivity.map((s) => s.horizon.events)).toEqual([0, 1, 1]);
+    expect(result.sensitivity[1].horizon).toEqual(result.horizons[2]);
+  });
+  it("distinguishes endpoint from mean floating return and includes the complete path", () => {
+    const data = touches(221);
+    for (let i = 201; i <= 220; i++)
+      data[i] = {
+        ...data[i],
+        open: 100,
+        close: i <= 210 ? 110 : 90,
+        high: 112,
+        low: 88,
+      };
+    const result = calculateEma200Study(data);
+    const p = result.events[0].paths["20"]!;
+    expect(p.endReturn).toBeCloseTo(-10);
+    expect(p.averageReturn).toBeCloseTo(0);
+    expect(p.maxGain).toBeCloseTo(12);
+    expect(p.maxLoss).toBeCloseTo(-12);
+    expect(p.hitDay).toBe(1);
+    expect(result.horizons[2].hitRate).toBe(100);
+    expect(result.horizons[2].medianHitDay).toBe(1);
+    expect(result.events[0].outcome).toBe("weak");
+    expect(result.events).toHaveLength(1);
+  });
+  it("does not count incomplete high-hit windows as successes", () => {
+    const data = touches(204);
+    data[201] = { ...data[201], open: 100, high: 150 };
+    const result = calculateEma200Study(data);
+    expect(result.events[0].paths["5"]).toBeNull();
+    expect(result.horizons[0].hitRate).toBeNull();
+    expect(result.events[0].outcome).toBe("pending");
+  });
+  it("keeps a prolonged decline in one episode until recovery and cooldown both finish", () => {
+    const data = touches(270);
+    for (let i = 201; i < 246; i++)
+      data[i] = { ...data[i], open: 90, close: 90, low: 88, high: 91 };
+    for (let i = 246; i <= 248; i++)
+      data[i] = { ...data[i], open: 110, close: 110, low: 109, high: 111 };
+    data[249].low = 90;
+    const result = calculateEma200Study(data);
+    expect(result.events).toHaveLength(2);
+    expect(result.events[1].date).toBe(data[249].timestamp.slice(0, 10));
+    expect(result.events[0].outcome).toBe("weak");
+    expect(result.events[0].returns["20"]).toBeCloseTo(0);
+  });
+  it("waits three sessions after a new low and starts confirmed returns at the next open", () => {
+    const data = touches(230);
+    data[201].low = 95;
+    data[202].low = 94;
+    data[203].low = 96;
+    data[204].low = 95;
+    data[205].low = 95;
+    data[206].open = 107;
+    data[225].close = 117;
+    const before = calculateEma200Study(data.slice(0, 205));
+    expect(before.events[0].confirmation).toBeNull();
+    const confirmed = calculateEma200Study(data.slice(0, 206)).events[0]
+      .confirmation!;
+    expect(confirmed.date).toBe(data[205].timestamp.slice(0, 10));
+    expect(confirmed.low).toBe(94);
+    expect(confirmed.entryPrice).toBeNull();
+    const result = calculateEma200Study(data);
+    const c = result.events[0].confirmation!;
+    expect(c.entryDate).toBe(data[206].timestamp.slice(0, 10));
+    expect(c.entryPrice).toBe(107);
+    expect(c.paths["20"]!.endReturn).toBeCloseTo((117 / 107 - 1) * 100);
+    expect(result.confirmed[2].path.count).toBe(1);
+    expect(result.confirmed[2].meanReturn).toBe(c.paths["20"]!.endReturn);
+  });
+  it("retains failed undercuts, labels reclaims only after maturity, and records near-line cases", () => {
+    const reclaimed = calculateEma200Study(touches(221));
+    expect(reclaimed.events[0].outcome).toBe("reclaimed");
+    const near = touches(221);
+    near[200].low = 102;
+    expect(calculateEma200Study(near).events[0].outcome).toBe("near");
+    const mixed = touches(221);
+    for (let i = 200; i <= 220; i++)
+      mixed[i] = { ...mixed[i], open: 99, close: 99, low: 98, high: 100 };
+    expect(calculateEma200Study(mixed).events[0].outcome).toBe("mixed");
+  });
+  it("uses entry-relative excursions and hit-only time without inventing gains on losing paths", () => {
+    const data = bars(6);
+    data[1].open = 110;
+    for (let i = 1; i < 6; i++)
+      data[i] = { ...data[i], close: 105, high: 110, low: 100 };
+    const p = forwardPath(data, 0, 5)!;
+    expect(p.maxGain).toBe(0);
+    expect(p.maxLoss).toBeCloseTo((100 / 110 - 1) * 100);
+    expect(p.hitDay).toBeNull();
+    data[1].open = 0;
+    expect(forwardPath(data, 0, 5)).toBeNull();
   });
 });

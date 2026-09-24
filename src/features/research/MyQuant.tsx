@@ -1,7 +1,9 @@
+import { EmaConsideration } from "./EmaConsideration";
+import { EmaOutcomes } from "./EmaOutcomes";
 import { ChartInspection } from "../../shared/ChartInspection";
 import { useState } from "react";
 import { RefreshCw, FlaskConical } from "lucide-react";
-import type { Ema200Study, ResearchReport } from "../../../shared/research";
+import type { Ema200StudyV2, ResearchReport } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 export function MyQuant({
   report,
@@ -15,7 +17,17 @@ export function MyQuant({
   const { t, locale } = useLocale();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const study = report.ema200Study;
+  const study =
+    report.ema200Study?.version === 2 ? report.ema200Study : undefined;
+  const legacy = report.ema200Study?.version === 1;
+  const outcomeLabel = (value: string) =>
+    ({
+      pending: t("Window incomplete", "窗口未完成"),
+      near: t("Near-line pullback", "附近回踩"),
+      reclaimed: t("Undercut & reclaimed", "曾跌破收回"),
+      weak: t("Sustained weakness", "持续走弱"),
+      mixed: t("Mixed / not reclaimed", "反复／未收回"),
+    })[value] ?? "—";
   const number = (v: number | null | undefined, unit = "") =>
     v === null || v === undefined
       ? "—"
@@ -31,7 +43,7 @@ export function MyQuant({
       });
       if (!response.ok) throw new Error(String(response.status));
       const next = (await response.json()) as ResearchReport;
-      if (!next.ema200Study) throw new Error("unavailable");
+      if (next.ema200Study?.version !== 2) throw new Error("unavailable");
       onLoaded(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : "unknown");
@@ -80,7 +92,10 @@ export function MyQuant({
         <header className="quant-model-heading">
           <div>
             <p className="eyebrow">
-              {t("Model 01 · event study · v1", "模型 01 · 事件研究 · v1")}
+              {t(
+                "Model 01 · event study · v2 · ±3%",
+                "模型 01 · 事件研究 · v2 · ±3%",
+              )}
             </p>
             <h4 id="ema200-heading">
               {t("EMA200 pullback & rebound", "EMA200 回踩与反弹")}
@@ -90,6 +105,7 @@ export function MyQuant({
             {status}
           </span>
         </header>
+        <EmaConsideration />
         <p className="quant-model-intro">
           {t(
             "When price approaches EMA200 from above, does touching the line precede stronger returns? Historical replay, not a live trade record.",
@@ -98,6 +114,14 @@ export function MyQuant({
         </p>
         {!study && (
           <div className="quant-model-empty">
+            {legacy && (
+              <p className="ema-verdict">
+                {t(
+                  "This report contains v1 (±1%). Recalculate v2 to view broader pullbacks and path outcomes. Existing metrics and AI text are preserved.",
+                  "此报告保存的是 v1（±1%）。补算 v2 后可查看更宽的回踩定义和路径表现；原有指标及 AI 解读保留。",
+                )}
+              </p>
+            )}
             <p>
               {t(
                 "New quantitative reports include this model. Older reports can calculate it separately without running AI.",
@@ -118,7 +142,9 @@ export function MyQuant({
               <RefreshCw size={15} aria-hidden="true" />
               {busy
                 ? t("Calculating…", "计算中…")
-                : t("Calculate EMA200 model", "计算 EMA200 模型")}
+                : legacy
+                  ? t("Upgrade EMA200 model to v2", "升级 EMA200 模型至 v2")
+                  : t("Calculate EMA200 model", "计算 EMA200 模型")}
             </button>
             {!canRun && (
               <p>
@@ -194,7 +220,7 @@ export function MyQuant({
                 </div>
                 <div>
                   <span>
-                    {t("20D mean return advantage", "20 日平均收益优势")}
+                    {t("20D endpoint return advantage", "20 日终点收益优势")}
                   </span>
                   <strong>{number(main?.lift, t(" pp", " 个百分点"))}</strong>
                   <small>
@@ -264,8 +290,8 @@ export function MyQuant({
                 <table>
                   <caption>
                     {t(
-                      "Historical outcomes · 20D is the only primary test; 5D/10D are descriptive",
-                      "历史效果 · 仅 20 日作主检验，5 / 10 日为描述性补充",
+                      "Fixed-horizon returns · 20D is the only primary test; 5D/10D are descriptive",
+                      "固定持有期收益 · 仅 20 日作主检验，5 / 10 日为描述性补充",
                     )}
                   </caption>
                   <thead>
@@ -273,8 +299,8 @@ export function MyQuant({
                       {[
                         t("Horizon", "窗口"),
                         t("Events", "事件数"),
-                        t("Mean", "平均收益"),
-                        t("Median", "中位收益"),
+                        t("Mean endpoint", "终点收益均值"),
+                        t("Median endpoint", "终点收益中位数"),
                         t("Positive rate", "上涨比例"),
                         t("Background n", "背景数"),
                         t("Background mean", "背景均值"),
@@ -303,6 +329,7 @@ export function MyQuant({
                   </tbody>
                 </table>
               </div>
+              <EmaOutcomes study={study} />
             </section>
             <section
               className="quant-model-item"
@@ -319,8 +346,8 @@ export function MyQuant({
                         "EMA200 needs 200 completed sessions",
                         "EMA200 需要 200 个完整交易日",
                       )
-                    : Math.abs(study.distance) <= 1
-                      ? t("Inside the ±1% EMA band", "位于 EMA ±1% 区域")
+                    : Math.abs(study.distance) <= 3
+                      ? t("Inside the ±3% EMA band", "位于 EMA ±3% 区域")
                       : study.distance > 0
                         ? t("Above EMA200", "位于 EMA200 上方")
                         : t("Below EMA200", "位于 EMA200 下方")}
@@ -364,12 +391,19 @@ export function MyQuant({
                       <tr>
                         {[
                           t("Touch date", "触碰日期"),
+                          t("Low / EMA distance", "低点距 EMA"),
+                          t("20D outcome · retrospective", "20 日形态 · 事后"),
                           t("Prior EMA", "前日 EMA"),
                           t("Entry date", "入场日期"),
                           t("Entry open", "入场开盘"),
                           t("5D return", "5 日收益"),
                           t("10D return", "10 日收益"),
                           t("20D return", "20 日收益"),
+                          t("20D average floating", "20 日平均浮盈"),
+                          t("20D max gain / loss", "20 日最大涨／跌"),
+                          t("Confirmation date", "确认日期"),
+                          t("Confirmed entry date / open", "确认入场日／开盘"),
+                          t("Confirmed 20D return", "确认后 20 日收益"),
                         ].map((h) => (
                           <th key={h}>{h}</th>
                         ))}
@@ -379,12 +413,30 @@ export function MyQuant({
                       {[...study.events].reverse().map((e) => (
                         <tr key={e.date}>
                           <td>{e.date}</td>
+                          <td>{number(e.lowDistance, "%")}</td>
+                          <td>{outcomeLabel(e.outcome)}</td>
                           <td>{number(e.referenceEma)}</td>
                           <td>{e.entryDate ?? "—"}</td>
                           <td>{number(e.entryPrice)}</td>
                           {[5, 10, 20].map((h) => (
                             <td key={h}>{number(e.returns[String(h)], "%")}</td>
                           ))}
+                          <td>{number(e.paths["20"]?.averageReturn, "%")}</td>
+                          <td>
+                            {number(e.paths["20"]?.maxGain, "%")} /{" "}
+                            {number(e.paths["20"]?.maxLoss, "%")}
+                          </td>
+                          <td>{e.confirmation?.date ?? "—"}</td>
+                          <td>
+                            {e.confirmation?.entryDate ?? "—"} /{" "}
+                            {number(e.confirmation?.entryPrice)}
+                          </td>
+                          <td>
+                            {number(
+                              e.confirmation?.paths["20"]?.endReturn,
+                              "%",
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -402,86 +454,15 @@ export function MyQuant({
             </section>
           </>
         )}
-        <details className="ema-method">
-          <summary>
-            {t(
-              "Exact rules, limitations & sources",
-              "完整规则、限制与参考资料",
-            )}
-          </summary>
-          <ol>
-            <li>
-              {t(
-                "EMA200: initialize with the first 200 closes’ simple average, then EMA = previous EMA + 2/201 × (close − previous EMA). No future prices enter the line.",
-                "EMA200：以最初 200 个收盘价的简单均值初始化，之后 EMA = 前日 EMA + 2/201 ×（收盘价 − 前日 EMA）。均线不使用未来价格。",
-              )}
-            </li>
-            <li>
-              {t(
-                "A pullback touch requires the prior close > prior EMA ×1.01 and the current daily high–low range to intersect prior EMA ±1%. The prior EMA is known before that session. Skip all event/control observations in the next 20 sessions.",
-                "回踩触碰：前日收盘 > 前日 EMA ×1.01，且当日高低价区间与前日 EMA ±1% 相交。前日 EMA 在当日交易前已知；此后 20 个交易日不再采集事件或背景观察。",
-              )}
-            </li>
-            <li>
-              {t(
-                "Background observations satisfy the same prior-above-band condition but do not touch, outside cooldown. Return = close at t+h / open at t+1 −1; positive return means >0, not an intraday bounce. Unknown future windows stay missing.",
-                "背景观察也要求前日价格在均线上方，但当日未触碰，且不处于冷却期。收益 = t+h 日收盘 ÷ t+1 日开盘 −1；上涨指期末收益 >0，不是盘中反弹幅度。未完成窗口留空。",
-              )}
-            </li>
-            <li>
-              {t(
-                "r is point-biserial (Pearson) correlation of the touch indicator (1 vs 0) with forward 20-session returns. Advantage is the difference between group means. A 1,000-resample, 42-session moving-block bootstrap estimates a 95% percentile interval, preserving calendar slots including ineligible days.",
-                "r 为触碰标记（1 / 0）与后续 20 日收益的点二列（Pearson）相关系数；优势为两组均值之差。使用 1000 次、每块 42 个交易日的移动分块 bootstrap，估计 95% 百分位区间；保留不合格日期的空位以维持时间结构。",
-              )}
-            </li>
-            <li>
-              {t(
-                "Exploratory association only: bull-market drift, overlapping returns, regime changes, rare events and testing many symbols can mislead. Blocks reduce local dependence but do not guarantee independence. No causality, trading costs, dividends or out-of-sample performance is established. We do not add this model to the buy/sell score.",
-                "仅为探索性关联：牛市漂移、收益重叠、市场环境变化、稀少事件以及反复筛选不同标的都可能误导。分块缓解局部依赖，但不保证独立；未证明因果，不含费用和股息，未做样本外验证。此模型不直接加入买卖决策分数。",
-              )}
-            </li>
-          </ol>
-          <p>
-            {t(
-              "Current adjusted history can differ from what the provider reported at the time. Limited history changes EMA initialization. Model parameters and sample gates are explicit site conventions.",
-              "当前复权历史可能与当时数据源版本不同；有限历史会影响 EMA 初始化。模型参数与样本门槛为本站明示设定。",
-            )}
-          </p>
-          <p>
-            <a
-              href="https://www.fidelity.com/learning-center/trading-investing/technical-analysis/technical-indicator-guide/ema"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Fidelity · EMA
-            </a>{" "}
-            ·{" "}
-            <a
-              href="https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pointbiserialr.html"
-              target="_blank"
-              rel="noreferrer"
-            >
-              SciPy · r
-            </a>{" "}
-            ·{" "}
-            <a
-              href="https://otexts.com/fpp3/bootstrap.html"
-              target="_blank"
-              rel="noreferrer"
-            >
-              FPP3 · block bootstrap
-            </a>
-          </p>
-        </details>
       </article>
     </section>
   );
 }
-function EmaChart({ study }: { study: Ema200Study }) {
+function EmaChart({ study }: { study: Ema200StudyV2 }) {
   const { t } = useLocale();
   if (study.chart.length < 2 || study.ema === null) return null;
   const all = study.chart.flatMap((p) =>
-    p.ema === null ? [p.close] : [p.close, p.ema],
+    p.ema === null ? [p.close] : [p.close, p.ema * 0.97, p.ema * 1.03],
   );
   const lo = Math.min(...all),
     hi = Math.max(...all),
@@ -503,12 +484,25 @@ function EmaChart({ study }: { study: Ema200Study }) {
       })
       .join(" ");
   };
+  const band = study.chart.flatMap((p, i) =>
+    p.ema === null ? [] : [{ i, ema: p.ema }],
+  );
+  const bandPath = band.length
+    ? "M" +
+      band.map((p) => `${x(p.i)},${y(p.ema * 1.03)}`).join(" L") +
+      " L" +
+      [...band]
+        .reverse()
+        .map((p) => `${x(p.i)},${y(p.ema * 0.97)}`)
+        .join(" L") +
+      " Z"
+    : "";
   return (
     <figure className="ema-chart">
       <figcaption>
         {t(
-          "Latest 252 sessions · solid: close · dashed: EMA200 · dots: event-day close",
-          "最近最多 252 日 · 实线：收盘价 · 虚线：EMA200 · 圆点：事件日收盘",
+          "Latest 252 sessions · solid: close · dashed: EMA200 · shaded: ±3% · dots: candidate-day close",
+          "最近最多 252 日 · 实线：收盘价 · 虚线：EMA200 · 阴影：±3% · 圆点：候选日收盘",
         )}
       </figcaption>
       <svg
@@ -533,6 +527,12 @@ function EmaChart({ study }: { study: Ema200Study }) {
             </text>
           </g>
         ))}
+        <path
+          d={bandPath}
+          fill="var(--accent)"
+          opacity="0.09"
+          aria-hidden="true"
+        />
         <path
           d={path("close")}
           fill="none"

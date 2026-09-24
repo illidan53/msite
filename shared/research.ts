@@ -75,7 +75,7 @@ export interface Ema200Horizon {
   lift: number | null;
   correlation: number | null;
 }
-export interface Ema200Study {
+export interface Ema200StudyV1 {
   version: 1;
   asOf: string;
   dataStart: string;
@@ -91,3 +91,52 @@ export interface Ema200Study {
   events: Ema200Event[];
   chart: { date: string; close: number; ema: number | null; touch: boolean }[];
 }
+
+export interface Ema200Path {
+  endReturn: number;
+  averageReturn: number;
+  maxGain: number;
+  maxLoss: number;
+  hitDay: number | null;
+}
+export interface Ema200EventV2 extends Ema200Event {
+  lowDistance: number;
+  outcome: "pending" | "near" | "reclaimed" | "weak" | "mixed";
+  paths: Record<string, Ema200Path | null>;
+  confirmation: {
+    date: string;
+    lowDate: string;
+    low: number;
+    entryDate: string | null;
+    entryPrice: number | null;
+    paths: Record<string, Ema200Path | null>;
+  } | null;
+}
+export interface Ema200PathSummary {
+  count: number;
+  averageReturn: number | null;
+  maxGain: number | null;
+  maxLoss: number | null;
+  hitRate: number | null;
+  medianHitDay: number | null;
+}
+export interface Ema200HorizonV2 extends Ema200Horizon, Ema200PathSummary {}
+export interface Ema200StudyV2 extends Omit<
+  Ema200StudyV1,
+  "version" | "events" | "horizons"
+> {
+  version: 2;
+  bandPercent: 3;
+  targetPercent: 5;
+  events: Ema200EventV2[];
+  horizons: Ema200HorizonV2[];
+  sensitivity: { bandPercent: number; horizon: Ema200HorizonV2 }[];
+  confirmed: {
+    sessions: number;
+    detected: number;
+    meanReturn: number | null;
+    positiveRate: number | null;
+    path: Ema200PathSummary;
+  }[];
+}
+export type Ema200Study = Ema200StudyV1 | Ema200StudyV2;

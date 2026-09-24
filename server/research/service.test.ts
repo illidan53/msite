@@ -172,9 +172,9 @@ describe("research job lifecycle", () => {
     expect(market.getHistory).toHaveBeenCalledTimes(2);
     expect(a.ema200Study?.asOf).toBe(original.sections.quant.asOf);
     expect(a.ema200Study?.basis).toBe("reconstructed");
-    // A report with cached metric history but no model still needs model backfill.
+    // A saved v1 model must upgrade even when metric history is cached.
     const legacy = { ...a };
-    delete legacy.ema200Study;
+    legacy.ema200Study = { ...a.ema200Study!, version: 1 };
     await writeFile(join(dir, "reports.json"), JSON.stringify([legacy]));
     const old = new ResearchService(
       market,
@@ -186,6 +186,7 @@ describe("research job lifecycle", () => {
     );
     const withModel = await old.buildHistory(original.id, true);
     expect(withModel.metricHistory).toEqual(a.metricHistory);
+    expect(withModel.ema200Study?.version).toBe(2);
     expect(withModel.ema200Study?.asOf).toBe(original.sections.quant.asOf);
     expect(withModel.metrics).toEqual(original.metrics);
     expect(ai).not.toHaveBeenCalled();

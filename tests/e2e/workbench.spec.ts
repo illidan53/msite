@@ -1177,6 +1177,7 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     }),
     "reconstructed",
   );
+  Object.assign(complete, { ema200Study: { ...ema200Study, version: 1 } });
   let modelPosts = 0;
   let historyPosts = 0;
   let posts = 0;
@@ -1347,12 +1348,55 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
       ),
     ),
   ).toBe(true);
-  await myQuant.getByRole("button", { name: "Calculate EMA200 model" }).click();
+  await expect(myQuant).toContainText("This report contains v1 (±1%)");
+  const consideration = myQuant.getByRole("button", {
+    name: "Consideration",
+    exact: true,
+  });
+  await consideration.click();
+  const drawer = page.getByRole("dialog", {
+    name: "Consideration",
+    exact: true,
+  });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toContainText("not an optimized threshold");
+  await expect(drawer).toContainText("never at the earlier low");
+  await expect(
+    drawer.getByRole("button", { name: "Close considerations" }),
+  ).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  expect(
+    await drawer.evaluate((el) => el.contains(document.activeElement)),
+  ).toBe(true);
+  await drawer.getByRole("button", { name: "Close considerations" }).focus();
+  await expect(drawer).toHaveCSS("right", "0px");
+  await expect(drawer).toHaveCSS("transform", "none");
+  const drawerBox = (await drawer.boundingBox())!;
+  expect(drawerBox.x + drawerBox.width).toBe(page.viewportSize()!.width);
+  await drawer.locator(".ema-consideration-content").evaluate((el) => {
+    el.scrollTop = 0;
+  });
+  await page.screenshot({ path: "test-results/ema-consideration-desktop.png" });
+  await page.keyboard.press("Escape");
+  await expect(drawer).not.toBeVisible();
+  await expect(consideration).toBeFocused();
+  await consideration.click();
+  await page.mouse.click(5, 100);
+  await expect(drawer).not.toBeVisible();
+  expect(modelPosts).toBe(0);
+  await myQuant
+    .getByRole("button", { name: "Upgrade EMA200 model to v2" })
+    .click();
   await expect(myQuant.getByRole("alert")).toContainText("This IP cannot run");
-  await myQuant.getByRole("button", { name: "Calculate EMA200 model" }).click();
+  await myQuant
+    .getByRole("button", { name: "Upgrade EMA200 model to v2" })
+    .click();
   await expect(myQuant.getByRole("img")).toBeVisible();
   await expect(myQuant).toContainText("Insufficient evidence");
-  await expect(myQuant).toContainText("20D mean return advantage");
+  await expect(myQuant).toContainText("20D endpoint return advantage");
+  await expect(myQuant).toContainText("Average floating return");
+  await expect(myQuant).toContainText("Wait for confirmation");
+  await expect(myQuant.locator(".ema-primary-band")).toContainText("±3%");
   expect(modelPosts).toBe(2);
   expect(posts).toBe(2);
   for (const chartSelector of [".ema-chart", ".research-chart"]) {
@@ -1398,6 +1442,36 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     .screenshot({ path: "test-results/ema-interaction-mobile.png" });
   await myQuant.screenshot({ path: "test-results/my-quant-mobile.png" });
   await expect(page).toHaveURL(/#research-my-quant$/);
+  const mobileConsideration = myQuant.getByRole("button", {
+    name: "Consideration · 模型说明",
+    exact: true,
+  });
+  await mobileConsideration.click();
+  const mobileDrawer = page.getByRole("dialog", { name: "模型说明与考量" });
+  await expect(mobileDrawer).toBeVisible();
+  expect(
+    await mobileDrawer.evaluate((el) => el.scrollWidth <= el.clientWidth),
+  ).toBe(true);
+  expect(await page.evaluate(() => document.body.style.overflow)).toBe(
+    "hidden",
+  );
+  await expect(mobileDrawer).toContainText("三个后续交易日未创新低");
+  await expect(mobileDrawer).toHaveCSS("transform", "none");
+  expect((await mobileDrawer.boundingBox())!.x).toBe(0);
+  expect(
+    await mobileDrawer
+      .locator(".ema-consideration-content")
+      .evaluate((el) => el.scrollTop),
+  ).toBe(0);
+  await page.screenshot({ path: "test-results/ema-consideration-mobile.png" });
+  await mobileDrawer
+    .getByRole("link", { name: /CFA Institute/ })
+    .scrollIntoViewIfNeeded();
+  await mobileDrawer.getByRole("button", { name: "关闭模型说明" }).click();
+  await expect(mobileConsideration).toBeFocused();
+  await expect
+    .poll(() => page.evaluate(() => document.body.style.overflow))
+    .not.toBe("hidden");
 
   await expect(
     page.locator('[data-metric="return252"] dt > span'),

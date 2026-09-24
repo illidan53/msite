@@ -925,3 +925,116 @@
     font-size: 16px;
   }
 }
+
+.ema-consideration-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  padding: 8px 12px;
+  cursor: pointer;
+  margin-top: 12px;
+}
+.ema-consideration-button:hover {
+  background: var(--accent-soft);
+}
+.ema-outcomes h6 {
+  font-size: 15px;
+  margin: 28px 0 10px;
+}
+.ema-primary-band {
+  background: var(--accent-soft);
+}
+.ema-consideration-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  width: min(560px, 100vw);
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: -12px 0 48px #18223c30;
+  overflow: hidden;
+}
+.ema-consideration-drawer[open] {
+  display: flex;
+  flex-direction: column;
+  animation: ema-drawer-enter 180ms ease-out;
+}
+.ema-consideration-drawer::backdrop {
+  background: #18223c66;
+}
+.ema-consideration-drawer > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ema-consideration-drawer h2 {
+  font-size: 22px;
+  margin: 6px 0 0;
+}
+.ema-consideration-drawer header button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  background: var(--surface);
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ema-consideration-content {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px max(28px, env(safe-area-inset-bottom));
+  font-size: 15px;
+  line-height: 1.85;
+}
+.ema-consideration-content section {
+  margin: 24px 0;
+}
+.ema-consideration-content h3 {
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 0 0 10px;
+}
+.ema-consideration-content p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ema-consideration-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ema-consideration-sources a {
+  color: var(--accent);
+}
+@keyframes ema-drawer-enter {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ema-consideration-drawer[open] {
+    animation: none;
+  }
+}
