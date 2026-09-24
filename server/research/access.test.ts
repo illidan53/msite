@@ -94,6 +94,13 @@ describe("research IP authorization", () => {
           .set("X-Forwarded-For", allowed)
       ).status,
     ).toBe(403);
+    expect(
+      (
+        await request(app)
+          .post("/api/research/84c70d36-2087-4b5c-b2e9-7ce3c411a188/models")
+          .set("X-Forwarded-For", allowed)
+      ).status,
+    ).toBe(403);
     expect(service.buildHistory).not.toHaveBeenCalled();
     expect(service.start).not.toHaveBeenCalled();
     expect((await request(app).get("/api/research")).status).toBe(200);

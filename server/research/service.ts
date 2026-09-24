@@ -10,6 +10,7 @@ import type { MarketDataProvider } from "../market/marketDataProvider";
 import type { PolygonClient } from "../market/polygonClient";
 import { ApiError } from "../http/apiError";
 import { calculateResearch, closedBars } from "./quant";
+import { calculateEma200Study } from "./ema200";
 import { calculateMetricHistory } from "./history";
 import { newYorkDate } from "../../shared/marketDate";
 
@@ -92,11 +93,15 @@ export class ResearchService {
     if (!r) throw new ApiError(404, "REPORT_NOT_FOUND", "Report not found");
     return structuredClone(r);
   }
-  async buildHistory(id: string): Promise<ResearchReport> {
+  async buildHistory(
+    id: string,
+    requireModel = false,
+  ): Promise<ResearchReport> {
     await this.loaded;
     const r = this.reports.find((r) => r.id === id);
     if (!r) throw new ApiError(404, "REPORT_NOT_FOUND", "Report not found");
-    if (r.metricHistory) return structuredClone(r);
+    if (r.metricHistory && (!requireModel || r.ema200Study?.version === 1))
+      return structuredClone(r);
     if (r.status === "running" || !r.sections.quant.asOf)
       throw new ApiError(
         409,
@@ -147,15 +152,19 @@ export class ResearchService {
         benchmark = [];
       }
     }
-    r.metricHistory = await calculateMetricHistory(
+    const previousHistory = r.metricHistory,
+      previousModel = r.ema200Study;
+    r.metricHistory ??= await calculateMetricHistory(
       bars,
       benchmark,
       "reconstructed",
     );
+    r.ema200Study = calculateEma200Study(bars, "reconstructed");
     try {
       await this.save();
     } catch (e) {
-      delete r.metricHistory;
+      r.metricHistory = previousHistory;
+      r.ema200Study = previousModel;
       throw e;
     }
     return structuredClone(r);
@@ -241,6 +250,7 @@ export class ResearchService {
       report.metrics = report.metrics.filter((m) => m.group === "fundamentals");
       report.prices = [];
       delete report.metricHistory;
+      delete report.ema200Study;
     }
     if (input.module === "all" || input.module === "fundamentals") {
       report.metrics = report.metrics.filter((m) => m.group !== "fundamentals");
@@ -341,6 +351,7 @@ export class ResearchService {
     r.prices = result.prices;
     r.sections.quant.asOf = result.prices.at(-1)?.date;
     r.metricHistory = await calculateMetricHistory(bars, benchmark);
+    r.ema200Study = calculateEma200Study(bars);
   }
   private async news(r: ResearchReport) {
     const from = new Date(Date.now() - 30 * 86400_000).toISOString();

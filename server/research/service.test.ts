@@ -170,6 +170,28 @@ describe("research job lifecycle", () => {
     ).toEqual(a.metricHistory);
     await reopened.buildHistory(original.id);
     expect(market.getHistory).toHaveBeenCalledTimes(2);
+    expect(a.ema200Study?.asOf).toBe(original.sections.quant.asOf);
+    expect(a.ema200Study?.basis).toBe("reconstructed");
+    // A report with cached metric history but no model still needs model backfill.
+    const legacy = { ...a };
+    delete legacy.ema200Study;
+    await writeFile(join(dir, "reports.json"), JSON.stringify([legacy]));
+    const old = new ResearchService(
+      market,
+      client,
+      dir,
+      "test-key",
+      "test-model",
+      ai,
+    );
+    const withModel = await old.buildHistory(original.id, true);
+    expect(withModel.metricHistory).toEqual(a.metricHistory);
+    expect(withModel.ema200Study?.asOf).toBe(original.sections.quant.asOf);
+    expect(withModel.metrics).toEqual(original.metrics);
+    expect(ai).not.toHaveBeenCalled();
+    expect(market.getHistory).toHaveBeenCalledTimes(4);
+    await old.buildHistory(original.id, true);
+    expect(market.getHistory).toHaveBeenCalledTimes(4);
   });
   it("runs, persists and refreshes news without rerunning quantitative data", async () => {
     const { service, market, client, dir } = await setup();
@@ -197,6 +219,7 @@ describe("research job lifecycle", () => {
     expect(refreshed.sections.quant).toEqual(report.sections.quant);
     expect(refreshed.metrics).toEqual(report.metrics);
     expect(refreshed.metricHistory).toEqual(report.metricHistory);
+    expect(refreshed.ema200Study).toEqual(report.ema200Study);
     expect((await service.get(report.id)).sections.news).toEqual(
       report.sections.news,
     );

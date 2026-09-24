@@ -1,3 +1,4 @@
+import { calculateEma200Study } from "../../server/research/ema200";
 import { expect, test, type Page } from "@playwright/test";
 import type {
   MarketSnapshot,
@@ -1153,6 +1154,23 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     fetchedAt: "2026-09-20T12:00:00Z",
     basis: "reconstructed",
   };
+  const ema200Study = calculateEma200Study(
+    Array.from({ length: 450 }, (_, i) => {
+      const close = 100 + i * 0.03 + 7 * Math.sin(i / 15);
+      return {
+        timestamp: new Date(
+          Date.UTC(2026, 8, 18, 21) + (i - 449) * 86400000,
+        ).toISOString(),
+        open: close,
+        close,
+        high: close + 1,
+        low: close - 1,
+        volume: 100,
+      };
+    }),
+    "reconstructed",
+  );
+  let modelPosts = 0;
   let historyPosts = 0;
   let posts = 0;
   const bodies: Record<string, unknown>[] = [];
@@ -1162,6 +1180,17 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
       await route.fulfill({
         json: { canRun: true, clientIp: "70.111.76.119" },
       });
+    } else if (new URL(req.url()).pathname.endsWith("/models")) {
+      modelPosts++;
+      if (modelPosts === 1)
+        await route.fulfill({
+          status: 403,
+          json: { code: "RESEARCH_IP_FORBIDDEN" },
+        });
+      else
+        await route.fulfill({
+          json: { ...complete, metricHistory, ema200Study },
+        });
     } else if (new URL(req.url()).pathname.endsWith("/history")) {
       historyPosts++;
       await route.fulfill({ json: { ...complete, metricHistory } });
@@ -1291,11 +1320,48 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await page.getByLabel("Saved reports").selectOption(complete.id);
   await expect(page.getByText("12.34%", { exact: true })).toBeVisible();
   expect(posts).toBe(2);
+  const toc = page.getByRole("navigation", { name: "Table of contents" });
+  await expect(toc.locator("ol > li")).toHaveCount(6);
+  await expect(
+    toc.getByRole("link", { name: "My Quant EMA200" }),
+  ).toHaveAttribute("href", "#research-my-quant");
+  await expect(
+    page.getByRole("heading", {
+      name: "General metric reference",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const myQuant = page.locator("#research-my-quant");
+  expect(
+    await myQuant.evaluate((el) =>
+      Boolean(
+        el.compareDocumentPosition(document.getElementById("research-quant")!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ),
+  ).toBe(true);
+  await myQuant.getByRole("button", { name: "Calculate EMA200 model" }).click();
+  await expect(myQuant.getByRole("alert")).toContainText("This IP cannot run");
+  await myQuant.getByRole("button", { name: "Calculate EMA200 model" }).click();
+  await expect(myQuant.getByRole("img")).toBeVisible();
+  await expect(myQuant).toContainText("Insufficient evidence");
+  await expect(myQuant).toContainText("20D mean return advantage");
+  expect(modelPosts).toBe(2);
+  expect(posts).toBe(2);
+  await myQuant.screenshot({ path: "test-results/my-quant-desktop.png" });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
   await expect(
     page.getByRole("heading", { name: "深度研究", exact: true }),
   ).toBeVisible();
+  await expect(myQuant).toContainText("当前所处位置");
+  await page
+    .getByRole("navigation", { name: "本页目录" })
+    .getByRole("link", { name: "我的量化 EMA200" })
+    .click();
+  await myQuant.screenshot({ path: "test-results/my-quant-mobile.png" });
+  await expect(page).toHaveURL(/#research-my-quant$/);
+
   await expect(
     page.locator('[data-metric="return252"] dt > span'),
   ).toBeVisible();

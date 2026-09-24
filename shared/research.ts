@@ -50,8 +50,44 @@ export interface ResearchReport {
   prices: { date: string; close: number; drawdown: number }[];
   news: ResearchNews[];
   metricHistory?: ResearchMetricHistory;
+  ema200Study?: Ema200Study;
   narrative?: string;
   model?: string;
   financialPeriod?: string;
   filingDate?: string;
+}
+
+export interface Ema200Event {
+  date: string;
+  referenceEma: number;
+  entryDate: string | null;
+  entryPrice: number | null;
+  returns: Record<string, number | null>;
+}
+export interface Ema200Horizon {
+  sessions: number;
+  events: number;
+  controls: number;
+  meanReturn: number | null;
+  medianReturn: number | null;
+  positiveRate: number | null;
+  controlMean: number | null;
+  lift: number | null;
+  correlation: number | null;
+}
+export interface Ema200Study {
+  version: 1;
+  asOf: string;
+  dataStart: string;
+  fetchedAt: string;
+  basis: "snapshot" | "reconstructed";
+  ema: number | null;
+  close: number | null;
+  distance: number | null;
+  status: "insufficient" | "positive" | "negative" | "inconclusive";
+  confidenceInterval: [number, number] | null;
+  bootstrapSamples: number;
+  horizons: Ema200Horizon[];
+  events: Ema200Event[];
+  chart: { date: string; close: number; ema: number | null; touch: boolean }[];
 }

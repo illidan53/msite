@@ -8,6 +8,7 @@ import type {
 } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 import "./research.css";
+import { MyQuant } from "./MyQuant";
 import { SymbolPicker } from "./SymbolPicker";
 import { DecisionSection } from "./DecisionSection";
 import { MetricHistory } from "./MetricHistory";
@@ -37,7 +38,7 @@ async function request<T>(path: string, body?: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 const labels = {
-  quant: ["Quantitative analysis", "量化分析"],
+  quant: ["General metric reference", "通用指标参考"],
   fundamentals: ["Fundamentals", "基本面"],
   news: ["News & catalysts", "新闻与催化因素"],
   ai: ["AI interpretation", "AI 综合解读"],
@@ -438,22 +439,41 @@ export function Research() {
             </p>
           </header>
           <nav
-            className="research-progress"
-            aria-label={t("Analysis progress", "分析进度")}
+            className="research-toc"
+            aria-label={t("Table of contents", "本页目录")}
           >
-            <a href="#research-decision">
-              <span>{t("Buy / sell reference", "买卖决策参考")}</span>
-              <small>{t("Rule model", "规则模型")}</small>
-            </a>
-            {Object.entries(labels).map(([key, label]) => (
-              <a key={key} href={`#research-${key}`}>
-                <span>{tr(label)}</span>
-                <small>
-                  {status(report.sections[key as keyof typeof labels])}
-                </small>
-              </a>
-            ))}
+            <h3>{t("Contents", "本页目录")}</h3>
+            <ol>
+              <li>
+                <a href="#research-my-quant">
+                  <span>{t("My Quant", "我的量化")}</span>
+                  <small>EMA200</small>
+                </a>
+              </li>
+              <li>
+                <a href="#research-decision">
+                  <span>{t("Buy / sell reference", "买卖决策参考")}</span>
+                  <small>{t("Rule model", "规则模型")}</small>
+                </a>
+              </li>
+              {(["quant", "fundamentals", "ai", "news"] as const).map((key) => (
+                <li key={key}>
+                  <a href={`#research-${key}`}>
+                    <span>{tr(labels[key])}</span>
+                    <small>{status(report.sections[key])}</small>
+                  </a>
+                </li>
+              ))}
+            </ol>
           </nav>
+          <MyQuant
+            key={report.id}
+            report={report}
+            canRun={Boolean(access?.canRun)}
+            onLoaded={(next) =>
+              setReport((current) => (current?.id === next.id ? next : current))
+            }
+          />
           <DecisionSection report={report} />
           <section id="research-quant" className="research-panel">
             {sectionHeader("quant")}
@@ -465,8 +485,8 @@ export function Research() {
             </p>
             <p className="research-meta">
               {t(
-                "Split-adjusted daily prices, excluding dividends and the current trading day. Risk uses up to 252 sessions; drawdowns use available history (up to 5 years). All values describe historical observations.",
-                "拆股调整日线，不含分红及当日未确认数据。风险指标使用最近最多 252 日；回撤使用可用历史（最多 5 年）。所有数值描述历史观测。",
+                "A general reference for returns, risk, trends and liquidity. Tap a metric for its history or ⓘ for an explanation. Split-adjusted closing prices exclude dividends and the current session; risk uses up to 252 sessions and drawdowns up to 5 years.",
+                "通用的收益、风险、趋势与流动性指标参考。点击指标查看历史，点击 ⓘ 查看说明。使用拆股调整收盘价，不含分红及当日数据；风险窗口最多 252 日，回撤历史最多 5 年。",
               )}
             </p>
             {report.prices.length > 1 && <PricePlot prices={report.prices} />}

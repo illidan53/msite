@@ -95,24 +95,6 @@
   color: var(--muted);
   font-size: 14px;
 }
-.research-progress {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-.research-progress a {
-  display: grid;
-  gap: 8px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 8px;
-  text-decoration: none;
-  color: var(--text);
-}
-.research-progress small {
-  color: var(--muted);
-}
 .research-panel {
   padding: 24px;
   border: 1px solid var(--border);
@@ -286,9 +268,6 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
   }
-  .research-progress {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 @media (max-width: 700px) {
   .research-page {
@@ -319,9 +298,6 @@
   }
   .research-metrics dd {
     font-size: 18px;
-  }
-  .research-progress a {
-    padding: 12px;
   }
   .research-section-heading {
     align-items: start;
@@ -677,4 +653,275 @@
 .research-symbol-dropdown li.is-active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.research-toc {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 24px;
+  padding: 20px 0;
+  border-block: 1px solid var(--border);
+}
+.research-toc h3 {
+  font-size: 14px;
+  margin: 12px 0;
+  color: var(--muted);
+}
+.research-toc ol {
+  margin: 0;
+  padding-left: 24px;
+  columns: 2;
+  column-gap: 40px;
+}
+.research-toc li {
+  break-inside: avoid;
+  padding-left: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.research-toc a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  color: var(--text);
+  text-decoration: none;
+}
+.research-toc a:hover span {
+  text-decoration: underline;
+  color: var(--accent);
+}
+.research-toc li:first-child a {
+  font-weight: 700;
+  color: var(--accent);
+}
+.research-toc small {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.research-my-quant {
+  border-top: 4px solid var(--accent);
+  background: linear-gradient(180deg, var(--accent-soft), var(--surface) 210px);
+}
+.my-quant-heading,
+.quant-model-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.my-quant-heading h3 {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 24px;
+  margin: 8px 0;
+}
+.my-quant-heading p,
+.quant-model-intro {
+  font-size: 14px;
+  line-height: 1.8;
+}
+.my-quant-count {
+  color: var(--accent);
+  font-size: 13px;
+}
+.quant-model {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px;
+  margin-top: 20px;
+  scroll-margin-top: 24px;
+  min-width: 0;
+}
+.quant-model-heading h4 {
+  font-size: 21px;
+  margin: 8px 0;
+}
+.quant-evidence {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+.quant-evidence.positive {
+  color: var(--positive);
+}
+.quant-evidence.negative {
+  color: var(--negative);
+}
+.quant-model-item {
+  margin-top: 28px;
+}
+.quant-model-item h5 {
+  font-size: 15px;
+  margin: 16px 0;
+}
+.ema-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.ema-stat-grid > div {
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.ema-stat-grid span,
+.ema-stat-grid small {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.ema-stat-grid strong {
+  font-size: 23px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.ema-stat-grid strong.ema-interval {
+  font-size: 18px;
+}
+.ema-verdict {
+  font-size: 14px;
+  line-height: 1.8;
+  padding: 16px;
+  background: var(--background);
+  border-radius: 6px;
+}
+.ema-position {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ema-position strong {
+  font-size: 30px;
+  color: var(--accent);
+}
+.ema-position p {
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.ema-chart {
+  margin: 20px 0 0;
+}
+.ema-chart figcaption {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.ema-chart svg {
+  width: 100%;
+  display: block;
+}
+.ema-chart text {
+  fill: var(--muted);
+  font-size: 14px;
+}
+.ema-table-wrap {
+  max-width: 100%;
+  overflow: auto;
+  margin: 16px 0;
+}
+.ema-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.ema-table-wrap th,
+.ema-table-wrap td {
+  padding: 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ema-table-wrap caption {
+  text-align: left;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.ema-table-wrap thead {
+  background: var(--background);
+}
+.ema-method,
+.quant-model details {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.ema-method {
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.quant-model summary {
+  min-height: 44px;
+  cursor: pointer;
+  padding: 10px 0;
+}
+.quant-model details .ema-table-wrap {
+  max-height: 350px;
+}
+.quant-model-run {
+  background: var(--accent);
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 14px;
+}
+.quant-model-empty {
+  font-size: 14px;
+  line-height: 1.8;
+  padding: 16px;
+  background: var(--background);
+  border-radius: 8px;
+}
+@media (max-width: 900px) {
+  .ema-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .research-toc {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .research-toc ol {
+    columns: 1;
+  }
+  .research-toc h3 {
+    margin-top: 0;
+  }
+  .quant-model {
+    padding: 16px;
+  }
+  .my-quant-heading h3 {
+    font-size: 22px;
+  }
+  .quant-model-heading h4 {
+    font-size: 18px;
+  }
+  .ema-chart text {
+    font-size: 30px;
+  }
+  .ema-stat-grid {
+    gap: 16px 8px;
+  }
+  .ema-stat-grid strong {
+    font-size: 20px;
+  }
+  .ema-stat-grid strong.ema-interval {
+    font-size: 16px;
+  }
 }

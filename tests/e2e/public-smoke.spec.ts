@@ -167,6 +167,10 @@ test("public research authorization resists spoofed source headers", async ({
       headers,
     });
     expect(historyDenied.status()).toBe(access.canRun ? 400 : 403);
+    const modelDenied = await request.post("/api/research/invalid/models", {
+      headers,
+    });
+    expect(modelDenied.status()).toBe(access.canRun ? 400 : 403);
     if (!access.canRun)
       expect((await denied.json()).code).toBe("RESEARCH_IP_FORBIDDEN");
   }
