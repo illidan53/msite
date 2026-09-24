@@ -20,6 +20,7 @@ function createMockChart() {
     addLineSeries: vi.fn(() => createSeries()),
     addCandlestickSeries: vi.fn(() => createSeries()),
     addHistogramSeries: vi.fn(() => createSeries()),
+    subscribeCrosshairMove: vi.fn(),
     remove: vi.fn(),
     resize: vi.fn(),
     timeScale: vi.fn(() => timeScaleApi),

@@ -1,3 +1,4 @@
+import { ChartInspection } from "../../shared/ChartInspection";
 import { useState } from "react";
 import { RefreshCw, FlaskConical } from "lucide-react";
 import type { Ema200Study, ResearchReport } from "../../../shared/research";
@@ -563,12 +564,18 @@ function EmaChart({ study }: { study: Ema200Study }) {
               </circle>
             ),
         )}
-        <text x="60" y="250">
-          {study.chart[0].date}
-        </text>
-        <text x="710" y="250" textAnchor="end">
-          {study.chart.at(-1)!.date}
-        </text>
+        <ChartInspection
+          dates={study.chart.map((p) => p.date)}
+          x={x}
+          top={35}
+          bottom={220}
+          labelY={250}
+          describe={(i) => [
+            `${t("Close", "收盘价")}: ${study.chart[i].close.toFixed(2)} USD`,
+            `EMA200: ${study.chart[i].ema?.toFixed(2) ?? "—"}`,
+            ...(study.chart[i].touch ? [t("Touch event", "触碰事件")] : []),
+          ]}
+        />
       </svg>
       <details>
         <summary>{t("View chart values", "查看图表数值")}</summary>

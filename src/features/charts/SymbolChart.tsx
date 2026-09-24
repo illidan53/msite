@@ -4,6 +4,7 @@ import {
   ColorType,
   LineSeries,
   createChart,
+  type Time,
 } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 import type { PriceBar, PriceSeries } from "../../../shared/types";
@@ -19,6 +20,7 @@ interface SymbolChartApi {
   addLineSeries(): ChartSeriesApi;
   addCandlestickSeries(): ChartSeriesApi;
   addHistogramSeries(): ChartSeriesApi;
+  subscribeCrosshairMove(handler: (event: { time?: Time }) => void): void;
   remove(): void;
   resize(width: number, height: number): void;
   timeScale(): {
@@ -52,6 +54,7 @@ export function SymbolChart({
 }: SymbolChartProps) {
   const { locale, t } = useLocale();
   const [mode, setMode] = useState<ChartMode>("trend");
+  const [inspected, setInspected] = useState<PriceBar | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -59,18 +62,68 @@ export function SymbolChart({
       return;
     }
 
+    setInspected(null);
+    const intraday = ["1h", "1d", "5d"].includes(range);
+    const formatTime = (time: Time, short = false) => {
+      const date =
+        typeof time === "number"
+          ? new Date(time * 1000)
+          : new Date(
+              typeof time === "string"
+                ? time + "T00:00:00Z"
+                : `${time.year}-${String(time.month).padStart(2, "0")}-${String(time.day).padStart(2, "0")}T00:00:00Z`,
+            );
+      return (
+        new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+          timeZone: intraday ? "America/New_York" : "UTC",
+          ...(short && intraday
+            ? {}
+            : ({
+                year: short ? undefined : "numeric",
+                month: "2-digit",
+                day: "2-digit",
+              } as const)),
+          ...(intraday
+            ? ({ hour: "2-digit", minute: "2-digit", hour12: false } as const)
+            : {}),
+        }).format(date) + (!short && intraday ? " ET" : "")
+      );
+    };
     const container = containerRef.current;
     const chart = createChart(container, {
-      localization: { locale: locale === "zh" ? "zh-CN" : "en-US" },
+      localization: {
+        locale: locale === "zh" ? "zh-CN" : "en-US",
+        timeFormatter: (time: Time) => formatTime(time),
+      },
       height: container.clientHeight || CHART_HEIGHT,
       layout: {
         background: { type: ColorType.Solid, color: "#ffffff" },
         textColor: "#626c7c",
-        fontSize: 11,
+        fontSize: 12,
       },
-      grid: { vertLines: { visible: false }, horzLines: { color: "#edf0f5" } },
+      grid: {
+        vertLines: { color: "#edf0f5" },
+        horzLines: { color: "#edf0f5" },
+      },
       rightPriceScale: { borderVisible: false },
-      timeScale: { borderVisible: false },
+      timeScale: {
+        borderVisible: false,
+        timeVisible: intraday,
+        secondsVisible: false,
+        tickMarkMaxCharacterLength: 7,
+        tickMarkFormatter: (time: Time, type: number) =>
+          intraday && type <= 2 && typeof time === "number"
+            ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+                timeZone: "America/New_York",
+                month: "2-digit",
+                day: "2-digit",
+              }).format(new Date(time * 1000))
+            : type === 0 && !intraday
+              ? typeof time === "string"
+                ? time.slice(0, 4)
+                : formatTime(time)
+              : formatTime(time, true),
+      },
       width: container.clientWidth || 640,
     }) as unknown as SymbolChartApi;
     const resizeObserver =
@@ -95,6 +148,20 @@ export function SymbolChart({
       );
     }
 
+    const byTime = new Map(
+      series.bars.map((bar) => [
+        String(toChartTime(bar.timestamp, range)),
+        bar,
+      ]),
+    );
+    chart.subscribeCrosshairMove((event) => {
+      const time = event.time;
+      const key =
+        typeof time === "object"
+          ? `${time.year}-${String(time.month).padStart(2, "0")}-${String(time.day).padStart(2, "0")}`
+          : String(time);
+      setInspected(byTime.get(key) ?? null);
+    });
     chart.timeScale().fitContent();
     resizeObserver?.observe(container);
 
@@ -146,6 +213,32 @@ export function SymbolChart({
         </div>
       </header>
 
+      <p className="chart-inspection-readout">
+        {inspected ? (
+          <>
+            {["1h", "1d", "5d"].includes(range)
+              ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en-US", {
+                  timeZone: "America/New_York",
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                }).format(new Date(inspected.timestamp)) + " ET"
+              : inspected.timestamp.slice(0, 10)}{" "}
+            · {t("Open", "开")}: {inspected.open.toFixed(2)} · {t("High", "高")}
+            : {inspected.high.toFixed(2)} · {t("Low", "低")}:{" "}
+            {inspected.low.toFixed(2)} · {t("Close", "收")}:{" "}
+            {inspected.close.toFixed(2)}
+          </>
+        ) : (
+          t(
+            "Hover or long-press the chart to inspect date and prices · intraday times in New York time",
+            "悬停或长按图表查看日期与价格 · 日内时间为纽约时间",
+          )
+        )}
+      </p>
       <div
         ref={containerRef}
         className="chart-canvas"

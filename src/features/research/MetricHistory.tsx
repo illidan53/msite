@@ -1,3 +1,4 @@
+import { ChartInspection } from "../../shared/ChartInspection";
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -335,36 +336,6 @@ function HistoryChart({
         viewBox="0 0 800 270"
         role="img"
         aria-label={t(`${metric.en} historical chart`, `${metric.zh}历史曲线`)}
-        onPointerMove={(event) => {
-          const b = event.currentTarget.getBoundingClientRect();
-          setSelected(
-            Math.max(
-              0,
-              Math.min(
-                points.length - 1,
-                Math.round(
-                  ((((event.clientX - b.left) / b.width) * 800 - 85) / 640) *
-                    (points.length - 1),
-                ),
-              ),
-            ),
-          );
-        }}
-        onPointerDown={(event) => {
-          const b = event.currentTarget.getBoundingClientRect();
-          setSelected(
-            Math.max(
-              0,
-              Math.min(
-                points.length - 1,
-                Math.round(
-                  ((((event.clientX - b.left) / b.width) * 800 - 85) / 640) *
-                    (points.length - 1),
-                ),
-              ),
-            ),
-          );
-        }}
       >
         <title>
           {metric[locale]} · {points[0].date} — {points.at(-1)!.date}
@@ -444,12 +415,15 @@ function HistoryChart({
             fill="var(--accent)"
           />
         )}
-        <text x="85" y="258">
-          {points[0].date}
-        </text>
-        <text x="725" y="258" textAnchor="end">
-          {points.at(-1)!.date}
-        </text>
+        <ChartInspection
+          dates={points.map((p) => p.date)}
+          x={x}
+          top={25}
+          bottom={230}
+          labelY={258}
+          onSelect={setSelected}
+          describe={(i) => [format(points[i].value)]}
+        />
       </svg>
       <label className="research-history-slider">
         {t("Choose date · arrow keys supported", "选择日期 · 支持方向键")}

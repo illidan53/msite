@@ -1,3 +1,4 @@
+import { ChartInspection } from "../../shared/ChartInspection";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PriceSeries } from "../../../shared/types";
 import { useLocale } from "../../shared/locale";
@@ -576,24 +577,20 @@ function TrendPaths({
             className="chart-cursor"
           />
         )}
-        {[0, Math.floor((data.dates.length - 1) / 2), data.dates.length - 1]
-          .filter((i, n, all) => i >= 0 && all.indexOf(i) === n)
-          .map((i) => (
-            <text
-              key={i}
-              x={x(i)}
-              y={266}
-              textAnchor={
-                i === 0
-                  ? "start"
-                  : i === data.dates.length - 1
-                    ? "end"
-                    : "middle"
-              }
-            >
-              {data.dates[i]?.slice(5)}
-            </text>
-          ))}
+        <ChartInspection
+          dates={data.dates}
+          x={x}
+          top={24}
+          bottom={240}
+          labelY={266}
+          onSelect={(index) => setInspection({ date: data.dates[0], index })}
+          describe={(i) =>
+            symbols.map(
+              (symbol) =>
+                `${symbol}: ${format(comparisonValue(data.series[symbol]?.[i], metric), unit)}`,
+            )
+          }
+        />
       </svg>
       {values.length === 0 && (
         <p className="overview-empty">

@@ -1,3 +1,4 @@
+import { ChartInspection } from "../../shared/ChartInspection";
 import { useEffect, useRef, useState } from "react";
 import { Play, RefreshCw, FileText, ExternalLink } from "lucide-react";
 import type {
@@ -688,7 +689,7 @@ function PricePlot({ prices }: { prices: ResearchReport["prices"] }) {
   const points = prices
     .map(
       (p, i) =>
-        `${12 + (i / (prices.length - 1)) * 776},${150 - ((p.close - lo) / (hi - lo || 1)) * 130}`,
+        `${12 + (i / Math.max(1, prices.length - 1)) * 776},${150 - ((p.close - lo) / (hi - lo || 1)) * 130}`,
     )
     .join(" ");
   return (
@@ -703,7 +704,7 @@ function PricePlot({ prices }: { prices: ResearchReport["prices"] }) {
         </span>
       </figcaption>
       <svg
-        viewBox="0 0 800 170"
+        viewBox="0 0 800 210"
         role="img"
         aria-label={t(
           `Closing price from ${prices[0].close} to ${prices.at(-1)!.close} USD`,
@@ -716,6 +717,16 @@ function PricePlot({ prices }: { prices: ResearchReport["prices"] }) {
           stroke="var(--accent)"
           strokeWidth="2.5"
           vectorEffect="non-scaling-stroke"
+        />
+        <ChartInspection
+          dates={prices.map((p) => p.date)}
+          x={(i) => 12 + (i / Math.max(1, prices.length - 1)) * 776}
+          top={20}
+          bottom={150}
+          labelY={190}
+          describe={(i) => [
+            `${t("Close", "收盘价")}: ${prices[i].close.toFixed(2)} USD`,
+          ]}
         />
       </svg>
       <div className="research-meta">

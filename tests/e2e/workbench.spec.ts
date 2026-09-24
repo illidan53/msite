@@ -497,7 +497,14 @@ for (const width of [1440, 375]) {
     await expect(
       page.getByText("69 sessions available", { exact: false }),
     ).toBeVisible();
-    const slider = page.getByRole("slider");
+    const hoverDate = comparison.locator('.chart-inspection [role="slider"]');
+    await hoverDate.hover({ position: { x: 1, y: 10 } });
+    await expect(hoverDate).toHaveAttribute("aria-valuenow", "0");
+    await expect(hoverDate).toHaveAttribute("aria-valuetext", /SPY:/);
+    await hoverDate.focus();
+    await page.keyboard.press("End");
+    await expect(hoverDate).toHaveAttribute("aria-valuenow", "69");
+    const slider = page.locator('input[type="range"]');
     await slider.focus();
     await page.keyboard.press("Home");
     const legend = page.getByRole("list", {
@@ -571,7 +578,7 @@ test("keeps overview usable when the shared benchmark is unavailable", async ({
       { exact: true },
     ),
   ).toBeVisible();
-  await expect(page.getByRole("slider")).toBeDisabled();
+  await expect(page.locator('input[type="range"]')).toBeDisabled();
   await expect(
     page
       .getByRole("list", { name: "Price changes on selected date" })
@@ -1272,7 +1279,7 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   ).toBeVisible();
   expect(historyPosts).toBe(1);
   await chart.getByRole("button", { name: "1M", exact: true }).click();
-  const slider = chart.getByRole("slider");
+  const slider = chart.locator('input[type="range"]');
   await expect(slider).toHaveAttribute("max", "20");
   await slider.focus();
   await page.keyboard.press("Home");
@@ -1348,6 +1355,23 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await expect(myQuant).toContainText("20D mean return advantage");
   expect(modelPosts).toBe(2);
   expect(posts).toBe(2);
+  for (const chartSelector of [".ema-chart", ".research-chart"]) {
+    const inspection = page.locator(
+      `${chartSelector} .chart-inspection [role="slider"]`,
+    );
+    await inspection.hover({
+      position: { x: 1, y: (await inspection.boundingBox())!.height - 5 },
+    });
+    await expect(inspection).toHaveAttribute("aria-valuenow", "0");
+    await expect(inspection).toHaveAttribute(
+      "aria-valuetext",
+      /\d{4}-\d{2}-\d{2}.*Close:/,
+    );
+    await inspection.focus();
+    await page.keyboard.press("End");
+    const last = await inspection.getAttribute("aria-valuemax");
+    await expect(inspection).toHaveAttribute("aria-valuenow", last!);
+  }
   await myQuant.screenshot({ path: "test-results/my-quant-desktop.png" });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
@@ -1359,6 +1383,19 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     .getByRole("navigation", { name: "本页目录" })
     .getByRole("link", { name: "我的量化 EMA200" })
     .click();
+  const emaInspect = myQuant.locator('.chart-inspection [role="slider"]');
+  await emaInspect.dispatchEvent("pointerdown", {
+    clientX: (await emaInspect.boundingBox())!.x + 0.1,
+    clientY: (await emaInspect.boundingBox())!.y + 4,
+    pointerType: "touch",
+  });
+  await expect(emaInspect).toHaveAttribute("aria-valuenow", "0");
+  await expect(emaInspect).toHaveAttribute("aria-valuetext", /EMA200:/);
+  await emaInspect.dispatchEvent("pointerleave", { pointerType: "touch" });
+  await expect(emaInspect).toHaveAttribute("aria-valuenow", "0");
+  await myQuant
+    .locator(".ema-chart")
+    .screenshot({ path: "test-results/ema-interaction-mobile.png" });
   await myQuant.screenshot({ path: "test-results/my-quant-mobile.png" });
   await expect(page).toHaveURL(/#research-my-quant$/);
 
