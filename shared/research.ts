@@ -51,6 +51,7 @@ export interface ResearchReport {
   news: ResearchNews[];
   metricHistory?: ResearchMetricHistory;
   ema200Study?: Ema200Study;
+  quantModels?: QuantModelSet;
   narrative?: string;
   model?: string;
   financialPeriod?: string;
@@ -140,3 +141,69 @@ export interface Ema200StudyV2 extends Omit<
   }[];
 }
 export type Ema200Study = Ema200StudyV1 | Ema200StudyV2;
+
+/** Bump when any pullback model definition or output shape changes. */
+export const QUANT_MODELS_VERSION = 1;
+export type PullbackModelId = "sma50" | "rsi2" | "bollinger";
+export interface PullbackExit {
+  date: string;
+  sessions: number;
+  return: number;
+  reason: "reverted" | "time";
+}
+export interface PullbackEvent {
+  date: string;
+  /** Model reading at the signal: low distance %, RSI(2), or close vs lower band %. */
+  trigger: number;
+  entryDate: string | null;
+  entryPrice: number | null;
+  returns: Record<string, number | null>;
+  paths: Record<string, Ema200Path | null>;
+  /** Null until the full 20-session window has matured. */
+  exit: PullbackExit | null;
+}
+export interface PullbackExitSummary {
+  count: number;
+  revertedRate: number | null;
+  meanReturn: number | null;
+  winRate: number | null;
+  medianSessions: number | null;
+  worstReturn: number | null;
+}
+export interface PullbackStudy {
+  id: PullbackModelId;
+  parameter: number;
+  primaryHorizon: number;
+  cooldown: number;
+  targetPercent: number;
+  status: "insufficient" | "positive" | "negative" | "inconclusive";
+  confidenceInterval: [number, number] | null;
+  bootstrapSamples: number;
+  horizons: Ema200HorizonV2[];
+  sensitivity: { parameter: number; horizon: Ema200HorizonV2 }[];
+  exit: PullbackExitSummary;
+  events: PullbackEvent[];
+  current: {
+    signal: boolean;
+    regime: boolean | null;
+    readings: Record<string, number | null>;
+    lastEvent: string | null;
+    sessionsSince: number | null;
+  };
+  /** Series aligned with QuantModelSet.chart.dates. */
+  chart: {
+    lines: Record<string, (number | null)[]>;
+    band?: { upper: (number | null)[]; lower: (number | null)[] };
+    oscillator?: { values: (number | null)[]; threshold: number };
+    events: number[];
+  };
+}
+export interface QuantModelSet {
+  version: typeof QUANT_MODELS_VERSION;
+  asOf: string;
+  dataStart: string;
+  fetchedAt: string;
+  basis: "snapshot" | "reconstructed";
+  chart: { dates: string[]; close: number[] };
+  models: PullbackStudy[];
+}

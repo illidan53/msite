@@ -1,4 +1,5 @@
 import { calculateEma200Study } from "../../server/research/ema200";
+import { calculateQuantModels } from "../../server/research/pullback";
 import { expect, test, type Page } from "@playwright/test";
 import type {
   MarketSnapshot,
@@ -1161,23 +1162,22 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     fetchedAt: "2026-09-20T12:00:00Z",
     basis: "reconstructed",
   };
-  const ema200Study = calculateEma200Study(
-    Array.from({ length: 450 }, (_, i) => {
-      const close = 100 + i * 0.03 + 7 * Math.sin(i / 15);
-      return {
-        timestamp: new Date(
-          Date.UTC(2026, 8, 18, 21) + (i - 449) * 86400000,
-        ).toISOString(),
-        open: close,
-        close,
-        high: close + 1,
-        low: close - 1,
-        volume: 100,
-      };
-    }),
-    "reconstructed",
-  );
-  Object.assign(complete, { ema200Study });
+  const modelBars = Array.from({ length: 450 }, (_, i) => {
+    const close = 100 + i * 0.03 + 7 * Math.sin(i / 15);
+    return {
+      timestamp: new Date(
+        Date.UTC(2026, 8, 18, 21) + (i - 449) * 86400000,
+      ).toISOString(),
+      open: close,
+      close,
+      high: close + 1,
+      low: close - 1,
+      volume: 100,
+    };
+  });
+  const ema200Study = calculateEma200Study(modelBars, "reconstructed");
+  const quantModels = calculateQuantModels(modelBars, "reconstructed");
+  Object.assign(complete, { ema200Study, quantModels });
   let modelPosts = 0;
   let historyPosts = 0;
   let posts = 0;
@@ -1331,7 +1331,7 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   const toc = page.getByRole("navigation", { name: "Table of contents" });
   await expect(toc.locator("ol > li")).toHaveCount(6);
   await expect(
-    toc.getByRole("link", { name: "My Quant EMA200" }),
+    toc.getByRole("link", { name: "My Quant 4 models" }),
   ).toHaveAttribute("href", "#research-my-quant");
   await expect(
     page.getByRole("heading", {
@@ -1351,50 +1351,52 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await expect(
     myQuant.getByRole("button", { name: /Upgrade|Calculate EMA200/ }),
   ).toHaveCount(0);
-  const consideration = myQuant.getByRole("button", {
-    name: "Consideration",
-    exact: true,
+  // Every model is a collapsible card; only Model 01 starts open.
+  const emaModel = myQuant.locator("#model-ema200");
+  const emaToggle = myQuant.getByRole("button", {
+    name: "EMA200 pullback & rebound",
   });
-  await consideration.click();
-  const drawer = page.getByRole("dialog", {
-    name: "Consideration",
-    exact: true,
+  await expect(emaToggle).toHaveAttribute("aria-expanded", "true");
+  for (const name of [
+    "SMA50 pullback in an uptrend",
+    "RSI(2) oversold rebound (Connors)",
+    "Bollinger lower-band reversion",
+  ])
+    await expect(myQuant.getByRole("button", { name })).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Consideration is an entry in the model's own contents, not a drawer.
+  const emaContents = emaModel.getByRole("navigation", {
+    name: "Model 01 contents",
   });
-  await expect(drawer).toBeVisible();
-  await expect(drawer).toContainText("not an optimized threshold");
-  await expect(drawer).toContainText("never at the earlier low");
-  await expect(
-    drawer.getByRole("button", { name: "Close considerations" }),
-  ).toBeFocused();
-  await page.keyboard.press("Shift+Tab");
-  expect(
-    await drawer.evaluate((el) => el.contains(document.activeElement)),
-  ).toBe(true);
-  await drawer.getByRole("button", { name: "Close considerations" }).focus();
-  await expect(drawer).toHaveCSS("right", "0px");
-  await expect(drawer).toHaveCSS("transform", "none");
-  const drawerBox = (await drawer.boundingBox())!;
-  expect(drawerBox.x + drawerBox.width).toBe(page.viewportSize()!.width);
-  await drawer.locator(".ema-consideration-content").evaluate((el) => {
-    el.scrollTop = 0;
-  });
+  await expect(emaContents.getByRole("link")).toHaveCount(5);
+  await emaContents.getByRole("link", { name: /Consideration/ }).click();
+  await expect(page).toHaveURL(/#ema200-consideration$/);
+  const consideration = emaModel.locator("#ema200-consideration");
+  await expect(consideration).toBeInViewport();
+  await expect(consideration.locator(".model-spec")).toContainText(
+    "Primary test",
+  );
+  await consideration.getByText("A zone, not an exact price").click();
+  await expect(consideration).toContainText("not an optimized threshold");
+  await consideration.getByText("Touch versus confirmed bottom").click();
+  await expect(consideration).toContainText("never at the earlier low");
+  await consideration.scrollIntoViewIfNeeded();
   await page.screenshot({ path: "test-results/ema-consideration-desktop.png" });
-  await page.keyboard.press("Escape");
-  await expect(drawer).not.toBeVisible();
-  await expect(consideration).toBeFocused();
-  await consideration.click();
-  await page.mouse.click(5, 100);
-  await expect(drawer).not.toBeVisible();
   expect(modelPosts).toBe(0);
-  await expect(myQuant.getByRole("img")).toBeVisible();
-  await expect(myQuant).toContainText("Insufficient evidence");
-  await expect(myQuant).toContainText("20D endpoint return advantage");
-  await expect(myQuant).toContainText("Average floating return");
-  await expect(myQuant).toContainText("Wait for confirmation");
-  await expect(myQuant.locator(".ema-primary-band")).toContainText("±3%");
+  await expect(emaModel.getByRole("img")).toBeVisible();
+  await expect(emaModel).toContainText("Insufficient evidence");
+  await expect(emaModel).toContainText("20D endpoint return advantage");
+  await expect(emaModel).toContainText("Average floating return");
+  await expect(emaModel).toContainText("Wait for confirmation");
+  await expect(
+    emaModel.locator(".quant-primary-row", { hasText: "±3%" }),
+  ).toHaveCount(1);
   expect(modelPosts).toBe(0);
   expect(posts).toBe(2);
-  for (const chartSelector of [".ema-chart", ".research-chart"]) {
+  for (const chartSelector of ["#model-ema200 .ema-chart", ".research-chart"]) {
     const inspection = page.locator(
       `${chartSelector} .chart-inspection [role="slider"]`,
     );
@@ -1411,7 +1413,33 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     const last = await inspection.getAttribute("aria-valuemax");
     await expect(inspection).toHaveAttribute("aria-valuenow", last!);
   }
+  // Clicking anywhere on the header collapses the model and unmounts its body.
+  await emaModel.locator(".quant-model-heading").click();
+  await expect(emaToggle).toHaveAttribute("aria-expanded", "false");
+  await expect(emaModel.locator(".ema-chart")).toHaveCount(0);
+  const rsiModel = myQuant.locator("#model-rsi2");
+  await myQuant
+    .getByRole("button", { name: "RSI(2) oversold rebound (Connors)" })
+    .click();
+  await expect(rsiModel).toContainText("5D endpoint return advantage");
+  await expect(rsiModel).toContainText("Rule exit · Close above SMA5");
+  await expect(
+    rsiModel.locator(".quant-primary-row", { hasText: "RSI(2) < 10" }),
+  ).toHaveCount(1);
+  const rsiInspect = rsiModel.locator('.chart-inspection [role="slider"]');
+  await rsiInspect.focus();
+  await page.keyboard.press("End");
+  await expect(rsiInspect).toHaveAttribute("aria-valuetext", /RSI\(2\): /);
   await myQuant.screenshot({ path: "test-results/my-quant-desktop.png" });
+  await myQuant.getByRole("button", { name: "Expand all" }).click();
+  await expect(
+    myQuant.locator('.quant-model-toggle[aria-expanded="true"]'),
+  ).toHaveCount(4);
+  await myQuant.getByRole("button", { name: "Collapse all" }).click();
+  await expect(
+    myQuant.locator('.quant-model-toggle[aria-expanded="true"]'),
+  ).toHaveCount(0);
+  await emaToggle.click();
   await page.setViewportSize({ width: 375, height: 812 });
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
   await expect(
@@ -1420,9 +1448,9 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await expect(myQuant).toContainText("当前所处位置");
   await page
     .getByRole("navigation", { name: "本页目录" })
-    .getByRole("link", { name: "我的量化 EMA200" })
+    .getByRole("link", { name: "我的量化 4 个模型" })
     .click();
-  const emaInspect = myQuant.locator('.chart-inspection [role="slider"]');
+  const emaInspect = emaModel.locator('.chart-inspection [role="slider"]');
   await emaInspect.dispatchEvent("pointerdown", {
     clientX: (await emaInspect.boundingBox())!.x + 0.1,
     clientY: (await emaInspect.boundingBox())!.y + 4,
@@ -1432,41 +1460,25 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await expect(emaInspect).toHaveAttribute("aria-valuetext", /EMA200:/);
   await emaInspect.dispatchEvent("pointerleave", { pointerType: "touch" });
   await expect(emaInspect).toHaveAttribute("aria-valuenow", "0");
-  await myQuant
+  await emaModel
     .locator(".ema-chart")
     .screenshot({ path: "test-results/ema-interaction-mobile.png" });
   await myQuant.screenshot({ path: "test-results/my-quant-mobile.png" });
   await expect(page).toHaveURL(/#research-my-quant$/);
-  const mobileConsideration = myQuant.getByRole("button", {
-    name: "Consideration · 模型说明",
-    exact: true,
-  });
-  await mobileConsideration.click();
-  const mobileDrawer = page.getByRole("dialog", { name: "模型说明与考量" });
-  await expect(mobileDrawer).toBeVisible();
+  await emaModel
+    .getByRole("navigation", { name: "模型 01 目录" })
+    .getByRole("link", { name: /模型说明与考量/ })
+    .click();
+  const mobileConsideration = emaModel.locator("#ema200-consideration");
+  await expect(mobileConsideration).toBeInViewport();
+  await mobileConsideration.getByText("首次回踩与底部确认分开").click();
+  await expect(mobileConsideration).toContainText("三个后续交易日未创新低");
   expect(
-    await mobileDrawer.evaluate((el) => el.scrollWidth <= el.clientWidth),
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
   ).toBe(true);
-  expect(await page.evaluate(() => document.body.style.overflow)).toBe(
-    "hidden",
-  );
-  await expect(mobileDrawer).toContainText("三个后续交易日未创新低");
-  await expect(mobileDrawer).toHaveCSS("transform", "none");
-  expect((await mobileDrawer.boundingBox())!.x).toBe(0);
-  expect(
-    await mobileDrawer
-      .locator(".ema-consideration-content")
-      .evaluate((el) => el.scrollTop),
-  ).toBe(0);
   await page.screenshot({ path: "test-results/ema-consideration-mobile.png" });
-  await mobileDrawer
-    .getByRole("link", { name: /CFA Institute/ })
-    .scrollIntoViewIfNeeded();
-  await mobileDrawer.getByRole("button", { name: "关闭模型说明" }).click();
-  await expect(mobileConsideration).toBeFocused();
-  await expect
-    .poll(() => page.evaluate(() => document.body.style.overflow))
-    .not.toBe("hidden");
 
   await expect(
     page.locator('[data-metric="return252"] dt > span'),

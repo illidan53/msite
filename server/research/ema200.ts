@@ -8,9 +8,9 @@ import type {
   Ema200PathSummary,
 } from "../../shared/research";
 import { newYorkDate } from "../../shared/marketDate";
-const mean = (a: number[]) =>
+export const mean = (a: number[]) =>
   a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
-const median = (a: number[]) => {
+export const median = (a: number[]) => {
   if (!a.length) return null;
   const sorted = [...a].sort((a, b) => a - b);
   return (
@@ -123,7 +123,7 @@ export function forwardPath(
     hitDay: hit < 0 ? null : hit + 1,
   };
 }
-function summarizePaths(paths: Ema200Path[]): Ema200PathSummary {
+export function summarizePaths(paths: Ema200Path[]): Ema200PathSummary {
   const hits = paths.flatMap((p) => (p.hitDay === null ? [] : [p.hitDay]));
   return {
     count: paths.length,
@@ -215,31 +215,39 @@ function studyBand(
       confirmation,
     });
   }
-  const horizons: Ema200HorizonV2[] = horizonsList.map((sessions) => {
-    const event: number[] = [],
-      control: number[] = [],
-      paths: Ema200Path[] = [];
-    for (const [i, group] of groups) {
-      const path = forwardPath(bars, i, sessions);
-      if (!path) continue;
-      (group ? event : control).push(path.endReturn);
-      if (group) paths.push(path);
-    }
-    return {
-      sessions,
-      events: event.length,
-      controls: control.length,
-      meanReturn: mean(event),
-      medianReturn: median(event),
-      positiveRate: event.length
-        ? (event.filter((v) => v > 0).length / event.length) * 100
-        : null,
-      controlMean: mean(control),
-      ...association(event, control),
-      ...summarizePaths(paths),
-    };
-  });
+  const horizons = horizonsList.map((sessions) =>
+    summarizeHorizon(bars, groups, sessions),
+  );
   return { events, groups, horizons };
+}
+/** Event (1) versus background (0) comparison for fully observed windows only. */
+export function summarizeHorizon(
+  bars: PriceBar[],
+  groups: Map<number, 0 | 1>,
+  sessions: number,
+): Ema200HorizonV2 {
+  const event: number[] = [],
+    control: number[] = [],
+    paths: Ema200Path[] = [];
+  for (const [i, group] of groups) {
+    const path = forwardPath(bars, i, sessions);
+    if (!path) continue;
+    (group ? event : control).push(path.endReturn);
+    if (group) paths.push(path);
+  }
+  return {
+    sessions,
+    events: event.length,
+    controls: control.length,
+    meanReturn: mean(event),
+    medianReturn: median(event),
+    positiveRate: event.length
+      ? (event.filter((v) => v > 0).length / event.length) * 100
+      : null,
+    controlMean: mean(control),
+    ...association(event, control),
+    ...summarizePaths(paths),
+  };
 }
 export function calculateEma200Study(
   bars: PriceBar[],

@@ -7,7 +7,10 @@ import request from "supertest";
 import { ResearchService, safeUrl } from "./service";
 import { createResearchRoutes } from "../routes/researchRoutes";
 import { apiErrorHandler, ApiError } from "../http/apiError";
-import type { ResearchReport } from "../../shared/research";
+import {
+  QUANT_MODELS_VERSION,
+  type ResearchReport,
+} from "../../shared/research";
 const dirs: string[] = [];
 afterEach(async () => {
   await Promise.all(
@@ -193,6 +196,29 @@ describe("research job lifecycle", () => {
     expect(market.getHistory).toHaveBeenCalledTimes(4);
     await old.buildHistory(original.id, true);
     expect(market.getHistory).toHaveBeenCalledTimes(4);
+    expect(withModel.quantModels?.version).toBe(QUANT_MODELS_VERSION);
+    expect(withModel.quantModels?.basis).toBe("reconstructed");
+    expect(withModel.quantModels?.asOf).toBe(original.sections.quant.asOf);
+    expect(withModel.quantModels?.models.map((m) => m.id)).toEqual([
+      "sma50",
+      "rsi2",
+      "bollinger",
+    ]);
+    // Reports saved before the pullback models existed upgrade on the same path.
+    const beforeModels = { ...withModel };
+    delete beforeModels.quantModels;
+    await writeFile(join(dir, "reports.json"), JSON.stringify([beforeModels]));
+    const upgraded = await new ResearchService(
+      market,
+      client,
+      dir,
+      "test-key",
+      "test-model",
+      ai,
+    ).buildHistory(original.id, true);
+    expect(upgraded.quantModels?.version).toBe(QUANT_MODELS_VERSION);
+    expect(upgraded.metrics).toEqual(original.metrics);
+    expect(ai).not.toHaveBeenCalled();
   });
   it("runs, persists and refreshes news without rerunning quantitative data", async () => {
     const { service, market, client, dir } = await setup();

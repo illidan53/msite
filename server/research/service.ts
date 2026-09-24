@@ -1,16 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-  ResearchReport,
-  ResearchModule,
-  ResearchMetric,
+import {
+  QUANT_MODELS_VERSION,
+  type ResearchReport,
+  type ResearchModule,
+  type ResearchMetric,
 } from "../../shared/research";
 import type { MarketDataProvider } from "../market/marketDataProvider";
 import type { PolygonClient } from "../market/polygonClient";
 import { ApiError } from "../http/apiError";
 import { calculateResearch, closedBars } from "./quant";
 import { calculateEma200Study } from "./ema200";
+import { calculateQuantModels } from "./pullback";
 import { calculateMetricHistory } from "./history";
 import { newYorkDate } from "../../shared/marketDate";
 
@@ -26,6 +28,10 @@ export interface ResearchInput {
   baseId?: string;
 }
 const modules = ["quant", "fundamentals", "news", "ai"] as const;
+/** Saved reports upgrade automatically when any model is missing or outdated. */
+export const modelsCurrent = (r: ResearchReport) =>
+  r.ema200Study?.version === 2 &&
+  r.quantModels?.version === QUANT_MODELS_VERSION;
 export class ResearchService {
   private reports: ResearchReport[] = [];
   private loaded: Promise<void>;
@@ -100,7 +106,7 @@ export class ResearchService {
     await this.loaded;
     const r = this.reports.find((r) => r.id === id);
     if (!r) throw new ApiError(404, "REPORT_NOT_FOUND", "Report not found");
-    if (r.metricHistory && (!requireModel || r.ema200Study?.version === 2))
+    if (r.metricHistory && (!requireModel || modelsCurrent(r)))
       return structuredClone(r);
     if (r.status === "running" || !r.sections.quant.asOf)
       throw new ApiError(
@@ -153,18 +159,21 @@ export class ResearchService {
       }
     }
     const previousHistory = r.metricHistory,
-      previousModel = r.ema200Study;
+      previousModel = r.ema200Study,
+      previousModels = r.quantModels;
     r.metricHistory ??= await calculateMetricHistory(
       bars,
       benchmark,
       "reconstructed",
     );
     r.ema200Study = calculateEma200Study(bars, "reconstructed");
+    r.quantModels = calculateQuantModels(bars, "reconstructed");
     try {
       await this.save();
     } catch (e) {
       r.metricHistory = previousHistory;
       r.ema200Study = previousModel;
+      r.quantModels = previousModels;
       throw e;
     }
     return structuredClone(r);
@@ -251,6 +260,7 @@ export class ResearchService {
       report.prices = [];
       delete report.metricHistory;
       delete report.ema200Study;
+      delete report.quantModels;
     }
     if (input.module === "all" || input.module === "fundamentals") {
       report.metrics = report.metrics.filter((m) => m.group !== "fundamentals");
@@ -352,6 +362,7 @@ export class ResearchService {
     r.sections.quant.asOf = result.prices.at(-1)?.date;
     r.metricHistory = await calculateMetricHistory(bars, benchmark);
     r.ema200Study = calculateEma200Study(bars);
+    r.quantModels = calculateQuantModels(bars);
   }
   private async news(r: ResearchReport) {
     const from = new Date(Date.now() - 30 * 86400_000).toISOString();

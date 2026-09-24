@@ -1,5 +1,6 @@
 import type { Ema200StudyV2 } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
+import { PathTable, SensitivityTable } from "./ModelTables";
 
 export function EmaOutcomes({ study }: { study: Ema200StudyV2 }) {
   const { t, locale } = useLocale();
@@ -19,47 +20,7 @@ export function EmaOutcomes({ study }: { study: Ema200StudyV2 }) {
           "每行汇总完整窗口事件。平均浮盈是每日收盘相对同一入场价的收益均值；最大上涨／下跌先按每次事件计算，再取平均，不是实际获利或峰谷回撤。",
         )}
       </p>
-      <div className="ema-table-wrap" tabIndex={0}>
-        <table>
-          <caption>
-            {t(
-              "Path outcomes · +5% is a preset intraday target; hit time includes hits only",
-              "路径表现 · +5% 为预设盘中目标；用时仅统计已命中的事件",
-            )}
-          </caption>
-          <thead>
-            <tr>
-              {[
-                t("Horizon", "窗口"),
-                t("Events", "事件数"),
-                t("Average floating return", "平均浮盈"),
-                t("Mean max gain", "平均最大上涨"),
-                t("Mean max loss", "平均最大下跌"),
-                t("Hit +5%", "+5% 发生率"),
-                t("Median sessions to hit", "到达用时中位数"),
-              ].map((h) => (
-                <th key={h}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {study.horizons.map((h) => (
-              <tr key={h.sessions}>
-                <th scope="row">
-                  {h.sessions}
-                  {t("D", " 日")}
-                </th>
-                <td>{h.count}</td>
-                <td>{n(h.averageReturn)}</td>
-                <td>{n(h.maxGain)}</td>
-                <td>{n(h.maxLoss)}</td>
-                <td>{n(h.hitRate)}</td>
-                <td>{n(h.medianHitDay, t(" sessions", " 交易日"))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <PathTable horizons={study.horizons} target={study.targetPercent} />
       <h6>
         {t("Wait for confirmation · separate entry", "等待确认 · 独立入场口径")}
       </h6>
@@ -124,52 +85,19 @@ export function EmaOutcomes({ study }: { study: Ema200StudyV2 }) {
           "±3% 为主模型；±1%／±5% 仅检查敏感性，不用于挑选收益最高的回测。放宽区域会同时改变事件和背景样本，并非只增加触碰次数。",
         )}
       </p>
-      <div className="ema-table-wrap" tabIndex={0}>
-        <table>
-          <caption>
-            {t(
-              "20-session endpoint and path comparison",
-              "20 日终点与路径对比",
-            )}
-          </caption>
-          <thead>
-            <tr>
-              {[
-                t("Band", "接触带"),
-                t("Events / background", "事件／背景"),
-                t("Mean endpoint", "平均终点收益"),
-                t("Advantage", "收益优势"),
-                "r",
-                t("Average floating return", "平均浮盈"),
-                t("Hit +5%", "+5% 发生率"),
-              ].map((h) => (
-                <th key={h}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {study.sensitivity.map(({ bandPercent, horizon: h }) => (
-              <tr
-                key={bandPercent}
-                className={bandPercent === 3 ? "ema-primary-band" : undefined}
-              >
-                <th scope="row">
-                  ±{bandPercent}%{" "}
-                  {bandPercent === 3 ? t("· primary", "· 主模型") : ""}
-                </th>
-                <td>
-                  {h.events} / {h.controls}
-                </td>
-                <td>{n(h.meanReturn)}</td>
-                <td>{n(h.lift, t(" pp", " 个百分点"))}</td>
-                <td>{h.correlation?.toFixed(3) ?? "—"}</td>
-                <td>{n(h.averageReturn)}</td>
-                <td>{n(h.hitRate)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SensitivityTable
+        caption={t(
+          "20-session endpoint and path comparison",
+          "20 日终点与路径对比",
+        )}
+        header={t("Band", "接触带")}
+        target={study.targetPercent}
+        rows={study.sensitivity.map(({ bandPercent, horizon }) => ({
+          label: `±${bandPercent}%`,
+          primary: bandPercent === 3,
+          horizon,
+        }))}
+      />
     </div>
   );
 }

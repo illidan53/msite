@@ -448,7 +448,7 @@ export function Research() {
               <li>
                 <a href="#research-my-quant">
                   <span>{t("My Quant", "我的量化")}</span>
-                  <small>EMA200</small>
+                  <small>{t("4 models", "4 个模型")}</small>
                 </a>
               </li>
               <li>
