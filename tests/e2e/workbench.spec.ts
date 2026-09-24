@@ -1177,7 +1177,7 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
     }),
     "reconstructed",
   );
-  Object.assign(complete, { ema200Study: { ...ema200Study, version: 1 } });
+  Object.assign(complete, { ema200Study });
   let modelPosts = 0;
   let historyPosts = 0;
   let posts = 0;
@@ -1348,7 +1348,9 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
       ),
     ),
   ).toBe(true);
-  await expect(myQuant).toContainText("This report contains v1 (±1%)");
+  await expect(
+    myQuant.getByRole("button", { name: /Upgrade|Calculate EMA200/ }),
+  ).toHaveCount(0);
   const consideration = myQuant.getByRole("button", {
     name: "Consideration",
     exact: true,
@@ -1384,20 +1386,13 @@ test("runs stock research, refreshes news and restores saved reports on mobile",
   await page.mouse.click(5, 100);
   await expect(drawer).not.toBeVisible();
   expect(modelPosts).toBe(0);
-  await myQuant
-    .getByRole("button", { name: "Upgrade EMA200 model to v2" })
-    .click();
-  await expect(myQuant.getByRole("alert")).toContainText("This IP cannot run");
-  await myQuant
-    .getByRole("button", { name: "Upgrade EMA200 model to v2" })
-    .click();
   await expect(myQuant.getByRole("img")).toBeVisible();
   await expect(myQuant).toContainText("Insufficient evidence");
   await expect(myQuant).toContainText("20D endpoint return advantage");
   await expect(myQuant).toContainText("Average floating return");
   await expect(myQuant).toContainText("Wait for confirmation");
   await expect(myQuant.locator(".ema-primary-band")).toContainText("±3%");
-  expect(modelPosts).toBe(2);
+  expect(modelPosts).toBe(0);
   expect(posts).toBe(2);
   for (const chartSelector of [".ema-chart", ".research-chart"]) {
     const inspection = page.locator(

@@ -1,10 +1,26 @@
 import { EmaConsideration } from "./EmaConsideration";
 import { EmaOutcomes } from "./EmaOutcomes";
 import { ChartInspection } from "../../shared/ChartInspection";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RefreshCw, FlaskConical } from "lucide-react";
 import type { Ema200StudyV2, ResearchReport } from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
+// Share an in-flight request across remounts (including React Strict Mode).
+const pendingModels = new Map<string, Promise<ResearchReport>>();
+function loadModel(id: string) {
+  const pending = pendingModels.get(id);
+  if (pending) return pending;
+  const task = fetch(`/api/research/${id}/models`, { method: "POST" })
+    .then(async (response) => {
+      if (!response.ok) throw new Error(String(response.status));
+      const next = (await response.json()) as ResearchReport;
+      if (next.ema200Study?.version !== 2) throw new Error("unavailable");
+      return next;
+    })
+    .finally(() => pendingModels.delete(id));
+  pendingModels.set(id, task);
+  return task;
+}
 export function MyQuant({
   report,
   canRun,
@@ -19,7 +35,34 @@ export function MyQuant({
     [error, setError] = useState("");
   const study =
     report.ema200Study?.version === 2 ? report.ema200Study : undefined;
-  const legacy = report.ema200Study?.version === 1;
+  const [retry, setRetry] = useState(0);
+  const loaded = useRef(onLoaded);
+  useEffect(() => {
+    loaded.current = onLoaded;
+  }, [onLoaded]);
+  const asOf = report.sections.quant.asOf;
+  useEffect(() => {
+    if (study || !canRun || report.status === "running" || !asOf) {
+      setBusy(false);
+      return;
+    }
+    let current = true;
+    setBusy(true);
+    setError("");
+    void loadModel(report.id)
+      .then((next) => {
+        if (current) loaded.current(next);
+      })
+      .catch((e) => {
+        if (current) setError(e instanceof Error ? e.message : "unknown");
+      })
+      .finally(() => {
+        if (current) setBusy(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [report.id, report.status, asOf, study, canRun, retry]);
   const outcomeLabel = (value: string) =>
     ({
       pending: t("Window incomplete", "窗口未完成"),
@@ -34,23 +77,6 @@ export function MyQuant({
       : new Intl.NumberFormat(locale, {
           maximumFractionDigits: unit === " r" ? 3 : 2,
         }).format(v) + (unit === " r" ? "" : unit);
-  const run = async () => {
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch(`/api/research/${report.id}/models`, {
-        method: "POST",
-      });
-      if (!response.ok) throw new Error(String(response.status));
-      const next = (await response.json()) as ResearchReport;
-      if (next.ema200Study?.version !== 2) throw new Error("unavailable");
-      onLoaded(next);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "unknown");
-    } finally {
-      setBusy(false);
-    }
-  };
   const status = study
     ? {
         positive: t("Preliminary positive association", "初步正向关联"),
@@ -58,7 +84,7 @@ export function MyQuant({
         inconclusive: t("No clear positive evidence", "未见明确正向证据"),
         insufficient: t("Insufficient evidence", "证据不足"),
       }[study.status]
-    : t("Not calculated yet", "尚未计算");
+    : t("Preparing model", "正在准备模型");
   const main = study?.horizons.find((h) => h.sessions === 20);
   return (
     <section
@@ -92,10 +118,7 @@ export function MyQuant({
         <header className="quant-model-heading">
           <div>
             <p className="eyebrow">
-              {t(
-                "Model 01 · event study · v2 · ±3%",
-                "模型 01 · 事件研究 · v2 · ±3%",
-              )}
+              {t("Model 01 · event study · ±3%", "模型 01 · 事件研究 · ±3%")}
             </p>
             <h4 id="ema200-heading">
               {t("EMA200 pullback & rebound", "EMA200 回踩与反弹")}
@@ -112,57 +135,20 @@ export function MyQuant({
             "价格从上方回踩 EMA200 后，是否更容易反弹？比较首次触碰与背景样本，检验“支撑有效”这一假设。这里是历史回放，不是实盘交易记录。",
           )}
         </p>
-        {!study && (
-          <div className="quant-model-empty">
-            {legacy && (
-              <p className="ema-verdict">
-                {t(
-                  "This report contains v1 (±1%). Recalculate v2 to view broader pullbacks and path outcomes. Existing metrics and AI text are preserved.",
-                  "此报告保存的是 v1（±1%）。补算 v2 后可查看更宽的回踩定义和路径表现；原有指标及 AI 解读保留。",
-                )}
-              </p>
-            )}
-            <p>
-              {t(
-                "New quantitative reports include this model. Older reports can calculate it separately without running AI.",
-                "新量化报告会自动包含此模型；旧报告可以单独补算，无需运行 AI。",
-              )}
-            </p>
-            <button
-              type="button"
-              className="quant-model-run"
-              disabled={
-                busy ||
-                !canRun ||
-                report.status === "running" ||
-                !report.sections.quant.asOf
-              }
-              onClick={() => void run()}
-            >
-              <RefreshCw size={15} aria-hidden="true" />
-              {busy
-                ? t("Calculating…", "计算中…")
-                : legacy
-                  ? t("Upgrade EMA200 model to v2", "升级 EMA200 模型至 v2")
-                  : t("Calculate EMA200 model", "计算 EMA200 模型")}
-            </button>
-            {!canRun && (
-              <p>
-                {t(
-                  "An allowed IP is required to generate missing model results. Saved results remain readable.",
-                  "生成缺失模型需要白名单 IP；已保存结果可直接查看。",
-                )}
-              </p>
-            )}
-            {!report.sections.quant.asOf && (
-              <p>
-                {t(
-                  "Complete a quantitative report first.",
-                  "请先完成量化报告。",
-                )}
-              </p>
-            )}
-          </div>
+        {!study && !error && (
+          <p className="quant-model-empty" role="status">
+            {busy || (canRun && asOf && report.status !== "running")
+              ? t("Preparing model results…", "正在准备模型结果…")
+              : !asOf || report.status === "running"
+                ? t(
+                    "Model results will appear when the quantitative analysis is ready.",
+                    "量化分析完成后，模型结果会自动显示。",
+                  )
+                : t(
+                    "Model results are not available yet.",
+                    "模型结果暂不可用。",
+                  )}
+          </p>
         )}
         {error && (
           <p role="alert">
@@ -178,6 +164,16 @@ export function MyQuant({
                     "模型计算失败，可能缺少历史行情，请重试。",
                   )}
           </p>
+        )}
+        {error && canRun && (
+          <button
+            className="quant-model-run"
+            disabled={busy}
+            onClick={() => setRetry((value) => value + 1)}
+          >
+            <RefreshCw size={15} aria-hidden="true" />
+            {t("Retry loading", "重新加载")}
+          </button>
         )}
         {study && (
           <>
