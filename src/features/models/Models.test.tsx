@@ -47,6 +47,7 @@ const fit = (overrides: Partial<ModelFit>): ModelFit => ({
   meanReturn: 1.1,
   positiveRate: 60,
   hitRate: 40,
+  breakdowns: null,
   signal: false,
   lastEvent: "2026-08-01",
   sessionsSince: 30,
@@ -83,7 +84,13 @@ const scan: ModelScan = {
       dataStart: "2021-09-27",
       sessions: 1255,
       fits: fits(
-        { tier: "moderate", status: "inconclusive", score: 1.4, lift: 2.1 },
+        {
+          tier: "moderate",
+          status: "inconclusive",
+          score: 1.4,
+          lift: 2.1,
+          breakdowns: { mature: 20, failed: 8 },
+        },
         { tier: "contrary", status: "negative", score: -2.4, lift: -1 },
       ),
     },
@@ -100,6 +107,7 @@ const scan: ModelScan = {
           score: 2.6,
           lift: 3.4,
           interval: [0.8, 6],
+          breakdowns: { mature: 20, failed: 1 },
         },
         { tier: "low", score: 0.2 },
       ),
@@ -228,6 +236,14 @@ it("shows the saved scan read-only with the best-fit chart and switches models",
   expect(
     screen.getByRole("columnheader", { name: /20D advantage/ }),
   ).toBeInTheDocument();
+  // Touch models show how often support broke and stayed broken.
+  const amd = within(table()).getByRole("row", { name: /AMD/ });
+  const rate = within(amd).getByText("8 / 20").previousElementSibling;
+  expect(rate).toHaveTextContent("40%");
+  expect(rate).toHaveClass("models-fragile");
+  expect(
+    within(table()).getByRole("row", { name: /NVDA/ }),
+  ).toHaveTextContent("5%1 / 20");
   expect(
     await screen.findByRole("img", {
       name: "NVDA · EMA200 pullback & rebound: closing price, reference lines and signals",
@@ -260,6 +276,9 @@ it("shows the saved scan read-only with the best-fit chart and switches models",
   expect(
     screen.getByRole("columnheader", { name: /5D advantage/ }),
   ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("columnheader", { name: /Breaks/ }),
+  ).not.toBeInTheDocument();
   expect(
     await screen.findByRole("img", { name: /^SPY · RSI\(2\)/ }),
   ).toBeInTheDocument();
@@ -309,6 +328,9 @@ it("filters by fit tier, list, symbol and today's signal, and sorts columns", as
   await user.click(symbolHeader);
   expect(symbolsInTable()).toEqual(["AMD", "NVDA", "SPY"]);
   expect(symbolHeader.closest("th")).toHaveAttribute("aria-sort", "ascending");
+  // Fewest breakdowns first; symbols without a rate stay last.
+  await user.click(screen.getByRole("button", { name: "Breaks" }));
+  expect(symbolsInTable()).toEqual(["NVDA", "AMD", "SPY"]);
   await user.click(screen.getByRole("button", { name: "Fit score" }));
   expect(symbolsInTable()).toEqual(["NVDA", "AMD", "SPY"]);
   await user.click(screen.getByRole("button", { name: "Fit score" }));

@@ -147,6 +147,13 @@
   font-weight: 400;
   color: var(--muted);
 }
+.models-sample-stats {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.models-fragile {
+  color: var(--negative);
+  font-weight: 600;
+}
 .models-filters {
   display: flex;
   flex-wrap: wrap;

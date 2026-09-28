@@ -76,6 +76,7 @@ export function ModelChart({
       " Z"
     : "";
   const events = new Set(chart.events);
+  const failed = new Set(chart.failed);
   const fmt = (v: number | null | undefined) =>
     v === null || v === undefined ? "—" : v.toFixed(2);
   return (
@@ -134,14 +135,19 @@ export function ModelChart({
             events.has(i) && (
               <circle
                 key={dates[i]}
+                className={failed.has(i) ? "model-event-failed" : undefined}
                 cx={x(i)}
                 cy={y(c)}
-                r="4"
-                fill="var(--surface)"
-                stroke="var(--accent)"
+                r={failed.has(i) ? 5 : 4}
+                fill={failed.has(i) ? "var(--negative)" : "var(--surface)"}
+                stroke={failed.has(i) ? "var(--negative)" : "var(--accent)"}
                 strokeWidth="2"
               >
-                <title>{dates[i]}</title>
+                <title>
+                  {failed.has(i)
+                    ? `${dates[i]} · ${t("breakdown, not reclaimed", "破位未收回")}`
+                    : dates[i]}
+                </title>
               </circle>
             ),
         )}
@@ -201,7 +207,16 @@ export function ModelChart({
                 `${lines[key]?.label ?? key}: ${fmt(series[i])}`,
             ),
             ...(osc ? [`RSI(2): ${fmt(osc.values[i])}`] : []),
-            ...(events.has(i) ? [t("Signal event", "信号事件")] : []),
+            ...(failed.has(i)
+              ? [
+                  t(
+                    "Signal event · breakdown, not reclaimed within 20 sessions",
+                    "信号事件 · 破位且 20 日内未收回",
+                  ),
+                ]
+              : events.has(i)
+                ? [t("Signal event", "信号事件")]
+                : []),
           ]}
         />
       </svg>

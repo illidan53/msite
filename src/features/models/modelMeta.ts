@@ -15,6 +15,8 @@ export interface ModelMeta {
   event: Pair;
   legend: Pair;
   lines: Record<string, ChartLine>;
+  /** Touch models judge support breakdowns against this line. */
+  touch: { line: string; lowerEdge: Pair } | null;
   /** The current reading shown in the fit list. */
   reading: { label: Pair; unit: string; signed: boolean };
   notes: ModelNotes;
@@ -23,6 +25,7 @@ export interface ModelMeta {
 const fromPullback = (
   id: Exclude<QuantModelId, "ema200">,
   reading: ModelMeta["reading"],
+  touch: ModelMeta["touch"] = null,
 ): ModelMeta => {
   const { index, title, intro, event, legend, lines } = pullbackConfigs[id];
   return {
@@ -32,6 +35,7 @@ const fromPullback = (
     event,
     legend,
     lines,
+    touch,
     reading,
     notes: pullbackNotes[id],
   };
@@ -48,18 +52,22 @@ export const modelMeta: Record<QuantModelId, ModelMeta> = {
     ],
     event: ["Touch", "触碰"],
     legend: [
-      "Latest 252 sessions · solid: close · dashed: EMA200 · shaded: ±3% zone · dots: touch-day close",
-      "最近最多 252 日 · 实线：收盘价 · 虚线：EMA200 · 阴影：±3% 区域 · 圆点：触碰日收盘",
+      "Latest 252 sessions · solid: close · dashed: EMA200 · shaded: ±3% zone · dots: touch-day close · red: breakdown not reclaimed within 20 sessions",
+      "最近最多 252 日 · 实线：收盘价 · 虚线：EMA200 · 阴影：±3% 区域 · 圆点：触碰日收盘 · 红点：破位且 20 日内未收回",
     ],
     lines: { ema200: { label: "EMA200", dash: "6 4" } },
+    touch: {
+      line: "EMA200",
+      lowerEdge: ["prior EMA200 × 0.97", "前日 EMA200 × 0.97"],
+    },
     reading: { label: ["vs EMA200", "距 EMA200"], unit: "%", signed: true },
     notes: ema200Notes,
   },
-  sma50: fromPullback("sma50", {
-    label: ["vs SMA50", "距 SMA50"],
-    unit: "%",
-    signed: true,
-  }),
+  sma50: fromPullback(
+    "sma50",
+    { label: ["vs SMA50", "距 SMA50"], unit: "%", signed: true },
+    { line: "SMA50", lowerEdge: ["prior SMA50 × 0.98", "前日 SMA50 × 0.98"] },
+  ),
   rsi2: fromPullback("rsi2", {
     label: ["RSI(2)", "RSI(2)"],
     unit: "",

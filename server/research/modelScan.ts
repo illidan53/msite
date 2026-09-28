@@ -3,8 +3,10 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { PriceBar, WatchlistsConfig } from "../../shared/types";
 import {
+  MAX_BREAKDOWN_RATE,
   MODEL_SCAN_VERSION,
   QUANT_MODELS_VERSION,
+  type BreakdownSummary,
   type Ema200HorizonV2,
   type ModelChartSet,
   type ModelFit,
@@ -71,10 +73,16 @@ export function fitTier(
   status: PullbackStudy["status"],
   score: number | null,
   meanReturn: number | null,
+  breakdowns: BreakdownSummary | null = null,
 ): ModelFitTier {
   if (status === "insufficient") return "insufficient";
-  if (status === "positive") return "high";
   if (status === "negative") return "contrary";
+  // Touch models: a significant edge with frequent unreclaimed breakdowns is not a high fit.
+  if (status === "positive")
+    return breakdowns?.mature &&
+      (breakdowns.failed / breakdowns.mature) * 100 > MAX_BREAKDOWN_RATE
+      ? "moderate"
+      : "high";
   return score !== null && score >= 1 && meanReturn !== null && meanReturn > 0
     ? "moderate"
     : "low";
@@ -87,11 +95,12 @@ function toFit(
     ModelFit,
     "signal" | "lastEvent" | "sessionsSince" | "regime" | "reading"
   >,
+  breakdowns: BreakdownSummary | null = null,
 ): ModelFit {
   const score = fitScore(primary.lift, interval);
   return {
     status,
-    tier: fitTier(status, score, primary.meanReturn),
+    tier: fitTier(status, score, primary.meanReturn, breakdowns),
     score: r4(score),
     primaryHorizon: primary.sessions,
     events: primary.events,
@@ -102,6 +111,7 @@ function toFit(
     meanReturn: r4(primary.meanReturn),
     positiveRate: r4(primary.positiveRate),
     hitRate: r4(primary.hitRate),
+    breakdowns,
     ...current,
     reading: r4(current.reading),
   };
@@ -135,11 +145,15 @@ export function scanSymbol(bars: PriceBar[]) {
           ema.ema === null || ema.close === null ? null : ema.close > ema.ema,
         reading: ema.distance,
       },
+      ema.failure,
     ),
   } as Record<QuantModelId, ModelFit>;
   const charts = {} as ModelChartSet["models"];
   // EMA200 keeps its own chart rows; both slices end on the same latest 252 sessions.
   const emaLine = ema.chart.map((p) => r4(p.ema));
+  const failedDates = new Set(
+    ema.events.flatMap((e) => (e.failed ? [e.date] : [])),
+  );
   charts.ema200 = {
     lines: { ema200: emaLine },
     band: {
@@ -147,6 +161,7 @@ export function scanSymbol(bars: PriceBar[]) {
       lower: emaLine.map((v) => (v === null ? null : r4(v * 0.97))),
     },
     events: ema.chart.flatMap((p, i) => (p.touch ? [i] : [])),
+    failed: ema.chart.flatMap((p, i) => (failedDates.has(p.date) ? [i] : [])),
   };
   for (const study of set.models) {
     fits[study.id] = toFit(
@@ -160,6 +175,7 @@ export function scanSymbol(bars: PriceBar[]) {
         regime: study.current.regime,
         reading: study.current.readings[readingKey[study.id]] ?? null,
       },
+      study.failure ?? null,
     );
     charts[study.id] = study.chart;
   }

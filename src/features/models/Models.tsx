@@ -7,6 +7,7 @@ import {
   ScanSearch,
 } from "lucide-react";
 import {
+  MAX_BREAKDOWN_RATE,
   quantModelIds,
   type ModelChartSet,
   type ModelFitTier,
@@ -20,6 +21,7 @@ import { useModelFormat } from "../research/ModelTables";
 import "../research/research.css";
 import "./models.css";
 import {
+  breakdownRate,
   expectedByChance,
   rankRows,
   sortRows,
@@ -189,14 +191,24 @@ export function Models() {
     })[id];
   const tierNote = (id: ModelFitTier) =>
     ({
-      high: t(
-        "95% interval above zero and events gained on average",
-        "95% 区间高于 0，且事件平均收益为正",
-      ),
-      moderate: t(
-        "Advantage ≥ 1 standard error; not yet significant",
-        "优势 ≥ 1 个标准误，尚不显著",
-      ),
+      high: meta.touch
+        ? t(
+            `95% interval above zero, events gained on average, ≤ ${MAX_BREAKDOWN_RATE}% breakdowns`,
+            `95% 区间高于 0，事件平均收益为正，破位失败 ≤ ${MAX_BREAKDOWN_RATE}%`,
+          )
+        : t(
+            "95% interval above zero and events gained on average",
+            "95% 区间高于 0，且事件平均收益为正",
+          ),
+      moderate: meta.touch
+        ? t(
+            `Significant but > ${MAX_BREAKDOWN_RATE}% breakdowns, or advantage ≥ 1 standard error`,
+            `显著但破位失败 > ${MAX_BREAKDOWN_RATE}%，或优势 ≥ 1 个标准误`,
+          )
+        : t(
+            "Advantage ≥ 1 standard error; not yet significant",
+            "优势 ≥ 1 个标准误，尚不显著",
+          ),
       low: t(
         "No clear advantage over background days",
         "相对背景交易日无明显优势",
@@ -256,6 +268,25 @@ export function Models() {
     ) : (
       "—"
     );
+  const breakdowns = (row: FitRow) =>
+    row.fit.breakdowns ? (
+      <>
+        <span
+          className={
+            (breakdownRate(row.fit) ?? 0) > MAX_BREAKDOWN_RATE
+              ? "models-fragile"
+              : undefined
+          }
+        >
+          {number(breakdownRate(row.fit), "%", 0)}
+        </span>
+        <small>
+          {row.fit.breakdowns.failed} / {row.fit.breakdowns.mature}
+        </small>
+      </>
+    ) : (
+      "—"
+    );
   const interval = (row: FitRow) =>
     row.fit.interval
       ? `${number(row.fit.interval[0])} ~ ${number(row.fit.interval[1])}`
@@ -276,7 +307,11 @@ export function Models() {
           onClick={() =>
             setSort((s) => ({
               key,
-              desc: s.key === key ? !s.desc : key !== "symbol",
+              // Fewer breakdowns is better, so it starts ascending like symbols.
+              desc:
+                s.key === key
+                  ? !s.desc
+                  : key !== "symbol" && key !== "breakdownRate",
             }))
           }
         >
@@ -558,7 +593,7 @@ export function Models() {
                   )}
                 </div>
               </div>
-              <div className="ema-stat-grid">
+              <div className="ema-stat-grid models-sample-stats">
                 <div>
                   <span>{t("Fit score", "拟合分")}</span>
                   <strong>{signed(chartRow.fit.score)}</strong>
@@ -595,6 +630,27 @@ export function Models() {
                     )}
                   </small>
                 </div>
+                {meta.touch && (
+                  <div>
+                    <span>{t("Support breakdowns", "破位失败")}</span>
+                    <strong
+                      className={
+                        (breakdownRate(chartRow.fit) ?? 0) > MAX_BREAKDOWN_RATE
+                          ? "models-fragile"
+                          : undefined
+                      }
+                    >
+                      {number(breakdownRate(chartRow.fit), "%", 0)}
+                    </strong>
+                    <small>
+                      {chartRow.fit.breakdowns &&
+                        t(
+                          `${chartRow.fit.breakdowns.failed} of ${chartRow.fit.breakdowns.mature} events closed below ${tr(meta.touch.lowerEdge)}, not back at ${meta.touch.line} within 20 sessions`,
+                          `${chartRow.fit.breakdowns.mature} 次中 ${chartRow.fit.breakdowns.failed} 次收盘跌破${tr(meta.touch.lowerEdge)}，20 日内未收回 ${meta.touch.line}`,
+                        )}
+                    </small>
+                  </div>
+                )}
                 <div>
                   <span>{t("Latest signal", "最近一次信号")}</span>
                   <strong className="ema-interval">
@@ -745,8 +801,10 @@ export function Models() {
                     )}
                     {header("positiveRate", t("Win rate", "上涨比例"))}
                     {header("hitRate", t("Hit +5%", "达 +5%"))}
+                    {meta.touch &&
+                      header("breakdownRate", t("Breaks", "破位失败"))}
                     {header("reading", tr(meta.reading.label))}
-                    {header("lastEvent", t("Latest signal", "最近信号"))}
+                    {header("lastEvent", t("Last signal", "最近信号"))}
                   </tr>
                 </thead>
                 <tbody>
@@ -789,6 +847,7 @@ export function Models() {
                       <td>{signed(row.fit.meanReturn, "%")}</td>
                       <td>{number(row.fit.positiveRate, "%", 0)}</td>
                       <td>{number(row.fit.hitRate, "%", 0)}</td>
+                      {meta.touch && <td>{breakdowns(row)}</td>}
                       <td>{reading(row)}</td>
                       <td>{lastSignal(row)}</td>
                     </tr>
@@ -825,6 +884,14 @@ export function Models() {
                     "拟合分 = 优势 ÷ 重采样标准误（区间宽度 ÷ 3.92）；约 ±1.96 对应区间边界。",
                   )}
                 </li>
+                {meta.touch && (
+                  <li>
+                    {t(
+                      `Support breakdown (touch models): a close below ${tr(meta.touch.lowerEdge)} during the touch session or the next 20 that has not closed back at ${meta.touch.line} when that window ends. Returns still enter at the next open, so a gap through support can show a gain from the lower entry; the breakdown rate records that the line did not hold. High fit also requires at most ${MAX_BREAKDOWN_RATE}% breakdowns; otherwise a significant result is shown as Moderate. Red dots on the chart mark these events.`,
+                      `破位失败（触碰类模型）：触碰当日至其后 20 日内收盘跌破${tr(meta.touch.lowerEdge)}，且到窗口结束仍未收盘收回 ${meta.touch.line}。收益仍按次日开盘入场计算，因此跳空击穿支撑后可能因入场价更低而显示为盈利；破位失败率记录的是“均线没有守住”。高拟合还要求破位失败率 ≤ ${MAX_BREAKDOWN_RATE}%，否则即使显著也只显示为“中等”。图中红点即为这类事件。`,
+                    )}
+                  </li>
+                )}
                 <li>
                   {t(
                     "Ranking: fit tier first, then fit score, then the number of mature events. Win rate is the share of events with a positive endpoint return; +5% hit rate counts events whose daily high reached entry × 1.05 within the window.",

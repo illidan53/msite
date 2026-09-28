@@ -8,6 +8,7 @@ import {
   type PullbackModelId,
   type PullbackStudy,
   type QuantModelSet,
+  type SupportBreakdown,
 } from "../../shared/research";
 import { newYorkDate } from "../../shared/marketDate";
 import {
@@ -15,7 +16,9 @@ import {
   forwardPath,
   mean,
   median,
+  summarizeBreakdowns,
   summarizeHorizon,
+  supportBreakdown,
 } from "./ema200";
 
 type Series = (number | null)[];
@@ -86,6 +89,8 @@ interface Detector {
   rearm(j: number): boolean;
   /** Reversion reached at close j for the signal at i. */
   exit(i: number, j: number): boolean;
+  /** Touch models only: whether the touched line broke and stayed broken. */
+  breakdown?(i: number): Required<SupportBreakdown>;
   current(last: number): {
     regime: boolean | null;
     readings: Record<string, number | null>;
@@ -137,6 +142,8 @@ export const modelSpecs: ModelSpec[] = [
         rearm: (j) => j >= 2 && above(j) && above(j - 1) && above(j - 2),
         exit: (i, j) =>
           closes[j] >= Math.max(...closes.slice(Math.max(0, i - 20), i)),
+        breakdown: (i) =>
+          supportBreakdown(bars, i, (j) => s50[j - 1], bandPercent / 100),
         current: (last) => ({
           regime:
             s50[last] === null || s200[last] === null
@@ -308,6 +315,7 @@ export function runPullbackStudy(
       ),
       paths,
       exit: exit && { ...exit, return: r6(exit.return) },
+      ...detector.breakdown?.(i),
     });
   }
   return { events, indices, groups };
@@ -387,6 +395,7 @@ function runModel(
             ),
     })),
     exit: summarizeExits(events),
+    ...(detector.breakdown && { failure: summarizeBreakdowns(events) }),
     events,
     current: {
       signal: lastIndex !== undefined && lastIndex === last,
@@ -397,6 +406,11 @@ function runModel(
     chart: {
       ...detector.chart(from),
       events: indices.filter((i) => i >= from).map((i) => i - from),
+      ...(detector.breakdown && {
+        failed: indices.flatMap((i, k) =>
+          i >= from && events[k].failed ? [i - from] : [],
+        ),
+      }),
     },
   };
 }

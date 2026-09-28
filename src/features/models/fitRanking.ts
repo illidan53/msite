@@ -21,6 +21,7 @@ export type SortKey =
   | "meanReturn"
   | "positiveRate"
   | "hitRate"
+  | "breakdownRate"
   | "reading"
   | "lastEvent";
 export interface FitRow {
@@ -52,8 +53,17 @@ export function rankRows(scan: ModelScan, model: QuantModelId): FitRow[] {
     .sort(compareFit)
     .map((row, i) => ({ ...row, rank: i + 1 }));
 }
+/** Share of mature events that broke support and stayed broken; touch models only. */
+export const breakdownRate = (fit: ModelFit) =>
+  fit.breakdowns?.mature
+    ? (fit.breakdowns.failed / fit.breakdowns.mature) * 100
+    : null;
 const value = (row: FitRow, key: Exclude<SortKey, "fit">) =>
-  key === "symbol" ? row.symbol : row.fit[key];
+  key === "symbol"
+    ? row.symbol
+    : key === "breakdownRate"
+      ? breakdownRate(row.fit)
+      : row.fit[key];
 /** Missing values always sort last, whichever direction is chosen. */
 export function sortRows(rows: FitRow[], key: SortKey, desc: boolean) {
   if (key === "fit")

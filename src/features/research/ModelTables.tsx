@@ -1,4 +1,10 @@
-import type { Ema200HorizonV2, PullbackStudy } from "../../../shared/research";
+import {
+  MAX_BREAKDOWN_RATE,
+  type BreakdownSummary,
+  type Ema200HorizonV2,
+  type PullbackStudy,
+  type SupportBreakdown,
+} from "../../../shared/research";
 import { useLocale } from "../../shared/locale";
 import type { Pair } from "./quantModelText";
 
@@ -291,3 +297,56 @@ export function SensitivityTable({
     </div>
   );
 }
+
+/** Per-event support outcome for touch models; — for reports saved before the rule. */
+export function useBreakdownLabel() {
+  const { t } = useLocale();
+  return (e: SupportBreakdown) =>
+    e.failed === undefined
+      ? "—"
+      : e.failed === null
+        ? e.breakdown
+          ? t(
+              `Broke ${e.breakdown} · window incomplete`,
+              `${e.breakdown} 破位 · 窗口未完成`,
+            )
+          : t("Window incomplete", "窗口未完成")
+        : e.failed
+          ? t(
+              `Broke ${e.breakdown} · not reclaimed`,
+              `${e.breakdown} 破位 · 未收回`,
+            )
+          : e.breakdown
+            ? t(`Broke ${e.breakdown} · reclaimed`, `${e.breakdown} 破位 · 已收回`)
+            : t("Held", "未破位");
+}
+
+/** How often a touch turned into a breakdown that stayed broken. */
+export function BreakdownNote({
+  summary,
+  line,
+  lowerEdge,
+}: {
+  summary: BreakdownSummary | undefined;
+  line: string;
+  lowerEdge: string;
+}) {
+  const { t, number } = useModelFormat();
+  if (!summary) return null;
+  const rate = summary.mature ? (summary.failed / summary.mature) * 100 : null;
+  return (
+    <p className="ema-verdict model-breakdown">
+      <strong>
+        {t(
+          `Support breakdowns: ${summary.failed} of ${summary.mature} mature events (${number(rate, "%", 0)})`,
+          `破位失败：${summary.mature} 次成熟事件中 ${summary.failed} 次（${number(rate, "%", 0)}）`,
+        )}
+      </strong>{" "}
+      {t(
+        `closed below ${lowerEdge} during the touch session or the next 20, and had not closed back at ${line} when that window ended. Returns above still enter at the next open; on the Models page a High fit also needs at most ${MAX_BREAKDOWN_RATE}% breakdowns.`,
+        `在触碰当日至其后 20 日内收盘跌破 ${lowerEdge}，且到窗口结束仍未收盘收回 ${line}。上方收益仍按次日开盘入场计算；在“模型”页，高拟合还要求破位失败率 ≤ ${MAX_BREAKDOWN_RATE}%。`,
+      )}
+    </p>
+  );
+}
+

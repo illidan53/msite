@@ -11,6 +11,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ResearchReport, Ema200StudyV2 } from "../../../shared/research";
 import { calculateQuantModels } from "../../../server/research/pullback";
+import { calculateEma200Study } from "../../../server/research/ema200";
 import { MyQuant } from "./MyQuant";
 const model: Ema200StudyV2 = {
   version: 2,
@@ -286,4 +287,36 @@ it("opens the model targeted by a contents link", async () => {
   expect(document.getElementById("bollinger-consideration")).toHaveTextContent(
     "Middle-band exit",
   );
+});
+it("shows EMA200 touches whose support broke and stayed broken", () => {
+  vi.stubGlobal("fetch", vi.fn());
+  // A touch at session 200, then closes 10% under the line for the whole window.
+  const bars = Array.from({ length: 240 }, (_, i) => {
+    const close = i < 199 ? 100 : i > 200 ? 90 : 110;
+    return {
+      timestamp: new Date(Date.UTC(2020, 0, i + 1, 21)).toISOString(),
+      open: close,
+      close,
+      high: close + 1,
+      low: i === 200 ? 100 : close - 1,
+      volume: 100,
+    };
+  });
+  const study = calculateEma200Study(bars, "reconstructed");
+  expect(study.events[0].failed).toBe(true);
+  render(
+    <MyQuant
+      report={{ ...next, ema200Study: study }}
+      canRun
+      onLoaded={vi.fn()}
+    />,
+  );
+  const card = document.getElementById("model-ema200")!;
+  expect(card).toHaveTextContent(
+    "Support breakdowns: 1 of 1 mature events (100%)",
+  );
+  expect(
+    within(card).getByText(`Broke ${study.events[0].breakdown} · not reclaimed`),
+  ).toBeInTheDocument();
+  expect(card.querySelectorAll("circle.model-event-failed")).toHaveLength(1);
 });

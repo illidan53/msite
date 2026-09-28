@@ -101,6 +101,16 @@ describe("fit ranking", () => {
     expect(fitTier("inconclusive", 1.4, -0.5)).toBe("low");
     expect(fitTier("inconclusive", 0.6, 0.5)).toBe("low");
   });
+  it("demotes a significant touch model with too many unreclaimed breakdowns", () => {
+    expect(fitTier("positive", 2.5, 1, { mature: 12, failed: 3 })).toBe("high");
+    expect(fitTier("positive", 2.5, 1, { mature: 12, failed: 4 })).toBe(
+      "moderate",
+    );
+    expect(fitTier("positive", 2.5, 1, null)).toBe("high");
+    expect(fitTier("negative", -2.5, -1, { mature: 12, failed: 0 })).toBe(
+      "contrary",
+    );
+  });
 });
 
 describe("scanSymbol", () => {
@@ -131,6 +141,12 @@ describe("scanSymbol", () => {
       expect(fit.signal).toBe(study.current.signal);
       expect(fit.sessionsSince).toBe(study.current.sessionsSince);
     }
+    expect(result.fits.ema200.breakdowns).toEqual(ema.failure);
+    expect(result.fits.sma50.breakdowns).toEqual(
+      set.models.find((m) => m.id === "sma50")!.failure,
+    );
+    expect(result.fits.rsi2.breakdowns).toBeNull();
+    expect(result.fits.bollinger.breakdowns).toBeNull();
     expect(result.fits.rsi2.reading).toBeCloseTo(
       set.models.find((m) => m.id === "rsi2")!.current.readings.rsi2!,
       4,
@@ -156,6 +172,11 @@ describe("scanSymbol", () => {
     expect(chart.models.ema200.lines.ema200.at(-1)).toBeCloseTo(ema.ema!, 3);
     expect(chart.models.ema200.events).toEqual(
       ema.chart.flatMap((p, i) => (p.touch ? [i] : [])),
+    );
+    expect(chart.models.ema200.failed).toEqual(
+      ema.chart.flatMap((p, i) =>
+        ema.events.some((e) => e.date === p.date && e.failed) ? [i] : [],
+      ),
     );
     expect(chart.models.ema200.band!.upper.at(-1)).toBeCloseTo(
       ema.ema! * 1.03,

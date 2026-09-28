@@ -150,6 +150,32 @@ describe("SMA50 pullback", () => {
     expect(event.exit?.reason).toBe("reverted");
     expect(event.exit?.sessions).toBe(2);
   });
+  it("marks touches whose SMA50 support breaks and stays broken", () => {
+    const reclaimed = trend();
+    reclaimed[240] = 150;
+    reclaimed[241] = 169;
+    const quick = study(series(reclaimed), "sma50").events[0];
+    expect(quick).toMatchObject({
+      breakdown: date(series(reclaimed), 240),
+      failed: false,
+    });
+    const closes = trend();
+    for (let i = 240; i <= 265; i++) closes[i] = 150;
+    const bars = series(closes);
+    bars[240] = { ...bars[240], low: 149 };
+    expect(study(bars, "sma50").events[0]).toMatchObject({
+      breakdown: date(bars, 240),
+      failed: true,
+    });
+    const result = model(bars, "sma50");
+    expect(result.failure).toEqual({ mature: 1, failed: 1 });
+    // Chart indices are relative to the latest 252 sessions.
+    expect(result.chart.failed).toEqual([240 - (300 - 252)]);
+    const rsi = model(rsiDip(), "rsi2");
+    expect(rsi.failure).toBeUndefined();
+    expect(rsi.chart.failed).toBeUndefined();
+    expect(rsi.events[0].failed).toBeUndefined();
+  });
   it("requires an approach from above in an SMA50 > SMA200 regime", () => {
     const falling = Array.from({ length: 300 }, (_, i) => 200 - 0.3 * i);
     expect(study(series(falling), "sma50").events).toHaveLength(0);

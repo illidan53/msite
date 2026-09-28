@@ -100,7 +100,24 @@ export interface Ema200Path {
   maxLoss: number;
   hitDay: number | null;
 }
-export interface Ema200EventV2 extends Ema200Event {
+/**
+ * Support breakdown for touch models: a close below the zone's lower edge
+ * that is still unreclaimed (no later close at the line) when the 20-session
+ * window ends. `failed` is null until the window matures; both fields are
+ * absent in reports saved before the rule existed.
+ */
+export interface SupportBreakdown {
+  /** First close below the zone's lower edge within the window. */
+  breakdown?: string | null;
+  failed?: boolean | null;
+}
+export interface BreakdownSummary {
+  mature: number;
+  failed: number;
+}
+/** High fit for touch models also requires at most this share of breakdowns. */
+export const MAX_BREAKDOWN_RATE = 25;
+export interface Ema200EventV2 extends Ema200Event, SupportBreakdown {
   lowDistance: number;
   outcome: "pending" | "near" | "reclaimed" | "weak" | "mixed";
   paths: Record<string, Ema200Path | null>;
@@ -132,6 +149,7 @@ export interface Ema200StudyV2 extends Omit<
   events: Ema200EventV2[];
   horizons: Ema200HorizonV2[];
   sensitivity: { bandPercent: number; horizon: Ema200HorizonV2 }[];
+  failure?: BreakdownSummary;
   confirmed: {
     sessions: number;
     detected: number;
@@ -143,7 +161,7 @@ export interface Ema200StudyV2 extends Omit<
 export type Ema200Study = Ema200StudyV1 | Ema200StudyV2;
 
 /** Bump when any pullback model definition or output shape changes. */
-export const QUANT_MODELS_VERSION = 1;
+export const QUANT_MODELS_VERSION = 2;
 export type PullbackModelId = "sma50" | "rsi2" | "bollinger";
 export interface PullbackExit {
   date: string;
@@ -151,7 +169,7 @@ export interface PullbackExit {
   return: number;
   reason: "reverted" | "time";
 }
-export interface PullbackEvent {
+export interface PullbackEvent extends SupportBreakdown {
   date: string;
   /** Model reading at the signal: low distance %, RSI(2), or close vs lower band %. */
   trigger: number;
@@ -182,6 +200,8 @@ export interface PullbackStudy {
   horizons: Ema200HorizonV2[];
   sensitivity: { parameter: number; horizon: Ema200HorizonV2 }[];
   exit: PullbackExitSummary;
+  /** Touch models only (SMA50). */
+  failure?: BreakdownSummary;
   events: PullbackEvent[];
   current: {
     signal: boolean;
@@ -196,6 +216,8 @@ export interface PullbackStudy {
     band?: { upper: (number | null)[]; lower: (number | null)[] };
     oscillator?: { values: (number | null)[]; threshold: number };
     events: number[];
+    /** Chart indices of events that ended in an unreclaimed breakdown. */
+    failed?: number[];
   };
 }
 export interface QuantModelSet {
@@ -217,10 +239,12 @@ export const quantModelIds: QuantModelId[] = [
 ];
 
 /** Bump when the scan universe, fit definition or stored shape changes. */
-export const MODEL_SCAN_VERSION = 1;
+export const MODEL_SCAN_VERSION = 2;
 /**
- * high: the model's own positive status; moderate: inconclusive but advantage,
- * event mean and score (≥ 1) all point the same way; contrary: negative status.
+ * high: the model's own positive status and, for touch models, at most
+ * MAX_BREAKDOWN_RATE% breakdowns; moderate: positive but more fragile than
+ * that, or inconclusive with score ≥ 1 and a positive event mean;
+ * contrary: negative status.
  */
 export type ModelFitTier =
   "high" | "moderate" | "low" | "contrary" | "insufficient";
@@ -238,6 +262,8 @@ export interface ModelFit {
   meanReturn: number | null;
   positiveRate: number | null;
   hitRate: number | null;
+  /** Touch models only: mature events and unreclaimed breakdowns. */
+  breakdowns: BreakdownSummary | null;
   signal: boolean;
   lastEvent: string | null;
   sessionsSince: number | null;

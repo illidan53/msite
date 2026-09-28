@@ -63,6 +63,13 @@ export const ema200Notes: ModelNotes = {
       ],
     },
     {
+      term: ["Breakdown", "破位失败"],
+      value: [
+        "A close below prior EMA × 0.97 during the touch session or the next 20 that is still unreclaimed (no later close ≥ EMA) when the window ends. Returns still enter at the next open; on the Models page High fit also needs ≤ 25% breakdowns",
+        "触碰当日至其后 20 日内收盘跌破前日 EMA × 0.97，且到窗口结束仍未收盘收回 EMA（之后无收盘 ≥ EMA）。收益仍按次日开盘入场计算；在“模型”页，高拟合还要求破位失败率 ≤ 25%",
+      ],
+    },
+    {
       term: ["Descriptive only", "仅作描述"],
       value: [
         "5/10 sessions, path measures, +5% target, confirmation entry, ±1% / ±5% bands",
@@ -247,6 +254,13 @@ export const pullbackNotes: Record<PullbackModelId, ModelNotes> = {
         value: [
           "±2% zone · 10-session endpoint advantage · ±1% / ±3% descriptive",
           "±2% 区域 · 10 日终点收益优势 · ±1%／±3% 仅作描述",
+        ],
+      },
+      {
+        term: ["Breakdown", "破位失败"],
+        value: [
+          "A close below prior SMA50 × 0.98 during the touch session or the next 20 that is still unreclaimed (no later close ≥ SMA50) when the window ends. On the Models page High fit also needs ≤ 25% breakdowns",
+          "触碰当日至其后 20 日内收盘跌破前日 SMA50 × 0.98，且到窗口结束仍未收盘收回 SMA50。在“模型”页，高拟合还要求破位失败率 ≤ 25%",
         ],
       },
     ],

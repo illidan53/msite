@@ -231,6 +231,45 @@ describe("EMA200 pullback study", () => {
       mixed[i] = { ...mixed[i], open: 99, close: 99, low: 98, high: 100 };
     expect(calculateEma200Study(mixed).events[0].outcome).toBe("mixed");
   });
+  it("fails a touch whose support breaks and stays broken through the 20-session window", () => {
+    const day = (data: PriceBar[], i: number) =>
+      data[i].timestamp.slice(0, 10);
+    const drop = (data: PriceBar[], from: number, to: number) => {
+      for (let i = from; i <= to; i++)
+        data[i] = { ...data[i], open: 90, close: 90, low: 88, high: 91 };
+      return data;
+    };
+    const broken = drop(touches(230), 201, 229);
+    const failed = calculateEma200Study(broken);
+    expect(failed.events[0]).toMatchObject({
+      breakdown: day(broken, 201),
+      failed: true,
+    });
+    expect(failed.failure).toEqual({ mature: 1, failed: 1 });
+    // Not yet mature: the line may still be reclaimed, so it is not a failure.
+    const open = calculateEma200Study(broken.slice(0, 215));
+    expect(open.events[0]).toMatchObject({
+      breakdown: day(broken, 201),
+      failed: null,
+    });
+    expect(open.failure).toEqual({ mature: 0, failed: 0 });
+    // A close back at the line within the window reclaims support...
+    const reclaimed = drop(touches(230), 201, 205);
+    expect(calculateEma200Study(reclaimed).events[0]).toMatchObject({
+      breakdown: day(reclaimed, 201),
+      failed: false,
+    });
+    // ...unless it breaks again and is still broken when the window ends.
+    const again = drop(drop(touches(230), 201, 205), 215, 229);
+    expect(calculateEma200Study(again).events[0].failed).toBe(true);
+    // A dip inside the zone never breaks support.
+    const held = touches(230);
+    held[201] = { ...held[201], close: 98, low: 97 };
+    expect(calculateEma200Study(held).events[0]).toMatchObject({
+      breakdown: null,
+      failed: false,
+    });
+  });
   it("uses entry-relative excursions and hit-only time without inventing gains on losing paths", () => {
     const data = bars(6);
     data[1].open = 110;

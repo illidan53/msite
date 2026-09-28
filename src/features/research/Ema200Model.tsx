@@ -4,7 +4,12 @@ import { ChartInspection } from "../../shared/ChartInspection";
 import { useLocale } from "../../shared/locale";
 import { EmaOutcomes } from "./EmaOutcomes";
 import { ModelConsideration } from "./ModelConsideration";
-import { ModelEvidence, useModelFormat } from "./ModelTables";
+import {
+  BreakdownNote,
+  ModelEvidence,
+  useBreakdownLabel,
+  useModelFormat,
+} from "./ModelTables";
 import { QuantModelCard, type ModelSection } from "./QuantModelCard";
 import { ema200Notes } from "./quantModelText";
 
@@ -20,6 +25,7 @@ export function Ema200Model({
   notice?: ReactNode;
 }) {
   const { t, number, signed, pp } = useModelFormat();
+  const breakdownLabel = useBreakdownLabel();
   const outcomeLabel = (value: string) =>
     ({
       pending: t("Window incomplete", "窗口未完成"),
@@ -53,6 +59,11 @@ export function Ema200Model({
                 status={study.status}
                 interval={study.confidenceInterval}
                 event={["Touch", "触碰"]}
+              />
+              <BreakdownNote
+                summary={study.failure}
+                line="EMA200"
+                lowerEdge={t("prior EMA200 × 0.97", "前日 EMA200 × 0.97")}
               />
             </>
           ),
@@ -121,6 +132,7 @@ export function Ema200Model({
                         t("Touch date", "触碰日期"),
                         t("Low / EMA distance", "低点距 EMA"),
                         t("20D outcome · retrospective", "20 日形态 · 事后"),
+                        t("Support · 20D", "支撑 · 20 日"),
                         t("Prior EMA", "前日 EMA"),
                         t("Entry date", "入场日期"),
                         t("Entry open", "入场开盘"),
@@ -143,6 +155,7 @@ export function Ema200Model({
                         <td>{e.date}</td>
                         <td>{number(e.lowDistance, "%")}</td>
                         <td>{outcomeLabel(e.outcome)}</td>
+                        <td>{breakdownLabel(e)}</td>
                         <td>{number(e.referenceEma)}</td>
                         <td>{e.entryDate ?? "—"}</td>
                         <td>{number(e.entryPrice)}</td>
@@ -219,6 +232,9 @@ export function Ema200Model({
 function EmaChart({ study }: { study: Ema200StudyV2 }) {
   const { t } = useLocale();
   if (study.chart.length < 2 || study.ema === null) return null;
+  const failed = new Set(
+    study.events.flatMap((e) => (e.failed ? [e.date] : [])),
+  );
   const all = study.chart.flatMap((p) =>
     p.ema === null ? [p.close] : [p.close, p.ema * 0.97, p.ema * 1.03],
   );
@@ -259,8 +275,8 @@ function EmaChart({ study }: { study: Ema200StudyV2 }) {
     <figure className="ema-chart">
       <figcaption>
         {t(
-          "Latest 252 sessions · solid: close · dashed: EMA200 · shaded: ±3% · dots: candidate-day close",
-          "最近最多 252 日 · 实线：收盘价 · 虚线：EMA200 · 阴影：±3% · 圆点：候选日收盘",
+          "Latest 252 sessions · solid: close · dashed: EMA200 · shaded: ±3% · dots: candidate-day close · red: breakdown not reclaimed within 20 sessions",
+          "最近最多 252 日 · 实线：收盘价 · 虚线：EMA200 · 阴影：±3% · 圆点：候选日收盘 · 红点：破位且 20 日内未收回",
         )}
       </figcaption>
       <svg
@@ -311,14 +327,21 @@ function EmaChart({ study }: { study: Ema200StudyV2 }) {
             p.touch && (
               <circle
                 key={p.date}
+                className={
+                  failed.has(p.date) ? "model-event-failed" : undefined
+                }
                 cx={x(i)}
                 cy={y(p.close)}
-                r="4"
-                fill="var(--surface)"
-                stroke="var(--accent)"
+                r={failed.has(p.date) ? 5 : 4}
+                fill={failed.has(p.date) ? "var(--negative)" : "var(--surface)"}
+                stroke={failed.has(p.date) ? "var(--negative)" : "var(--accent)"}
                 strokeWidth="2"
               >
-                <title>{p.date}</title>
+                <title>
+                  {failed.has(p.date)
+                    ? `${p.date} · ${t("breakdown, not reclaimed", "破位未收回")}`
+                    : p.date}
+                </title>
               </circle>
             ),
         )}
@@ -331,7 +354,16 @@ function EmaChart({ study }: { study: Ema200StudyV2 }) {
           describe={(i) => [
             `${t("Close", "收盘价")}: ${study.chart[i].close.toFixed(2)} USD`,
             `EMA200: ${study.chart[i].ema?.toFixed(2) ?? "—"}`,
-            ...(study.chart[i].touch ? [t("Touch event", "触碰事件")] : []),
+            ...(failed.has(study.chart[i].date)
+              ? [
+                  t(
+                    "Touch event · breakdown, not reclaimed within 20 sessions",
+                    "触碰事件 · 破位且 20 日内未收回",
+                  ),
+                ]
+              : study.chart[i].touch
+                ? [t("Touch event", "触碰事件")]
+                : []),
           ]}
         />
       </svg>

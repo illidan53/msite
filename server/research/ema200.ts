@@ -1,5 +1,7 @@
 import type { PriceBar } from "../../shared/types";
 import type {
+  BreakdownSummary,
+  SupportBreakdown,
   Ema200Study,
   Ema200StudyV2,
   Ema200HorizonV2,
@@ -134,6 +136,48 @@ export function summarizePaths(paths: Ema200Path[]): Ema200PathSummary {
     medianHitDay: median(hits),
   };
 }
+/** Breakdowns are judged over the same 20 sessions as the outcome labels. */
+export const BREAKDOWN_WINDOW = 20;
+/**
+ * From the touch session through the next 20, a close below the zone's lower
+ * edge (line × (1 − band)) breaks support and a later close at or above the
+ * line reclaims it. The event fails if support is still broken when the
+ * window ends. `line(j)` must only use data known before session j.
+ */
+export function supportBreakdown(
+  bars: PriceBar[],
+  signal: number,
+  line: (j: number) => number | null | undefined,
+  band: number,
+): Required<SupportBreakdown> {
+  let first = -1,
+    broken = false;
+  const end = Math.min(signal + BREAKDOWN_WINDOW, bars.length - 1);
+  for (let j = signal; j <= end; j++) {
+    const level = line(j);
+    if (level === null || level === undefined) continue;
+    if (bars[j].close < level * (1 - band)) {
+      broken = true;
+      if (first < 0) first = j;
+    } else if (broken && bars[j].close >= level) broken = false;
+  }
+  return {
+    breakdown: first < 0 ? null : newYorkDate(bars[first].timestamp),
+    // A still-open window may yet reclaim, so it is neither a failure nor a hold.
+    failed: signal + BREAKDOWN_WINDOW < bars.length ? broken : null,
+  };
+}
+export function summarizeBreakdowns(
+  events: SupportBreakdown[],
+): BreakdownSummary {
+  const mature = events.filter(
+    (e) => e.failed !== null && e.failed !== undefined,
+  );
+  return {
+    mature: mature.length,
+    failed: mature.filter((e) => e.failed).length,
+  };
+}
 const horizonsList = [5, 10, 20];
 function studyBand(
   bars: PriceBar[],
@@ -213,6 +257,7 @@ function studyBand(
       paths,
       outcome,
       confirmation,
+      ...supportBreakdown(bars, i, (j) => averages[j - 1], band),
     });
   }
   const horizons = horizonsList.map((sessions) =>
@@ -295,6 +340,7 @@ export function calculateEma200Study(
           ? horizons[2]
           : studyBand(bars, averages, bandPercent / 100).horizons[2],
     })),
+    failure: summarizeBreakdowns(events),
     confirmed: horizonsList.map((sessions) => {
       const paths = events.flatMap((e) => {
         const p = e.confirmation?.paths[String(sessions)];

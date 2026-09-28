@@ -7,9 +7,11 @@ import type {
 import { ModelChart, type ChartLine } from "./ModelChart";
 import { ModelConsideration } from "./ModelConsideration";
 import {
+  BreakdownNote,
   ModelEvidence,
   PathTable,
   SensitivityTable,
+  useBreakdownLabel,
   useModelFormat,
 } from "./ModelTables";
 import { QuantModelCard, type ModelSection } from "./QuantModelCard";
@@ -45,8 +47,8 @@ export const pullbackConfigs: Record<PullbackModelId, ModelConfig> = {
     param: (v) => `±${v}%`,
     exitLine: ["Pre-touch 20-session high", "触碰前 20 日最高收盘"],
     legend: [
-      "Latest 252 sessions · solid: close · dashed: SMA50 · dotted: SMA200 · shaded: ±2% zone · dots: touch-day close",
-      "最近最多 252 日 · 实线：收盘价 · 虚线：SMA50 · 点线：SMA200 · 阴影：±2% 区域 · 圆点：触碰日收盘",
+      "Latest 252 sessions · solid: close · dashed: SMA50 · dotted: SMA200 · shaded: ±2% zone · dots: touch-day close · red: breakdown not reclaimed within 20 sessions",
+      "最近最多 252 日 · 实线：收盘价 · 虚线：SMA50 · 点线：SMA200 · 阴影：±2% 区域 · 圆点：触碰日收盘 · 红点：破位且 20 日内未收回",
     ],
     lines: {
       sma50: { label: "SMA50", dash: "6 4" },
@@ -120,6 +122,9 @@ export function PullbackModel({
   const format = useModelFormat();
   const { t, tr, number, days, pp } = format;
   const config = pullbackConfigs[id];
+  const breakdownLabel = useBreakdownLabel();
+  // Only the touch model defines a support line that can break.
+  const touch = id === "sma50";
   const study = set?.models.find((m) => m.id === id);
   const primary = study?.horizons.find(
     (h) => h.sessions === study.primaryHorizon,
@@ -151,6 +156,13 @@ export function PullbackModel({
                   interval={study.confidenceInterval}
                   event={config.event}
                 />
+                {touch && (
+                  <BreakdownNote
+                    summary={study.failure}
+                    line="SMA50"
+                    lowerEdge={t("prior SMA50 × 0.98", "前日 SMA50 × 0.98")}
+                  />
+                )}
               </>
             ),
           },
@@ -327,6 +339,7 @@ export function PullbackModel({
                         {[
                           t("Signal date", "信号日期"),
                           tr(config.trigger),
+                          ...(touch ? [t("Support · 20D", "支撑 · 20 日")] : []),
                           t("Entry date", "入场日期"),
                           t("Entry open", "入场开盘"),
                           t("5D return", "5 日收益"),
@@ -347,6 +360,7 @@ export function PullbackModel({
                         <tr key={e.date}>
                           <td>{e.date}</td>
                           <td>{number(e.trigger, config.triggerUnit)}</td>
+                          {touch && <td>{breakdownLabel(e)}</td>}
                           <td>{e.entryDate ?? "—"}</td>
                           <td>{number(e.entryPrice)}</td>
                           {[5, 10, 20].map((h) => (
