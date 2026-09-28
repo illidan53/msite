@@ -171,7 +171,22 @@ test("public research authorization resists spoofed source headers", async ({
       headers,
     });
     expect(modelDenied.status()).toBe(access.canRun ? 400 : 403);
-    if (!access.canRun)
+    if (!access.canRun) {
       expect((await denied.json()).code).toBe("RESEARCH_IP_FORBIDDEN");
+      // Only probe the scan endpoint when it cannot start a real scan.
+      const scanDenied = await request.post("/api/models/scan", { headers });
+      expect(scanDenied.status()).toBe(403);
+    }
   }
+});
+
+test("public deployment serves saved model scans read-only", async ({
+  request,
+}) => {
+  const response = await request.get("/api/models/scan");
+  expect(response.ok()).toBe(true);
+  const state = (await response.json()) as Record<string, unknown>;
+  expect(Object.keys(state).sort()).toEqual(["job", "lastFailure", "scan"]);
+  const invalid = await request.get("/api/models/charts/%24BAD");
+  expect(invalid.status()).toBe(400);
 });

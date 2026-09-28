@@ -1,6 +1,9 @@
 import express from "express";
 import { ResearchService } from "./research/service";
+import { ModelScanService, scanUniverse } from "./research/modelScan";
 import { createResearchRoutes } from "./routes/researchRoutes";
+import { createModelRoutes } from "./routes/modelRoutes";
+import { ConfigRepository } from "./config/configRepository";
 import type { Express } from "express";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -33,6 +36,9 @@ export function createApp(options: CreateAppOptions = {}): Express {
     new PolygonClient(polygonApiKey),
   );
   const indexHtml = resolve(staticDir, "index.html");
+  const researchDir =
+    process.env.RESEARCH_DATA_DIR ?? resolve(process.cwd(), "data/research");
+  const configRepository = new ConfigRepository({ configDir });
 
   app.use(express.json());
 
@@ -56,10 +62,19 @@ export function createApp(options: CreateAppOptions = {}): Express {
       new ResearchService(
         marketDataProvider,
         new PolygonClient(polygonApiKey),
-        process.env.RESEARCH_DATA_DIR ??
-          resolve(process.cwd(), "data/research"),
+        researchDir,
         process.env.OPENAI_API_KEY,
         process.env.OPENAI_MODEL?.trim() || "gpt-5.6-sol",
+      ),
+    ),
+  );
+  app.use(
+    "/api",
+    createModelRoutes(
+      new ModelScanService(
+        marketDataProvider,
+        async () => scanUniverse(await configRepository.readWatchlists()),
+        researchDir,
       ),
     ),
   );

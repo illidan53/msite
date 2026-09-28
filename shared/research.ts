@@ -207,3 +207,81 @@ export interface QuantModelSet {
   chart: { dates: string[]; close: number[] };
   models: PullbackStudy[];
 }
+
+export type QuantModelId = "ema200" | PullbackModelId;
+export const quantModelIds: QuantModelId[] = [
+  "ema200",
+  "sma50",
+  "rsi2",
+  "bollinger",
+];
+
+/** Bump when the scan universe, fit definition or stored shape changes. */
+export const MODEL_SCAN_VERSION = 1;
+/**
+ * high: the model's own positive status; moderate: inconclusive but advantage,
+ * event mean and score (≥ 1) all point the same way; contrary: negative status.
+ */
+export type ModelFitTier =
+  "high" | "moderate" | "low" | "contrary" | "insufficient";
+export interface ModelFit {
+  status: PullbackStudy["status"];
+  tier: ModelFitTier;
+  /** Advantage ÷ bootstrap standard error (interval width ÷ 3.92). */
+  score: number | null;
+  primaryHorizon: number;
+  events: number;
+  controls: number;
+  lift: number | null;
+  interval: [number, number] | null;
+  correlation: number | null;
+  meanReturn: number | null;
+  positiveRate: number | null;
+  hitRate: number | null;
+  signal: boolean;
+  lastEvent: string | null;
+  sessionsSince: number | null;
+  regime: boolean | null;
+  /** EMA200/SMA50 distance %, RSI(2), or Bollinger %B at the latest close. */
+  reading: number | null;
+}
+export interface ModelScanRow {
+  symbol: string;
+  lists: string[];
+  asOf: string;
+  dataStart: string;
+  sessions: number;
+  fits: Record<QuantModelId, ModelFit>;
+}
+export interface ModelScan {
+  version: typeof MODEL_SCAN_VERSION;
+  modelsVersion: typeof QUANT_MODELS_VERSION;
+  id: string;
+  status: "complete" | "partial";
+  startedAt: string;
+  completedAt: string;
+  /** Most common latest completed session across scanned symbols. */
+  asOf: string;
+  lists: { id: string; name: string }[];
+  rows: ModelScanRow[];
+  failures: { symbol: string; message: string }[];
+}
+export interface ModelScanJob {
+  id: string;
+  startedAt: string;
+  total: number;
+  done: number;
+}
+export interface ModelScanState {
+  scan: ModelScan | null;
+  job: ModelScanJob | null;
+  lastFailure: { at: string; message: string } | null;
+}
+/** Latest 252 sessions of every model's chart for one symbol. */
+export interface ModelChartSet {
+  symbol: string;
+  asOf: string;
+  dates: string[];
+  close: number[];
+  models: Record<QuantModelId, PullbackStudy["chart"]>;
+}

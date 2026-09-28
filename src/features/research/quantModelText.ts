@@ -1,4 +1,5 @@
 import type { PullbackModelId } from "../../../shared/research";
+export { quantModelIds, type QuantModelId } from "../../../shared/research";
 
 export type Pair = readonly [string, string];
 export interface ModelNotes {
@@ -6,13 +7,6 @@ export interface ModelNotes {
   notes: { title: Pair; body: Pair }[];
   sources: { label: Pair; href: string }[];
 }
-export type QuantModelId = "ema200" | PullbackModelId;
-export const quantModelIds: QuantModelId[] = [
-  "ema200",
-  "sma50",
-  "rsi2",
-  "bollinger",
-];
 
 const entry = {
   term: ["Entry", "入场"],

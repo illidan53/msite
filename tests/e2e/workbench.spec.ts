@@ -1,5 +1,11 @@
 import { calculateEma200Study } from "../../server/research/ema200";
 import { calculateQuantModels } from "../../server/research/pullback";
+import { scanSymbol } from "../../server/research/modelScan";
+import {
+  MODEL_SCAN_VERSION,
+  QUANT_MODELS_VERSION,
+  type ModelScan,
+} from "../../shared/research";
 import { expect, test, type Page } from "@playwright/test";
 import type {
   MarketSnapshot,
@@ -1577,3 +1583,148 @@ test("keeps research read-only for visitors outside the IP allowlist", async ({
   await expect(page.getByText("仅白名单 IP", { exact: false })).toBeVisible();
   expect(posts).toBe(0);
 });
+
+for (const width of [1440, 390]) {
+  test(`ranks every model across site symbols on Analytics → Models at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    const mocks = await mockWorkbenchApis(page);
+    const results = Object.fromEntries(
+      ["NVDA", "AMD", "SPY"].map((symbol, k) => {
+        const bars = Array.from({ length: 700 }, (_, i) => {
+          const close = 100 + i * 0.04 + 7 * Math.sin((i + k * 23) / 15);
+          return {
+            timestamp: new Date(
+              Date.UTC(2026, 8, 25, 21) + (i - 699) * 86400000,
+            ).toISOString(),
+            open: close,
+            close,
+            high: close + 1,
+            low: close - 1,
+            volume: 100,
+          };
+        });
+        return [symbol, scanSymbol(bars)];
+      }),
+    );
+    const scan: ModelScan = {
+      version: MODEL_SCAN_VERSION,
+      modelsVersion: QUANT_MODELS_VERSION,
+      id: "e2e-scan",
+      status: "complete",
+      startedAt: "2026-09-26T21:00:00Z",
+      completedAt: "2026-09-26T21:01:00Z",
+      asOf: results.NVDA.asOf,
+      lists: [
+        { id: "semiconductors", name: "Semiconductors" },
+        { id: "etf", name: "Sectors & ETFs" },
+      ],
+      rows: Object.entries(results).map(([symbol, result]) => ({
+        symbol,
+        lists: symbol === "SPY" ? ["etf"] : ["semiconductors"],
+        asOf: result.asOf,
+        dataStart: result.dataStart,
+        sessions: 700,
+        fits: result.fits,
+      })),
+      failures: [],
+    };
+    const chartRequests: string[] = [];
+    let posts = 0;
+    await page.route("**/api/research/access", (route) =>
+      route.fulfill({ json: { canRun: false, clientIp: "198.51.100.7" } }),
+    );
+    await page.route("**/api/models/**", async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (route.request().method() === "POST") {
+        posts++;
+        await route.fulfill({ status: 403, json: {} });
+      } else if (path === "/api/models/scan")
+        await route.fulfill({
+          json: { scan, job: null, lastFailure: null },
+        });
+      else {
+        const symbol = decodeURIComponent(path.split("/").at(-1)!);
+        chartRequests.push(symbol);
+        await route.fulfill({ json: { symbol, ...results[symbol].chart } });
+      }
+    });
+
+    await page.goto("/");
+    const analytics = page.getByRole("button", {
+      name: "Analytics",
+      exact: true,
+    });
+    await expect(analytics).toHaveAttribute("aria-expanded", "true");
+    await page.getByRole("button", { name: "Models", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Models", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Model", { exact: true })).toHaveValue(
+      "ema200",
+    );
+    await expect(
+      page.getByRole("button", { name: "Rescan all symbols" }),
+    ).toBeDisabled();
+    const table = page.getByRole("table", {
+      name: "EMA200 pullback & rebound fit list",
+    });
+    await expect(
+      table.getByRole("button", { name: /^Show .+ chart$/ }),
+    ).toHaveCount(3);
+    await expect(table.getByText("S&P 500")).toBeVisible();
+    const sample = page.locator(".models-sample");
+    await expect(sample.getByRole("img")).toHaveAttribute(
+      "aria-label",
+      /EMA200 pullback & rebound: closing price/,
+    );
+    await table.getByRole("button", { name: "Show AMD chart" }).click();
+    await expect(
+      page.getByRole("heading", { name: /^AMD/, level: 3 }),
+    ).toBeVisible();
+    await expect(sample.getByRole("img")).toHaveAttribute(
+      "aria-label",
+      /^AMD · EMA200/,
+    );
+
+    await page
+      .getByLabel("Model", { exact: true })
+      .selectOption({ label: "04 · Bollinger lower-band reversion" });
+    await expect(
+      page.getByRole("heading", {
+        name: "Bollinger lower-band reversion",
+        level: 3,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("table", { name: "Bollinger lower-band reversion fit list" }),
+    ).toBeVisible();
+    await expect(page.getByText(/^Sample chart · /)).toBeVisible();
+    await expect(
+      page.getByRole("columnheader", { name: "10D advantage" }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Rules & considerations" }))
+      .toBeVisible();
+
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(
+      page.getByRole("heading", { name: "全站标的拟合度" }),
+    ).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "模型" })).toContainText(
+      "布林下轨回归",
+    );
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    expect(posts).toBe(0);
+    expect(new Set(chartRequests).size).toBe(chartRequests.length);
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+    await page.screenshot({
+      path: `test-results/models-${width}.png`,
+      fullPage: true,
+    });
+  });
+}

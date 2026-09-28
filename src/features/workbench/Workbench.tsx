@@ -1,4 +1,5 @@
 import { Research } from "../research/Research";
+import { Models } from "../models/Models";
 import {
   LocaleProvider,
   LanguageSwitcher,
@@ -83,7 +84,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   const { span: spanChange, dollarVolume: dollarVolumeHelp } =
     activityExplanations(locale);
   const [activePage, setActivePage] = useState<
-    "watchlist" | "analytics" | "research"
+    "watchlist" | "analytics" | "research" | "models"
   >("watchlist");
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [otherWatchlistsOpen, setOtherWatchlistsOpen] = useState(false);
@@ -571,17 +572,21 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           <p className="eyebrow">
             {activePage === "research"
               ? t("ANALYTICS / DIG DEEP", "分析 / 深度研究")
-              : activePage === "analytics"
-                ? t("ANALYTICS / SECTORS")
-                : t("WATCHLIST / MARKET OVERVIEW")}
+              : activePage === "models"
+                ? t("ANALYTICS / MODELS", "分析 / 模型")
+                : activePage === "analytics"
+                  ? t("ANALYTICS / SECTORS")
+                  : t("WATCHLIST / MARKET OVERVIEW")}
           </p>
           <div className="watchlist-heading-line">
             <h2>
               {activePage === "research"
                 ? t("Dig Deep", "深度研究")
-                : activePage === "analytics"
-                  ? t("Sectors & ETFs")
-                  : t(watchlist.name)}
+                : activePage === "models"
+                  ? t("Models", "模型")
+                  : activePage === "analytics"
+                    ? t("Sectors & ETFs")
+                    : t(watchlist.name)}
             </h2>
             {activePage === "watchlist" && (
               <>
@@ -627,6 +632,13 @@ function WorkbenchContent({ api }: WorkbenchProps) {
               {t(
                 "On-demand research · Quantitative data, fundamentals & news",
                 "按需研究 · 量化指标、基本面与新闻",
+              )}
+            </p>
+          ) : activePage === "models" ? (
+            <p>
+              {t(
+                "Pullback models · Fit across every symbol on this site",
+                "回踩模型 · 全站标的拟合度",
               )}
             </p>
           ) : activePage === "analytics" ? (
@@ -918,6 +930,17 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             >
               {t("Dig Deep", "深度研究")}
             </button>
+            <button
+              type="button"
+              className="watchlist-button"
+              aria-pressed={activePage === "models"}
+              onClick={() => {
+                setActivePage("models");
+                handleCloseDetails();
+              }}
+            >
+              {t("Models", "模型")}
+            </button>
           </div>
         </nav>
         <details className="connection-details">
@@ -952,6 +975,8 @@ function WorkbenchContent({ api }: WorkbenchProps) {
 
       {activePage === "research" ? (
         <Research />
+      ) : activePage === "models" ? (
+        <Models />
       ) : activePage === "analytics" ? (
         <SectorAnalytics api={api} onHistoryRequests={setHistoryRequestCount} />
       ) : (
