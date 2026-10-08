@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPortfolio,
+  clipCorrelation,
   diversificationMultiplier,
   ewmaSeries,
   expandingQuantile,
   instrumentWeights,
   isMonthStart,
   normalisedReturns,
+  quadraticForm,
+  symmetricEigen,
   weekBlocks,
 } from "./portfolio";
+import { seededRandom } from "./stats";
 import {
   defaultClasses,
   sliceSystem,
@@ -133,6 +137,52 @@ describe("instrument diversification multiplier", () => {
   });
 });
 
+describe("correlation repair", () => {
+  // Floored estimates mixed with the 0.99 fill, as the IDM fit produces them.
+  const mixed = (n: number) => {
+    const random = seededRandom(9);
+    const H = new Float64Array(n * n);
+    for (let i = 0; i < n; i++) {
+      H[i * n + i] = 1;
+      for (let j = i + 1; j < n; j++)
+        H[i * n + j] = H[j * n + i] = random() < 0.3 ? 0.99 : Math.max(0, random() - 0.4);
+    }
+    return H;
+  };
+  it("decomposes a symmetric matrix into orthonormal eigenvectors", () => {
+    const n = 30;
+    const H = mixed(n);
+    const { values, vectors } = symmetricEigen(H, n);
+    for (let k = 0; k < n; k++)
+      for (let i = 0; i < n; i++) {
+        let hv = 0,
+          dot = 0;
+        for (let j = 0; j < n; j++) {
+          hv += H[i * n + j] * vectors[k * n + j];
+          dot += vectors[i * n + j] * vectors[k * n + j];
+        }
+        expect(hv).toBeCloseTo(values[k] * vectors[k * n + i], 12);
+        expect(dot).toBeCloseTo(i === k ? 1 : 0, 12);
+      }
+    expect(values.reduce((sum, v) => sum + v, 0)).toBeCloseTo(n, 10);
+    expect(Math.min(...values)).toBeLessThan(-1);
+  });
+  it("keeps PSD matrices and clips indefinite ones to PSD with a unit diagonal", () => {
+    const flat = Float64Array.from({ length: 25 }, (_, k) => (k % 6 === 0 ? 1 : 0.99));
+    expect(clipCorrelation(flat, 5)).toEqual(flat);
+    const n = 30;
+    const clipped = clipCorrelation(mixed(n), n);
+    expect(Math.min(...symmetricEigen(clipped, n).values)).toBeGreaterThan(-1e-12);
+    for (let i = 0; i < n; i++) {
+      expect(clipped[i * n + i]).toBe(1);
+      for (let j = 0; j < n; j++) {
+        expect(clipped[i * n + j]).toBe(clipped[j * n + i]);
+        expect(Math.abs(clipped[i * n + j])).toBeLessThanOrEqual(1 + 1e-12);
+      }
+    }
+  });
+});
+
 describe("sizing and the risk overlay", () => {
   it("sizes a = IDM·w·τ/σ and x = a·F⁺/10 with the long-only floor", () => {
     const system = testSystem({
@@ -183,6 +233,107 @@ describe("sizing and the risk overlay", () => {
       for (let j = 0; j < 5; j++) risk += x[i] * 0.8 * x[j] * 0.8 * (i === j ? 1 : 0.99);
     expect(overlayLimitCodes[frame.limit[t]]).toBe("normal_risk");
     expect(frame.multiplier[t]).toBeCloseTo((1.75 * 0.2) / Math.sqrt(risk), 12);
+  });
+  // Every pair at the pre-fit 0.99: risk = √(Σᵢⱼ xᵢsᵢ·xⱼsⱼ·Hᵢⱼ).
+  const preFitRisk = (x: number[], s: number[]) => {
+    let sum = 0;
+    for (let i = 0; i < x.length; i++)
+      for (let j = 0; j < x.length; j++) sum += x[i] * s[i] * x[j] * s[j] * (i === j ? 1 : 0.99);
+    return Math.sqrt(sum);
+  };
+  const w = [0.125, 0.125, 0.25, 0.25, 0.25];
+  it("binds on correlation shock Σ|x|σ when the other limits are loose", () => {
+    // At 120% vol and forecast 50, Σ|x|σ = τ·5 = 1 > 4τ while gross is 5/6.
+    const overlay = { gross: 10, normalRisk: 10, correlationShock: 4, jumpRisk: 10 };
+    const loose = { ...config, engine: { ...config.engine, overlay } };
+    const frame = buildPortfolio(
+      testSystem({ sessions: 40, sigma: 1.2, forecast: () => 50, config: loose }),
+      loose,
+    );
+    const t = 30;
+    const x = w.map((wi) => ((wi * 0.2) / 1.2) * 5);
+    const shock = x.reduce((sum, xi) => sum + xi * 1.2, 0);
+    expect(shock).toBeCloseTo(1, 12);
+    expect(overlayLimitCodes[frame.limit[t]]).toBe("correlation_shock");
+    expect(frame.multiplier[t]).toBeCloseTo((4 * 0.2) / shock, 12);
+    expect(frame.targetWeight.map((s) => s[t])).toEqual(x.map((v) => expect.closeTo(v * 0.8, 12)));
+  });
+  it("binds on jump risk with the expanding 99th-percentile σ after an early spike", () => {
+    // σ was 150% for the first 20 sessions and is 20% now; forecast 8 keeps gross at 0.8.
+    const frame = buildPortfolio(
+      testSystem({ sessions: 40, sigma: (_, t) => (t < 20 ? 1.5 : 0.2), forecast: () => 8 }),
+      config,
+    );
+    const t = 30;
+    const x = w.map((wi) => ((wi * 0.2) / 0.2) * 0.8);
+    const normal = preFitRisk(x, Array(5).fill(0.2));
+    const jump = preFitRisk(x, Array(5).fill(1.5));
+    expect(normal).toBeLessThan(1.75 * 0.2);
+    expect(jump).toBeGreaterThan(4 * 0.2);
+    expect(overlayLimitCodes[frame.limit[t]]).toBe("jump_risk");
+    expect(frame.multiplier[t]).toBeCloseTo((4 * 0.2) / jump, 12);
+    expect(frame.gross[t]).toBeCloseTo(0.8 * frame.multiplier[t], 12);
+    // Once the spike is a small enough share of history, the quantile drops and nothing binds.
+    const later = buildPortfolio(
+      testSystem({ sessions: 3000, sigma: (_, t) => (t < 20 ? 1.5 : 0.2), forecast: () => 8 }),
+      config,
+    );
+    expect(overlayLimitCodes[later.limit[2999]]).not.toBe("jump_risk");
+  });
+  it("measures signed risk on the PSD-repaired correlation", () => {
+    // AAA and BBB move exactly opposite (ρ = −1, floored to 0); CCC lists at 450,
+    // so its pairs are still unfitted (0.99) at 480. That H is indefinite.
+    const symbols = ["AAA", "BBB", "CCC"];
+    const book = testBook(symbols.map((s) => ({ id: s.toLowerCase(), rows: [[s]] })), {
+      maxPositionWeight: 10,
+    });
+    const closes: Record<string, number[]> = {};
+    for (const s of ["SPY", ...symbols]) {
+      closes[s] = [100];
+      for (let t = 1; t < 500; t++) {
+        const a = Math.sin(0.9 * t) + 0.5 * Math.sin(0.13 * t);
+        const e = s === "AAA" ? a : s === "BBB" ? -a : Math.cos(2.3 * t);
+        closes[s].push(closes[s][t - 1] * (1 + 0.01 * e));
+      }
+    }
+    const panel = testPanel({
+      symbols,
+      sessions: 500,
+      close: (s, t) => closes[s][t],
+      firstBar: { CCC: 450 },
+    });
+    // Only normal risk can bind: x ∝ (1.8, 0.2, −1.4) has xᵀHx < 0.
+    const overlay = { gross: 10, normalRisk: 1.75, correlationShock: 10, jumpRisk: 10 };
+    const loose = { ...config, engine: { ...config.engine, overlay } };
+    const system = systemFromPanel(panel, book, loose, {
+      sigma: 0.16,
+      forecast: (i) => [90, 10, -70][i],
+    });
+    const frame = buildPortfolio(system, loose, { longShort: true });
+    const t = 480;
+    const x = [90, 10, -70].map(
+      (f, i) => ((frame.idm[t] * frame.instrumentWeight[i][t] * 0.2) / 0.16) * (f / 10),
+    );
+    const H = [1, 0, 0.99, 0, 1, 0.99, 0.99, 0.99, 1];
+    expect(quadraticForm(H, [0, 1, 2], x)).toBeLessThan(0);
+    // Clipping by hand: H = v₁v₁ᵀ + (1 + 0.99√2)·v₊v₊ᵀ + (1 − 0.99√2)·v₋v₋ᵀ with
+    // v₁ = (1, −1, 0)/√2 and v₊ = (½, ½, 1/√2); drop v₋, rescale to a unit diagonal.
+    const lambda = 1 + 0.99 * Math.SQRT2;
+    const d12 = 0.5 + lambda / 4,
+      d3 = lambda / 2;
+    const r12 = (-0.5 + lambda / 4) / d12;
+    const r13 = lambda / 2 / Math.SQRT2 / Math.sqrt(d12 * d3);
+    const clipped = [1, r12, r13, r12, 1, r13, r13, r13, 1];
+    expect(Array.from(clipCorrelation(H, 3))).toEqual(clipped.map((v) => expect.closeTo(v, 12)));
+    const risk = 0.16 * Math.sqrt(quadraticForm(clipped, [0, 1, 2], x));
+    expect(risk).toBeGreaterThan(1.75 * 0.2);
+    expect(overlayLimitCodes[frame.limit[t]]).toBe("normal_risk");
+    expect(frame.multiplier[t]).toBeCloseTo((1.75 * 0.2) / risk, 10);
+    // Long-only weights keep H itself (non-negative entries, so xᵀHx ≥ 0).
+    const longOnly = buildPortfolio(system, loose);
+    const longRisk = 0.16 * Math.sqrt(quadraticForm(H, [0, 1, 2], [x[0], x[1], 0]));
+    expect(overlayLimitCodes[longOnly.limit[t]]).toBe("normal_risk");
+    expect(longOnly.multiplier[t]).toBeCloseTo((1.75 * 0.2) / longRisk, 10);
   });
   it("is zero for ineligible symbols", () => {
     const frame = buildPortfolio(testSystem({ sessions: 40, eligibleFrom: { BBB: 30 } }), config);

@@ -14,10 +14,55 @@ import type { SystemFrame } from "./types";
 const CURVE_TAU = 0.2;
 const trendRules: RuleId[] = ["ewmac8", "ewmac16", "ewmac32", "ewmac64"];
 
+/** Rules behind the AFTS Strategy 27 sign gate (0 while they disagree with ewmac16). */
+export const signGatedRules = new Set(
+  ruleCatalog.filter((rule) => rule.params.gate !== undefined).map((rule) => rule.id),
+);
+
+/** Pooled mean |f| over eligible symbol-sessions in the window; `nonZero` skips exact zeros. */
+export function meanAbsForecast(
+  system: SystemFrame,
+  rule: RuleId,
+  startIndex: number,
+  endIndex = system.dates.length - 1,
+  nonZero = false,
+) {
+  let sum = 0,
+    count = 0;
+  system.forecasts[rule].forEach((forecast, i) => {
+    const eligible = system.eligible[i];
+    for (let t = Math.max(0, startIndex); t <= endIndex; t++)
+      if (eligible[t] === 1 && Number.isFinite(forecast[t]) && !(nonZero && forecast[t] === 0)) {
+        sum += Math.abs(forecast[t]);
+        count++;
+      }
+  });
+  return count ? sum / count : null;
+}
+
+/**
+ * Mean |f| over the population the rule's scalar was calibrated on, for the
+ * forecast_scale check. A gated rule's scalar targets 10 while the gate is
+ * open (mr5's 9.3 is the ungated Strategy 26 scalar; the pooled scalar
+ * counts nonzero values only), so its gate-closed zeros, about half of
+ * symbol-days, would pull the realised mean to about 5 and keep the warning
+ * on permanently.
+ */
+export function calibratedMeanAbsForecast(
+  system: SystemFrame,
+  rule: RuleId,
+  startIndex: number,
+  endIndex = system.dates.length - 1,
+) {
+  return meanAbsForecast(system, rule, startIndex, endIndex, signGatedRules.has(rule));
+}
+
 /**
  * Daily pooled rule returns after the window start, signed and long-only:
- * the mean over symbols eligible at the decision session. Days without one
- * are skipped.
+ * the mean over symbols eligible at the decision session, plus symbols whose
+ * notional was cut to 0 there because they left eligibility (their exit cost
+ * lands on the next session, like any other change). Days without either are
+ * skipped.
  */
 export function ruleAccountCurve(
   system: SystemFrame,
@@ -42,7 +87,7 @@ export function ruleAccountCurve(
       dqLong = 0;
     for (let t = 0; t <= endIndex; t++) {
       if (!(close[t] > 0)) continue;
-      if (prev >= startIndex && eligible[prev] === 1) {
+      if (prev >= startIndex && (eligible[prev] === 1 || dq > 0)) {
         const r = close[t] / close[prev] - 1;
         const c = (Number.isFinite(costBps[prev]) ? costBps[prev] : 0) / 1e4;
         signed[t] += q * r - dq * c;
@@ -104,14 +149,6 @@ export function ruleDiagnostics(
 
   return ruleCatalog.map((rule): RuleDiagnostics => {
     const forecast = system.forecasts[rule.id];
-    let sum = 0,
-      count = 0;
-    for (let i = 0; i < n; i++)
-      for (let t = Math.max(0, startIndex); t <= endIndex; t++)
-        if (eligible[i][t] === 1 && Number.isFinite(forecast[i][t])) {
-          sum += Math.abs(forecast[i][t]);
-          count++;
-        }
     let live = 0,
       passing = 0;
     for (let i = 0; i < n; i++)
@@ -130,7 +167,7 @@ export function ruleDiagnostics(
       family: rule.family,
       scalar: nullable(system.scalars[rule.id][endIndex]),
       scalarSource: rule.scalar === null ? "pooled" : "book",
-      meanAbsForecast: count ? sum / count : null,
+      meanAbsForecast: meanAbsForecast(system, rule.id, startIndex, endIndex),
       turnover: nullable(system.turnover[rule.id][endIndex]),
       costPassRate: live ? (passing / live) * 100 : null,
       sharpe: nullable(dailySharpe(curve.signed) * 16),

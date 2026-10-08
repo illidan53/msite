@@ -14,7 +14,7 @@ import {
 import { ruleCatalog } from "../../shared/strategyRules";
 import { configHash, type BookDefinition, type StrategyConfig } from "./config";
 import { buildPortfolio } from "./portfolio";
-import { ruleDiagnostics } from "./ruleCurves";
+import { calibratedMeanAbsForecast, ruleDiagnostics, signGatedRules } from "./ruleCurves";
 import {
   simulate,
   simulateBuyHold,
@@ -379,17 +379,14 @@ async function bookReport(
   });
 
   const warnings: BacktestBookReport["warnings"] = [];
-  const offScale = rules.filter(
-    (r) =>
-      core.baseWeights[r.id] > 0 &&
-      r.meanAbsForecast !== null &&
-      (r.meanAbsForecast < 7 || r.meanAbsForecast > 13),
-  );
-  if (offScale.length)
-    warnings.push({
-      code: "forecast_scale",
-      detail: offScale.map((r) => `${r.id} ${r.meanAbsForecast!.toFixed(1)}`).join(", "),
-    });
+  // Gated rules are judged with the gate open: see calibratedMeanAbsForecast.
+  const offScale = ruleCatalog.flatMap(({ id }) => {
+    const scale = core.baseWeights[id] > 0 ? calibratedMeanAbsForecast(core, id, start, end) : null;
+    return scale !== null && (scale < 7 || scale > 13)
+      ? [`${id} ${scale.toFixed(1)}${signGatedRules.has(id) ? " (gate open)" : ""}`]
+      : [];
+  });
+  if (offScale.length) warnings.push({ code: "forecast_scale", detail: offScale.join(", ") });
   const { costSharpe, sharpe } = coreRun.stats;
   if (costSharpe !== null && sharpe !== null && costSharpe > sharpe / 3)
     warnings.push({

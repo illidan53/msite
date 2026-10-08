@@ -386,7 +386,10 @@ export function seededRandom(seed = 0x2002026) {
  * Paired block bootstrap of the annual Sharpe difference a − b:
  * both series are resampled with the same 42-session blocks, so their daily
  * dependence survives. Returns the 95% interval, or null when fewer than 95%
- * of the resamples produce a defined difference.
+ * of the resamples produce a defined difference. Below two blocks of data
+ * there are too few distinct block starts (one at n = block, so every
+ * resample is the sample itself) and the "interval" collapses to a point;
+ * null says there is no interval rather than a falsely certain one.
  */
 export function pairedSharpeInterval(
   a: ArrayLike<number>,
@@ -394,8 +397,7 @@ export function pairedSharpeInterval(
   { block = 42, samples = 1000, seed = 0x2002026 } = {},
 ): [number, number] | null {
   const n = Math.min(a.length, b.length);
-  const length = Math.min(block, n);
-  if (n < 2 || !length) return null;
+  if (!(block >= 1) || n < 2 * block) return null;
   const random = seededRandom(seed);
   const effects: number[] = [];
   for (let sample = 0; sample < samples; sample++) {
@@ -405,8 +407,8 @@ export function pairedSharpeInterval(
       sbb = 0,
       used = 0;
     while (used < n) {
-      const start = Math.floor(random() * (n - length + 1));
-      for (let j = 0; j < length && used < n; j++, used++) {
+      const start = Math.floor(random() * (n - block + 1));
+      for (let j = 0; j < block && used < n; j++, used++) {
         const x = a[start + j],
           y = b[start + j];
         sa += x;

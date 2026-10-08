@@ -170,6 +170,18 @@ describe("Sharpe-difference tests", () => {
     expect(pairedSharpeInterval(a, a)).toEqual([0, 0]);
     expect(sharpeDifference(a, a)).toMatchObject({ difference: 0, z: null, p: null });
   });
+  it("gives no interval below two 42-session blocks instead of a point", () => {
+    // At n ≤ 42 every resample is the sample itself: [d, d] would look certain.
+    for (const n of [10, 42, 83])
+      expect(pairedSharpeInterval(a.slice(0, n), b.slice(0, n))).toBeNull();
+    const d = sharpeDifference(a.slice(0, 40), b.slice(0, 40));
+    expect(d.interval).toBeNull();
+    expect(d.difference).not.toBeNull();
+    const two = pairedSharpeInterval(a.slice(0, 84), b.slice(0, 84))!;
+    expect(two[1] - two[0]).toBeGreaterThan(0.1);
+    expect(pairedSharpeInterval(a, b, { block: 5 })).not.toBeNull();
+    expect(pairedSharpeInterval(a.slice(0, 9), b.slice(0, 9), { block: 5 })).toBeNull();
+  });
 });
 
 describe("deflated Sharpe ratio (Bailey & López de Prado 2014)", () => {
