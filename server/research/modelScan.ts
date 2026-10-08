@@ -25,7 +25,7 @@ import { ApiError } from "../http/apiError";
 import type { MarketDataProvider } from "../market/marketDataProvider";
 import { calculateEma200Study } from "./ema200";
 import { calculateQuantModels } from "./pullback";
-import { closedBars } from "./quant";
+import { fetchClosedBars, fetchFailureCode } from "./barFetch";
 
 export interface ScanUniverse {
   lists: { id: string; name: string }[];
@@ -201,12 +201,7 @@ function commonDate(dates: string[]) {
   );
   return ranked[0]?.[0] ?? "";
 }
-const failureCode = (e: unknown) =>
-  e instanceof ApiError
-    ? e.code === "NO_HISTORY"
-      ? "NO_HISTORY"
-      : `PROVIDER_${e.status}`
-    : "FETCH_FAILED";
+const failureCode = fetchFailureCode;
 
 interface Stored {
   scan: ModelScan;
@@ -301,32 +296,10 @@ export class ModelScanService {
     }
     return this.state();
   }
-  private async bars(symbol: string) {
-    const get = async (range: "5y" | "1y") => {
-      for (let attempt = 0; ; attempt++) {
-        try {
-          return await this.market.getHistory({ symbol, range });
-        } catch (e) {
-          // One polite retry when the provider throttles.
-          if (!(e instanceof ApiError) || e.status !== 429 || attempt >= 1)
-            throw e;
-          await new Promise((r) =>
-            setTimeout(r, this.options.retryDelayMs ?? 2000),
-          );
-        }
-      }
-    };
-    let series;
-    try {
-      series = await get("5y");
-    } catch (e) {
-      if (!(e instanceof ApiError) || ![400, 403].includes(e.status)) throw e;
-      series = await get("1y");
-    }
-    const bars = closedBars(series.bars);
-    if (bars.length < 2)
-      throw new ApiError(422, "NO_HISTORY", "Insufficient completed bars");
-    return bars;
+  private bars(symbol: string) {
+    return fetchClosedBars(this.market, symbol, {
+      retryDelayMs: this.options.retryDelayMs,
+    });
   }
   private async run(job: ModelScanJob) {
     try {
