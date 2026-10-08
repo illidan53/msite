@@ -1,0 +1,79 @@
+# Quant System configuration (Carver, Advanced Futures Trading Strategies, 2023).
+# Changing anything here changes the config hash shown on reports and paper ledgers.
+# Email recipients and credentials are never stored here: see README → Quant System.
+version: 1
+benchmark: SPY
+engine:
+  forecastCap: 20
+  buffer: 0.1
+  # Fractional shares in paper trading and signals; the whole_shares variant uses 1.
+  lot: 0.0001
+  minTradeNotional: 25
+  eligibilitySessions: 256
+  evaluationMinSession: 320
+  evaluationEligibleShare: 0.8
+  ruleCostLimitSharpe: 0.15
+  instrumentCostLimitSharpe: 0.01
+  diversificationCap: 2.5
+  overlay:
+    gross: 1
+    normalRisk: 1.75
+    correlationShock: 4
+    jumpRisk: 4
+costs:
+  benchmarkBps: 1.5
+  # One-way cost by trailing 60-session median dollar volume.
+  tiers:
+    - minDollarVolume: 500000000
+      bps: 3
+    - minDollarVolume: 100000000
+      bps: 5
+    - minDollarVolume: 10000000
+      bps: 10
+    - minDollarVolume: 0
+      bps: 30
+  secFeeBps: 0.206
+  secFeeFrom: "2026-04-04"
+books:
+  - id: stocks
+    name:
+      en: Stock book
+      zh: 个股组合
+    source: watchlists
+    # Lists that never define a symbol's class (their unique names need an override).
+    classExcludeLists:
+      - close-watch
+    classOverrides:
+      ETN: industrials-defense
+      XYL: industrials-defense
+      EQPT: industrials-defense
+      TECK: energy
+    riskTarget: 0.2
+    maxPositionWeight: 0.1
+    capital: 100000
+    enabled: true
+  - id: sectors
+    name:
+      en: Sector ETF book
+      zh: 板块 ETF 组合
+    source: symbols
+    className: SPDR sectors
+    symbols: [XLK, XLF, XLV, XLI, XLY, XLP, XLE, XLU, XLB, XLRE, XLC]
+    riskTarget: 0.15
+    maxPositionWeight: 0.25
+    capital: 100000
+    enabled: true
+schedule:
+  timezone: America/New_York
+  # Daily run after the previous session is final, before the next open.
+  dailyAt: "07:00"
+  dailyRetryMinutes: 30
+  dailyGiveUpAt: "12:00"
+  # 0 = Sunday … 6 = Saturday
+  weeklyDay: 6
+  weeklyAt: "09:00"
+email:
+  locale: zh
+  sendWhenNoSignals: false
+  weeklyReport: true
+  failureAlerts: true
