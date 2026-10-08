@@ -1906,7 +1906,7 @@ for (const width of [1440, 390]) {
         "GET /api/strategy/paper/stocks",
         "GET /api/strategy/reports",
         "GET /api/strategy/reports/bt-20261003",
-        "GET /api/strategy/signals?limit=200",
+        "GET /api/strategy/signals?book=stocks&limit=1000",
         "GET /api/strategy/outbox",
         "GET /api/strategy/charts/stocks/NVDA",
       ]),

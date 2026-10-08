@@ -9,7 +9,15 @@ import { ActionBadge, LatestGate, Pending, type RunControls } from "./parts";
 import { useResource } from "./strategyApi";
 import { reasonLabels } from "./strategyText";
 
-export const signalsPath = "/strategy/signals?limit=200";
+/** The route's maximum page; the log keeps the newest 5000 across both books. */
+export const signalHistoryLimit = 1000;
+/**
+ * The stock book trades far more often than the sector book, so a shared page
+ * would push sector history out. `book` lets the server filter; a server that
+ * ignores it still answers the newest page, which is filtered below.
+ */
+export const signalsPath = (book: string) =>
+  `/strategy/signals?book=${encodeURIComponent(book)}&limit=${signalHistoryLimit}`;
 export const outboxPath = "/strategy/outbox";
 
 export function SignalsTab({
@@ -131,12 +139,14 @@ export function SignalTable({
 }
 
 function SignalHistory({ book }: { book: string }) {
-  const { t, tr, money, shares } = useStrategyFormat();
-  const resource = useResource<SignalRecord[]>(signalsPath);
-  const rows =
-    resource?.status === "ready"
-      ? resource.value.filter((s) => s.book === book)
-      : [];
+  const { t, tr, number, money, shares } = useStrategyFormat();
+  const path = signalsPath(book);
+  const resource = useResource<SignalRecord[]>(path);
+  const page = resource?.status === "ready" ? resource.value : [];
+  const rows = page.filter((s) => s.book === book);
+  // A full page means older records exist beyond it, so an empty list is not "none yet".
+  const truncated = page.length >= signalHistoryLimit;
+  const newest = number(signalHistoryLimit, 0);
   const fill = (s: SignalRecord) =>
     !s.fill ? (
       <span className="research-status running">{t("Pending", "待成交")}</span>
@@ -167,7 +177,7 @@ function SignalHistory({ book }: { book: string }) {
         {t("Signal history", "信号历史")}
       </h3>
       <Pending
-        path={signalsPath}
+        path={path}
         resource={resource}
         label={t("signal history", "信号历史")}
       />
@@ -211,13 +221,23 @@ function SignalHistory({ book }: { book: string }) {
           </div>
         ) : (
           <p className="quant-model-empty">
-            {t(
-              "No signals recorded for this book yet.",
-              "该组合尚无信号记录。",
-            )}
+            {truncated
+              ? t(
+                  `No signals for this book among the newest ${newest} records.`,
+                  `最新 ${newest} 条记录中没有该组合的信号。`,
+                )
+              : t(
+                  "No signals recorded for this book yet.",
+                  "该组合尚无信号记录。",
+                )}
           </p>
         ))}
       <p className="research-meta">
+        {truncated &&
+          t(
+            `Only the newest ${newest} signal records are loaded; older ones stay on the server. `,
+            `仅加载最新 ${newest} 条信号记录，更早的记录保留在服务器上。`,
+          )}
         {t(
           `Ineligibility reasons: ${Object.values(reasonLabels)
             .map((r) => r.en.toLowerCase())

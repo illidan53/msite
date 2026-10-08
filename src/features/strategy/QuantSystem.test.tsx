@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { StrategyState } from "../../../shared/strategy";
+import type { SignalRecord, StrategyState } from "../../../shared/strategy";
 import { ruleCatalog } from "../../../shared/strategyRules";
 import { LanguageSwitcher, LocaleProvider } from "../../shared/locale";
 import {
@@ -27,6 +27,15 @@ import { QuantSystem } from "./QuantSystem";
 type Reply = unknown;
 type Handler = (path: string, method: string, body: unknown) => Reply;
 const error = (status: number, code = "") => ({ __status: status, code });
+/** Like the route: newest first, `limit` (default 200) applied, `book` ignored. */
+const signalPage = (path: string, log: SignalRecord[]) => {
+  const query = path.match(/^\/api\/strategy\/signals(?:\?(.*))?$/);
+  if (!query) return undefined;
+  return log.slice(
+    0,
+    Number(new URLSearchParams(query[1]).get("limit") ?? 200),
+  );
+};
 /** Default fixture-backed API; `override` answers first when it returns something. */
 function routes(canRun = false, override?: Handler): Handler {
   return (path, method, body) => {
@@ -45,7 +54,8 @@ function routes(canRun = false, override?: Handler): Handler {
       );
     const paper = path.match(/^\/api\/strategy\/paper\/(.+)$/);
     if (paper) return paperFixture(paper[1]);
-    if (path === "/api/strategy/signals?limit=200") return signalsFixture;
+    const signals = signalPage(path, signalsFixture);
+    if (signals) return signals;
     if (path === "/api/strategy/outbox") return outboxFixture;
     const chart = path.match(/^\/api\/strategy\/charts\/([^/]+)\/(.+)$/);
     if (chart) return chartFixture(chart[1], decodeURIComponent(chart[2]));
@@ -164,7 +174,9 @@ it("shows status, benchmark KPIs, equity curves, paper record and today's signal
   expect(nvda).toHaveTextContent("0.00% → 2.51%");
   expect(within(today).getAllByRole("row")).toHaveLength(5);
   // Overview never loads the other tabs' data.
-  expect(calls(fetcher, "/api/strategy/signals?limit=200")).toBe(0);
+  expect(
+    fetcher.mock.calls.some(([url]) => url.startsWith("/api/strategy/signals")),
+  ).toBe(false);
   expect(calls(fetcher, "/api/strategy/paper/stocks")).toBe(1);
   expect(fetcher.mock.calls.some(([, init]) => init?.method === "POST")).toBe(
     false,
@@ -254,6 +266,55 @@ it("lists latest orders with drivers, fill history and the email outbox", async 
     "MessageRejected",
   );
   expect(calls(fetcher, "/api/strategy/outbox")).toBe(1);
+  expect(calls(fetcher, "/api/strategy/signals?book=stocks&limit=1000")).toBe(
+    1,
+  );
+});
+
+it("keeps a quiet book's signal history when the busy book fills the log", async () => {
+  const [stock] = signalsFixture;
+  const sector = signalsFixture.find((s) => s.book === "sectors")!;
+  const busy = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ...stock,
+      id: `stocks:busy:${i}`,
+      symbol: `S${i}`,
+    }));
+  storage.set("msite-strategy-book", "sectors");
+  storage.set("msite-strategy-tab", "signals");
+  // Newest first: the stock book's daily trades sit ahead of older sector entries.
+  const open = (log: SignalRecord[]) => {
+    cleanup();
+    const fetcher = mockApi(routes(false, (path) => signalPage(path, log)));
+    renderPage();
+    return fetcher;
+  };
+
+  const fetcher = open([...busy(250), sector]);
+  const history = await screen.findByRole("table", { name: "Signal history" });
+  expect(
+    within(history).getByRole("row", { name: new RegExp(sector.symbol) }),
+  ).toBeInTheDocument();
+  expect(within(history).getAllByRole("row")).toHaveLength(2);
+  expect(calls(fetcher, "/api/strategy/signals?book=sectors&limit=1000")).toBe(
+    1,
+  );
+  expect(screen.queryByText(/Only the newest/)).not.toBeInTheDocument();
+
+  // Past the route's 1000-record page the sector entry is out of reach: say so
+  // instead of claiming the book has never traded.
+  open([...busy(1000), sector]);
+  expect(
+    await screen.findByText(
+      "No signals for this book among the newest 1,000 records.",
+    ),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByText("No signals recorded for this book yet."),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.getByText(/Only the newest 1,000 signal records are loaded/),
+  ).toBeInTheDocument();
 });
 
 it("sorts and filters positions and drills into a symbol chart", async () => {
