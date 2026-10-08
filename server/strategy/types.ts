@@ -36,6 +36,7 @@ export interface EngineOptions {
  */
 export interface SystemFrame {
   book: BookDefinition;
+  panel: Panel;
   dates: string[];
   /** Book symbols present in the panel, in book order. */
   symbols: string[];
