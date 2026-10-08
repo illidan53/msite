@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { expectSeries, goldenCloses } from "./engineTestUtils";
-import { ewmStd, rollingQuantile, spanAlpha } from "./math";
+import { expectSeries, goldenCloses, lcg } from "./engineTestUtils";
+import { ewmStd, spanAlpha } from "./math";
 import { blendedVol, normalisedReturns, robustVol, volAttenuation } from "./vol";
 
 const _ = NaN;
@@ -52,20 +52,22 @@ describe("normalised returns", () => {
 });
 
 describe("robust vol of index changes", () => {
-  it("is the EW std until 100 values exist, then floored at the trailing 5% quantile", () => {
-    // Large moves, then a calm spell: the floor slows the collapse of vol.
-    const changes = [
-      _,
-      ...Array.from({ length: 400 }, (_, t) => (t % 2 ? 1 : -1) * (t < 150 ? 1 : 0.001)),
-    ];
+  it("matches pandas robust_vol_calc well past the 500-session floor window", () => {
+    // Shrinking regimes, so the floor binds before and after the window fills (pandas golden).
+    const uniform = lcg(99);
+    const scale = (t: number) => (t < 200 ? 1 : t < 600 ? 0.2 : 0.02);
+    const changes = [_, ...Array.from({ length: 899 }, (_, t) => scale(t) * (uniform() - 0.5))];
     const vol = robustVol(changes);
+    const points = [9, 10, 108, 109, 150, 300, 499, 500, 600, 610, 620, 640, 700, 899];
+    expectSeries(at(vol, points), [
+      _, 0.25462787973678763, 0.27185887365546957, 0.27912737918220604, 0.297043027437436,
+      0.064284944688784, 0.04767629884311715, 0.048514072747663645, 0.05701101987910344,
+      0.046789750265416694, 0.04577804195460696, 0.03738225039470776, 0.008780255006160451,
+      0.005643696345395329,
+    ], 14);
     const raw = ewmStd(changes, spanAlpha(35), 10);
-    const floor = rollingQuantile(raw, 500, 0.05, 100);
-    expect(vol.slice(0, 10).every(Number.isNaN)).toBe(true);
-    raw.forEach((s, t) => {
-      if (t >= 10) expect(vol[t]).toBe(Math.max(s, t < 109 ? 0 : floor[t]));
-    });
-    expect(vol[200]).toBeGreaterThan(raw[200]);
+    for (const t of [300, 610, 620, 640, 700]) expect(vol[t]).toBeGreaterThan(raw[t]);
+    expect(vol[899]).toBe(raw[899]);
   });
   it("forward-fills and never divides by zero on a constant index", () => {
     const vol = robustVol([_, ...Array(200).fill(0)]);

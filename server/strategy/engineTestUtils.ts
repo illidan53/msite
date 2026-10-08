@@ -50,18 +50,23 @@ export function weekdays(start: string, count: number) {
   return dates;
 }
 
+/** A constant, or a value per session index. */
+type PerSession = number | ((k: number) => number);
+const valueAt = (value: PerSession | undefined, k: number, fallback: number) =>
+  value === undefined ? fallback : typeof value === "function" ? value(k) : value;
+
 export interface PathSpec {
   seed: number;
-  /** Daily log drift, constant or per session index. */
-  drift?: number | ((k: number) => number);
+  /** Daily log drift. */
+  drift?: PerSession;
   /** Annualised volatility (fraction). */
-  vol?: number;
+  vol?: PerSession;
   /** First session index with a bar (late listing). */
   start?: number;
   /** Session indices without a bar. */
   gaps?: number[];
   /** Shares per day; dollar volume is close × volume. */
-  volume?: number;
+  volume?: PerSession;
   price?: number;
   /** Session index range [from, to) where the close does not move (stale prices). */
   flat?: [number, number];
@@ -71,14 +76,12 @@ export interface PathSpec {
 export function syntheticBars(dates: string[], spec: PathSpec): PriceBar[] {
   const draw = gaussian(spec.seed);
   const gaps = new Set(spec.gaps ?? []);
-  const daily = (spec.vol ?? 0.3) / 16;
   let close = spec.price ?? 100;
   const bars: PriceBar[] = [];
   dates.forEach((date, k) => {
     if (k < (spec.start ?? 0)) return;
-    const drift = typeof spec.drift === "function" ? spec.drift(k) : (spec.drift ?? 0);
     const open = close;
-    const move = Math.exp(drift + daily * draw());
+    const move = Math.exp(valueAt(spec.drift, k, 0) + (valueAt(spec.vol, k, 0.3) / 16) * draw());
     if (!spec.flat || k < spec.flat[0] || k >= spec.flat[1]) close *= move;
     if (gaps.has(k)) return;
     bars.push({
@@ -87,7 +90,7 @@ export function syntheticBars(dates: string[], spec: PathSpec): PriceBar[] {
       high: Math.max(open, close) * 1.002,
       low: Math.min(open, close) * 0.998,
       close,
-      volume: spec.volume ?? 5e6,
+      volume: valueAt(spec.volume, k, 5e6),
     });
   });
   return bars;

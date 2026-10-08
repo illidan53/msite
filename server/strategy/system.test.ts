@@ -27,10 +27,10 @@ const specs: Record<string, PathSpec> = {
   A4: { seed: 14, drift: -0.001, ...liquid },
   A5: { seed: 15, drift: 0.0003, gaps: [300, 301, 302, 450], ...liquid },
   A6: { seed: 16, drift: 0.0008, start: 150, ...liquid },
-  // beta: three members (median over whoever trades), one expensive to trade.
+  // beta: three members (median over whoever trades), one expensive to trade ($2m a day, 30 bps).
   B1: { seed: 21, drift: -0.002, vol: 0.35, volume: 1e7 },
   B2: { seed: 22, drift: -0.001, vol: 0.35, volume: 1e7 },
-  B3: { seed: 23, drift: -0.0005, vol: 0.45, volume: 4e4 },
+  B3: { seed: 23, drift: -0.0005, vol: 0.45, volume: 4e3 },
   // gamma: a single member whose prices freeze for a while.
   STALE: { seed: 31, drift: 0.0005, flat: [600, 620], ...liquid },
 };
@@ -109,12 +109,66 @@ describe("eligibility", () => {
     expect(frame.costBps[row("A1")][last]).toBe(3);
     expect(frame.costBps[row("B3")][last]).toBe(30);
     expect(frame.dollarVolume[row("B3")][last]).toBeLessThan(10e6);
+    // Windows count own sessions, so A5's missing bars and A6's late listing shift them.
+    frame.symbols.forEach((symbol, i) => {
+      const close = panel.close[frame.panelIndex[i]];
+      const volume = panel.volume[frame.panelIndex[i]];
+      const own = Array.from(close).flatMap((c, t) => (c > 0 ? [t] : []));
+      own.forEach((t, k) => {
+        const window = own.slice(Math.max(0, k - 59), k + 1).map((s) => close[s] * volume[s]);
+        expect(frame.dollarVolume[i][t], `${symbol} ${t}`).toBe(median(window));
+      });
+    });
   });
   it("leaves combined forecasts NaN while ineligible", () => {
     expect(frame.combined[row("A1")][264]).toBeNaN();
     expect(frame.combined[row("A5")][300]).toBeNaN();
     expect(frame.combined[row("STALE")][610]).toBeNaN();
     expect(frame.combined[row("A1")][last]).not.toBeNaN();
+  });
+});
+
+describe("cost tiers and the cost limit use trailing medians, not the latest value", () => {
+  const days = weekdays("2023-01-02", n);
+  const small = buildPanel(
+    {
+      SPY: syntheticBars(days, { seed: 1, vol: 0.18, volume: 8e7 }),
+      // About $2bn a day until session 400, then about $30m.
+      STEP: syntheticBars(days, { seed: 41, volume: (k) => (k < 400 ? 2e7 : 3e5) }),
+      // 30 bps throughout; vol falls from 45% to 12% (or rises from 12% to 45%) at session 350.
+      CALMING: syntheticBars(days, { seed: 42, vol: (k) => (k < 350 ? 0.45 : 0.12), volume: 1e4 }),
+      HEATING: syntheticBars(days, { seed: 43, vol: (k) => (k < 350 ? 0.12 : 0.45), volume: 1e4 }),
+    },
+    "SPY",
+  );
+  const result = computeSystem(small, testBook({ c: ["STEP", "CALMING", "HEATING"] }), testConfig);
+  it("changes tier only once the lower volume fills most of the 60-session window", () => {
+    const step = result.costBps[0];
+    // At 429 the median still averages one $2bn day in; at 430 lows are 31 of 60.
+    expect([step[399], step[400], step[428], step[429], step[430], step[last]]).toEqual([
+      3, 3, 3, 3, 10, 10,
+    ]);
+    expect(result.dollarVolume[0][429]).toBeGreaterThan(500e6);
+    expect(result.dollarVolume[0][430]).toBeLessThan(100e6);
+  });
+  it.each([
+    ["CALMING", 5],
+    ["HEATING", 0],
+  ])("%s: tests bps ÷ the 252-session median σ_b against 0.01 SR, ends at reason %i", (symbol, final) => {
+    const i = result.symbols.indexOf(symbol);
+    const sigma = Array.from(result.sigma[i]);
+    const reason = result.reason[i];
+    for (let t = 265; t < n; t++) {
+      expect(result.costBps[i][t]).toBe(30);
+      const costSharpe = 30 / 1e4 / median(sigma.slice(Math.max(0, t - 251), t + 1));
+      expect(reason[t], `${days[t]}`).toBe(costSharpe > 0.01 ? 5 : 0);
+    }
+    expect(reason[last]).toBe(final);
+    // The latest σ_b crosses 30% (0.01 SR at 30 bps) months before the median does.
+    const latest = sigma.findIndex((s, t) => t > 350 && (s < 0.3) === (final === 5));
+    const flip = reason.findIndex((r, t) => t > 350 && r === final);
+    expect(latest).toBeGreaterThan(350);
+    expect(flip - latest).toBeGreaterThan(60);
   });
 });
 
@@ -198,6 +252,7 @@ describe("pooled scalar for mr20", () => {
 describe("speed limit (AFTS Strategy 9)", () => {
   const b3 = row("B3");
   it("drops an expensive fast rule but keeps slow ones", () => {
+    expect(frame.costBps[b3][last]).toBe(30);
     expect(frame.costPass.ewmac8[b3][last]).toBe(0);
     expect(frame.costPass.ewmac64[b3][last]).toBe(1);
     expect(frame.costPass.ewmac8[row("A1")][last]).toBe(1);
@@ -207,23 +262,27 @@ describe("speed limit (AFTS Strategy 9)", () => {
     expect(weights.ewmac64).toBeGreaterThan(0);
   });
   it("tests c_SR × T ≤ 0.15 on each month's first session from the previous session's data", () => {
-    const own = Array.from(frame.sigma[b3]).flatMap((s, t) => (Number.isFinite(s) ? [t] : []));
-    for (let t = 300; t < n; t++) {
-      const monthStart = dates[t].slice(0, 7) !== dates[t - 1].slice(0, 7);
-      for (const rule of ["ewmac8", "mr5", "ewmac64"] as RuleId[]) {
-        const pass = frame.costPass[rule][b3];
-        if (!monthStart) {
-          expect(pass[t]).toBe(pass[t - 1]);
-          continue;
-        }
+    const outcomes = new Set<number>();
+    frame.symbols.forEach((symbol, i) => {
+      const own = Array.from(frame.sigma[i]).flatMap((s, t) => (Number.isFinite(s) ? [t] : []));
+      for (let t = 300; t < n; t++) {
+        const monthStart = dates[t].slice(0, 7) !== dates[t - 1].slice(0, 7);
         const previous = own.filter((s) => s < t).slice(-252);
-        const sigma = median(previous.map((s) => frame.sigma[b3][s]));
-        const costSharpe = frame.costBps[b3][t - 1] / 1e4 / sigma;
-        expect(pass[t], `${rule} ${dates[t]}`).toBe(
-          costSharpe * frame.turnover[rule][t - 1] > 0.15 ? 0 : 1,
-        );
+        const sigma = median(previous.map((s) => frame.sigma[i][s]));
+        const costSharpe = frame.costBps[i][t - 1] / 1e4 / sigma;
+        for (const rule of ruleIds) {
+          const pass = frame.costPass[rule][i];
+          if (!monthStart) {
+            expect(pass[t]).toBe(pass[t - 1]);
+            continue;
+          }
+          const expected = costSharpe * frame.turnover[rule][t - 1] > 0.15 ? 0 : 1;
+          expect(pass[t], `${symbol} ${rule} ${dates[t]}`).toBe(expected);
+          outcomes.add(expected);
+        }
       }
-    }
+    });
+    expect([...outcomes].sort()).toEqual([0, 1]);
   });
   it("measures turnover as 256 × mean |Δf| / 10 over every symbol's sessions so far", () => {
     let sum = 0,

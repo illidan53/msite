@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expectSeries } from "./engineTestUtils";
+import { expectSeries, lcg } from "./engineTestUtils";
 import {
   clip,
   comAlpha,
@@ -18,8 +18,23 @@ import {
 } from "./math";
 
 const _ = NaN;
+const at = (series: ArrayLike<number>, indices: number[]) => indices.map((i) => series[i]);
 // Golden values: pandas 3.0.6 on the same vector (NaN gaps, leading NaN).
 const x = [_, 1, 2, _, _, 5, 3, _, 8, 1, 2, 7, _, 4];
+/**
+ * 300 draws with a NaN gap and isolated NaNs: half-point ticks (many ties, mirrored in pandas),
+ * plain noise, or an up-drifting walk whose newest value is often the window's largest.
+ */
+const draws = (kind: "ticks" | "noise" | "walk") => {
+  const uniform = lcg(2026);
+  let level = 0;
+  const values = Array.from({ length: 300 }, () => {
+    const u = uniform();
+    return kind === "ticks" ? Math.floor(u * 21) / 2 : kind === "noise" ? u : (level += u - 0.3);
+  });
+  for (const k of [40, 41, 42, 43, 44, 133, 250]) values[k] = NaN;
+  return values;
+};
 
 describe("pandas-exact EWMA (adjust=True, ignore_na=False)", () => {
   it("matches ewm(span=3).mean() through NaN gaps", () => {
@@ -96,6 +111,41 @@ describe("pandas rolling windows", () => {
     expect(floor[99]).toBeCloseTo(0.20547738693467335, 12);
     expect(floor[150]).toBeCloseTo(0.15678391959798993, 12);
     expect(floor[199]).toBeCloseTo(0.11000000000000003, 12);
+  });
+  it("matches pandas once the window is full and older values must leave it", () => {
+    expectSeries(rollingMedian([5, 4, 3, 2, 1, 9, 8, 7], 3), [_, _, 4, 3, 2, 2, 8, 8]);
+    expectSeries(rollingQuantile([5, 4, 3, 2, 1, 9, 8, 7], 3, 0.25), [
+      _, _, 3.5, 2.5, 1.5, 1.5, 4.5, 7.5,
+    ]);
+    const values = draws("ticks");
+    const idx = [0, 13, 14, 19, 20, 21, 44, 45, 60, 99, 133, 150, 199, 250, 268, 299];
+    expectSeries(at(rollingQuantile(values, 20, 0.05, 15), idx), [
+      _, _, 0, 0, 0, 0, 0, 0, 0.375, 0.5, 0.95, 0.45, 0.5, 0.5, 0, 2.4250000000000003,
+    ]);
+    expectSeries(at(rollingQuantile(values, 20, 0.5, 15), idx), [
+      _, _, 5, 4, 5.5, 6.25, 3, 3, 5.75, 5, 6.5, 4, 4, 5.5, 5.5, 4.75,
+    ]);
+    expectSeries(at(rollingMedian(values, 60, 50), [48, 49, 59, 60, 61, 100, 133, 180, 250, 299]), [
+      _, _, 4, 5, 5.5, 5.25, 6, 5, 5, 5.5,
+    ]);
+  });
+  it.each([
+    ["ticks", 7, 1],
+    ["ticks", 20, 15],
+    ["noise", 20, 15],
+    ["walk", 20, 15],
+    ["walk", 60, 50],
+  ] as const)("agrees with sorting every window (%s, window %i, min %i)", (kind, window, minp) => {
+    const values = draws(kind);
+    const medians = rollingMedian(values, window, minp);
+    const lows = rollingQuantile(values, window, 0.05, minp);
+    values.forEach((_, i) => {
+      const slice = values.slice(Math.max(0, i - window + 1), i + 1);
+      const enough = slice.filter(Number.isFinite).length >= minp;
+      expect(medians[i], `median ${i}`).toBe(enough ? median(slice) : NaN);
+      if (enough) expect(lows[i], `q05 ${i}`).toBeCloseTo(quantile(slice, 0.05), 12);
+      else expect(lows[i]).toBeNaN();
+    });
   });
   it("returns a repeated constant exactly", () => {
     expect([...rollingMean([3.3, 3.3, 3.3, 3.3], 2)]).toEqual([NaN, 3.3, 3.3, 3.3]);

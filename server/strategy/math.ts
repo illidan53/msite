@@ -217,10 +217,11 @@ function rollingOrder(
   const sorted = new SortedWindow(Math.min(window, n));
   const minp = Math.max(minPeriods, 1);
   for (let i = 0; i < n; i++) {
-    const cur = values[i];
-    if (cur === cur) sorted.insert(cur);
+    // Drop the leaving value first: inserting first needs window + 1 slots once the window is full.
     const drop = i - window;
     if (drop >= 0 && values[drop] === values[drop]) sorted.remove(values[drop]);
+    const cur = values[i];
+    if (cur === cur) sorted.insert(cur);
     if (sorted.size >= minp) out[i] = pick(sorted);
   }
   return out;
