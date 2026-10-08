@@ -10,6 +10,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSnapshot, PriceSeries } from "../../../shared/types";
 import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
+import {
+  latestFixture,
+  paperFixture,
+  reportFixtures,
+  stateFixture,
+} from "../strategy/fixtures";
 import { Workbench } from "./Workbench";
 
 afterEach(() => {
@@ -504,6 +510,63 @@ describe("Workbench", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Config unavailable",
     );
+  });
+
+  it("opens Analytics → Quant System from the rail before Models", async () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const fetcher = vi.fn(async (url: string) => {
+      const json =
+        url === "/api/research/access"
+          ? { canRun: false, clientIp: null }
+          : url === "/api/strategy/state"
+            ? stateFixture
+            : url === "/api/strategy/latest"
+              ? latestFixture
+              : url.startsWith("/api/strategy/reports/")
+                ? reportFixtures[0]
+                : url.startsWith("/api/strategy/paper/")
+                  ? paperFixture()
+                  : null;
+      return json
+        ? { ok: true, status: 200, json: async () => json }
+        : { ok: false, status: 404, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", fetcher);
+    const user = userEvent.setup();
+    try {
+      render(<Workbench api={createApi()} />);
+      const menu = await screen.findByRole("button", { name: "Models" });
+      const quant = screen.getByRole("button", { name: "Quant System" });
+      expect(
+        quant.compareDocumentPosition(menu) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      await user.click(quant);
+      expect(quant).toHaveAttribute("aria-pressed", "true");
+      expect(
+        screen.getByRole("heading", { name: "Quant System", level: 2 }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("ANALYTICS / QUANT SYSTEM")).toBeInTheDocument();
+      expect(
+        await screen.findByRole("tab", { name: "Overview" }),
+      ).toHaveAttribute("aria-selected", "true");
+      expect(
+        await screen.findByRole("heading", { name: "System status" }),
+      ).toBeInTheDocument();
+      expect(fetcher).toHaveBeenCalledWith(
+        "/api/strategy/state",
+        expect.objectContaining({ method: "GET" }),
+      );
+    } finally {
+      // Unmount first so late chart effects never run without the stubs.
+      cleanup();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("renders an accessible error when snapshot fetching fails", async () => {

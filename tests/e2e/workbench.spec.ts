@@ -7,6 +7,16 @@ import {
   type ModelScan,
 } from "../../shared/research";
 import { expect, test, type Page } from "@playwright/test";
+import {
+  chartFixture,
+  latestFixture,
+  outboxFixture,
+  paperFixture,
+  reportFixtures,
+  reportSummariesFixture,
+  signalsFixture,
+  stateFixture,
+} from "../../src/features/strategy/fixtures";
 import type {
   MarketSnapshot,
   PriceSeries,
@@ -1724,6 +1734,186 @@ for (const width of [1440, 390]) {
     expect(mocks.unexpectedApiRequests).toEqual([]);
     await page.screenshot({
       path: `test-results/models-${width}.png`,
+      fullPage: true,
+    });
+  });
+}
+
+/** Fixture answer for every Quant System GET the page makes; undefined is unexpected. */
+function strategyResponse(url: URL): unknown {
+  const path = url.pathname;
+  if (path === "/api/strategy/state") return stateFixture;
+  if (path === "/api/strategy/latest") return latestFixture;
+  if (path === "/api/strategy/reports") return reportSummariesFixture;
+  if (path === "/api/strategy/signals") return signalsFixture;
+  if (path === "/api/strategy/outbox") return outboxFixture;
+  const [, , , kind, ...rest] = path.split("/").map(decodeURIComponent);
+  if (kind === "reports" && rest.length === 1)
+    return reportFixtures.find((r) => r.id === rest[0]);
+  if (kind === "paper" && rest.length === 1) return paperFixture(rest[0]);
+  if (kind === "charts" && rest.length === 2)
+    return chartFixture(rest[0], rest[1]);
+  return undefined;
+}
+
+for (const width of [1440, 390]) {
+  test(`shows the Quant System on Analytics → Quant System at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    const mocks = await mockWorkbenchApis(page);
+    const strategyRequests: string[] = [];
+    let posts = 0;
+    await page.route("**/api/research/access", (route) =>
+      route.fulfill({ json: { canRun: false, clientIp: "198.51.100.7" } }),
+    );
+    await page.route("**/api/strategy/**", async (route) => {
+      const request = route.request();
+      const url = new URL(request.url());
+      strategyRequests.push(`${request.method()} ${url.pathname}${url.search}`);
+      if (request.method() !== "GET") {
+        posts++;
+        await route.fulfill({
+          status: 403,
+          json: { code: "RESEARCH_IP_FORBIDDEN" },
+        });
+        return;
+      }
+      const json = strategyResponse(url);
+      // Unknown paths fall through to the catch-all, which records them.
+      if (json === undefined) await route.fallback();
+      else await route.fulfill({ json });
+    });
+    const noOverflow = async () =>
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= innerWidth,
+        ),
+      ).toBe(true);
+
+    await page.goto("/");
+    await expect(
+      page.getByRole("button", { name: "Analytics", exact: true }),
+    ).toHaveAttribute("aria-expanded", "true");
+    await page
+      .getByRole("button", { name: "Quant System", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Quant System", level: 2 }),
+    ).toBeVisible();
+    await expect(page.getByText("ANALYTICS / QUANT SYSTEM")).toBeVisible();
+    const tabs = page.getByRole("tablist", { name: "Quant System sections" });
+    await expect(tabs.getByRole("tab")).toHaveText([
+      "Overview",
+      "Signals",
+      "Positions",
+      "Backtest",
+      "Rules",
+    ]);
+    await expect(
+      page.getByRole("heading", { name: "System status" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("img", {
+        name: "Stock book: equity indexed to 100 at the start",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Paper record" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Run daily" })).toHaveCount(
+      0,
+    );
+    await noOverflow();
+
+    await tabs.getByRole("tab", { name: "Signals" }).click();
+    const orders = page.getByRole("table", { name: "Signals", exact: true });
+    await expect(orders.getByRole("row", { name: /NVDA/ })).toContainText(
+      "Breakout 80",
+    );
+    await expect(
+      page
+        .getByRole("table", { name: "Signal history" })
+        .getByRole("row", { name: /XOM/ }),
+    ).toContainText("Filled");
+    await expect(
+      page.getByRole("table", { name: "Email outbox" }),
+    ).toBeVisible();
+    await noOverflow();
+
+    await tabs.getByRole("tab", { name: "Positions" }).click();
+    const positions = page.getByRole("table", { name: "Positions" });
+    await positions.getByRole("button", { name: "Show NVDA chart" }).click();
+    await expect(
+      page.getByRole("img", {
+        name: "NVDA · Quant System: close, combined forecast and target weight",
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("table", { name: "NVDA rule forecasts" }),
+    ).toBeVisible();
+    await noOverflow();
+
+    await tabs.getByRole("tab", { name: "Backtest" }).click();
+    const stats = page.getByRole("table", { name: "Backtest statistics" });
+    await expect(
+      stats.getByRole("row", { name: /Core \(live system\)/ }),
+    ).toContainText("0.92 ± 0.66");
+    await expect(
+      page.getByRole("table", { name: "Family admission" }),
+    ).toContainText("Detracts");
+    await noOverflow();
+
+    await tabs.getByRole("tab", { name: "Rules" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Trading rules" }),
+    ).toBeVisible();
+    await expect(page.getByText(/ISBN 9780857199683/)).toBeVisible();
+
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(
+      page.getByRole("heading", { name: "量化系统", level: 2 }),
+    ).toBeVisible();
+    await expect(page.getByText("分析 / 量化系统")).toBeVisible();
+    const zhTabs = page.getByRole("tablist", { name: "量化系统栏目" });
+    await expect(zhTabs.getByRole("tab")).toHaveText([
+      "概览",
+      "信号",
+      "持仓",
+      "回测",
+      "规则",
+    ]);
+    await expect(page.getByRole("heading", { name: "交易规则" })).toBeVisible();
+    await zhTabs.getByRole("tab", { name: "回测" }).click();
+    await expect(
+      page
+        .getByRole("table", { name: "回测统计" })
+        .getByRole("row", { name: /核心（实盘系统）/ }),
+    ).toBeVisible();
+    await zhTabs.getByRole("tab", { name: "信号" }).click();
+    await expect(
+      page
+        .getByRole("table", { name: "信号", exact: true })
+        .getByRole("row", { name: /NVDA/ }),
+    ).toContainText("建仓");
+    await noOverflow();
+
+    expect(posts).toBe(0);
+    expect(strategyRequests).toEqual(
+      expect.arrayContaining([
+        "GET /api/strategy/state",
+        "GET /api/strategy/latest",
+        "GET /api/strategy/paper/stocks",
+        "GET /api/strategy/reports",
+        "GET /api/strategy/reports/bt-20261003",
+        "GET /api/strategy/signals?limit=200",
+        "GET /api/strategy/outbox",
+        "GET /api/strategy/charts/stocks/NVDA",
+      ]),
+    );
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+    await page.screenshot({
+      path: `test-results/quant-${width}.png`,
       fullPage: true,
     });
   });
