@@ -90,8 +90,8 @@ describe("paper ledger: first run", () => {
       positions: {},
       equity: [{ date: d(4), value: 100000, benchmark: 404 }],
       pending: [
-        { signalId: `stocks:${d(4)}:A`, symbol: "A", shares: 40, decidedAt: d(4), waited: 0 },
-        { signalId: `stocks:${d(4)}:B`, symbol: "B", shares: 20, decidedAt: d(4), waited: 0 },
+        { signalId: `stocks:${d(4)}:A`, symbol: "A", shares: 40, decidedAt: d(4), decisionClose: 100, waited: 0 },
+        { signalId: `stocks:${d(4)}:B`, symbol: "B", shares: 20, decidedAt: d(4), decisionClose: 50, waited: 0 },
       ],
     });
     expect(result.ledger.events).toEqual([
@@ -182,7 +182,7 @@ describe("paper ledger: replay", () => {
     });
     expect(second.signals[0].fromWeight).toBeCloseTo((1060 / equity) * 100, 3);
     expect(second.ledger.pending).toEqual([
-      { signalId: `stocks:${d(7)}:B`, symbol: "B", shares: -20, decidedAt: d(7), waited: 0 },
+      { signalId: `stocks:${d(7)}:B`, symbol: "B", shares: -20, decidedAt: d(7), decisionClose: 53, waited: 0 },
     ]);
   });
 
@@ -451,6 +451,105 @@ describe("paper ledger: corporate actions and removals", () => {
     ]);
   });
 
+  it("rescales pending orders by their own decision close, held or not", () => {
+    const ledger = createLedger("stocks", 100000, d(3), "h");
+    ledger.lastSession = d(4);
+    // B is held through a 2:1 split; A is a fresh entry decided before a 10:1 split.
+    holding(ledger, "B", 10, 100, d(4));
+    ledger.pending = [
+      { signalId: `stocks:${d(4)}:A`, symbol: "A", shares: 5, decidedAt: d(4), decisionClose: 1000, waited: 0 },
+      { signalId: `stocks:${d(4)}:B`, symbol: "B", shares: 4, decidedAt: d(4), decisionClose: 100, waited: 0 },
+    ];
+    const spec: FrameSpec = {
+      dates: dates.slice(0, 6),
+      symbols: [
+        { symbol: "A", close: repeat(6, 100), open: [...repeat(5, 100), 100.5], target: repeat(6, 0.05) },
+        { symbol: "B", close: repeat(6, 50), open: [...repeat(5, 50), 50.25], target: repeat(6, 0.01) },
+      ],
+    };
+    const result = replayPaper({ ledger, frame: buildFrame(spec), config, drivers: noDrivers, lot: 1 });
+    const splits = result.ledger.events.filter((e) => e.kind === "split");
+    expect(splits.map((e) => [e.date, e.symbol])).toEqual([
+      [d(5), "B"],
+      [d(5), "A"],
+    ]);
+    expect(splits[0].detail).toContain(`order stocks:${d(4)}:B shares 4 → 8`);
+    expect(splits[1].detail).toBe(
+      `Close on ${d(4)} 1000 → 100 (×10); order stocks:${d(4)}:A shares 5 → 50`,
+    );
+    expect(result.ledger.fills.map((f) => [f.symbol, f.shares, f.price])).toEqual([
+      ["A", 50, 100.5],
+      ["B", 8, 50.25],
+    ]);
+    expect(result.ledger.positions.B.shares).toBe(28);
+  });
+
+  it("carries a pending order for a book symbol missing from the data instead of filling it at the last mark", () => {
+    const ledger = createLedger("stocks", 100000, d(3), "h");
+    ledger.lastSession = d(4);
+    holding(ledger, "M", 3, 40, d(4));
+    ledger.pending = [
+      { signalId: `stocks:${d(4)}:M`, symbol: "M", shares: -3, decidedAt: d(4), decisionClose: 40, waited: 0 },
+    ];
+    const a = { symbol: "A", close: repeat(7, 100), target: repeat(7, 0) };
+    // M's fetch failed on the run through d(5).
+    const failed = replayPaper({
+      ledger,
+      frame: buildFrame({ dates: dates.slice(0, 6), symbols: [a], missing: ["M"] }),
+      config,
+      drivers: noDrivers,
+      lot: 1,
+    });
+    expect(failed.fills).toEqual([]);
+    expect(failed.ledger.fills).toEqual([]);
+    expect(failed.ledger.positions.M).toMatchObject({ shares: 3, lastClose: 40 });
+    expect(failed.ledger.pending).toEqual([{ ...ledger.pending[0], waited: 1 }]);
+
+    // Still missing next run: cancelled like any order without a bar.
+    const stillMissing = replayPaper({
+      ledger: persist(failed.ledger),
+      frame: buildFrame({ dates: dates.slice(0, 7), symbols: [a], missing: ["M"] }),
+      config,
+      drivers: noDrivers,
+      lot: 1,
+    });
+    expect(stillMissing.fills).toEqual([{ signalId: `stocks:${d(4)}:M`, fill: { cancelled: d(6) } }]);
+    expect(stillMissing.ledger.positions.M.shares).toBe(3);
+
+    // Back next run: fills at the open with its own liquidity tier ($50m, 10 bps).
+    const back = replayPaper({
+      ledger: persist(failed.ledger),
+      frame: buildFrame({
+        dates: dates.slice(0, 7),
+        symbols: [
+          a,
+          {
+            symbol: "M",
+            close: [40, 40, 40, 40, 40, 41, 42],
+            open: [40, 40, 40, 40, 40, 40.5, 41.5],
+            target: repeat(7, 0),
+            dollarVolume: repeat(7, 50e6),
+          },
+        ],
+      }),
+      config,
+      drivers: noDrivers,
+      lot: 1,
+    });
+    expect(back.ledger.fills).toEqual([
+      {
+        date: d(6),
+        symbol: "M",
+        side: "sell",
+        shares: 3,
+        price: 41.5,
+        cost: (3 * 41.5 * 10.206) / 1e4,
+        signalId: `stocks:${d(4)}:M`,
+      },
+    ]);
+    expect(back.ledger.positions.M).toBeUndefined();
+  });
+
   it("forces out symbols that left the book or turned ineligible, but holds through a failed fetch", () => {
     const ledger = createLedger("stocks", 100000, d(3), "h");
     ledger.lastSession = d(4);
@@ -554,7 +653,7 @@ describe("paper ledger: corporate actions and removals", () => {
       lot: 1,
     });
     expect(waited.ledger.pending).toEqual([
-      { signalId: `stocks:${d(4)}:A`, symbol: "A", shares: 40, decidedAt: d(4), waited: 1 },
+      { signalId: `stocks:${d(4)}:A`, symbol: "A", shares: 40, decidedAt: d(4), decisionClose: 100, waited: 1 },
     ]);
     expect(waited.signals).toEqual([]);
     expect(waited.fills).toEqual([]);

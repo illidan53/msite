@@ -1,4 +1,5 @@
 import type {
+  PaperEvent,
   PaperFill,
   PaperLedger,
   PaperOrder,
@@ -28,7 +29,7 @@ import type { PortfolioFrame, Series } from "./types";
  */
 
 export const PAPER_FILL_LIMIT = 5000;
-/** Stored vs re-fetched close ratio beyond which a held symbol is treated as split. */
+/** Stored vs re-fetched close ratio beyond which a held symbol or pending order is treated as split. */
 export const SPLIT_TOLERANCE = 0.005;
 
 /**
@@ -138,6 +139,7 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
 
   // Split check once up front: after it, every mark comes from this frame.
   const firstDate = dates[start];
+  const splits = new Map<string, { ratio: number; event: PaperEvent }>();
   for (const position of Object.values(ledger.positions)) {
     const t = dateIndex.get(position.lastDate);
     if (t === undefined) continue;
@@ -146,18 +148,41 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
     const ratio = position.lastClose / fresh;
     if (Math.abs(ratio - 1) <= SPLIT_TOLERANCE) continue;
     const shares = roundToLot(position.shares * ratio, lot);
-    ledger.events.push({
+    const event: PaperEvent = {
       date: firstDate,
       kind: "split",
       symbol: position.symbol,
       detail: `Close on ${position.lastDate} ${position.lastClose} → ${fresh} (×${round(ratio, 6)}); shares ${position.shares} → ${shares}`,
-    });
+    };
+    ledger.events.push(event);
+    splits.set(position.symbol, { ratio, event });
     position.shares = shares;
     position.averageCost /= ratio;
     position.lastClose = fresh;
-    for (const order of ledger.pending)
-      if (order.symbol === position.symbol)
-        order.shares = roundToLot(order.shares * ratio, lot);
+  }
+  // Pending orders were sized in decision-session shares. Each is checked
+  // against its own decision close, so an entry for a symbol not held yet is
+  // rescaled too; orders saved without one follow their position's ratio.
+  for (const order of ledger.pending) {
+    const split = splits.get(order.symbol);
+    const t = dateIndex.get(order.decidedAt);
+    const fresh = t === undefined ? Number.NaN : at(panel.close, order.symbol, t);
+    const decided = order.decisionClose ?? Number.NaN;
+    const own = decided > 0 && fresh > 0;
+    const ratio = own ? decided / fresh : split?.ratio;
+    if (ratio === undefined || Math.abs(ratio - 1) <= SPLIT_TOLERANCE) continue;
+    const before = order.shares;
+    order.shares = roundToLot(order.shares * ratio, lot);
+    if (own) order.decisionClose = fresh;
+    const change = `order ${order.signalId} shares ${before} → ${order.shares}`;
+    if (split) split.event.detail += `; ${change}`;
+    else
+      ledger.events.push({
+        date: firstDate,
+        kind: "split",
+        symbol: order.symbol,
+        detail: `Close on ${order.decidedAt} ${decided} → ${fresh} (×${round(ratio, 6)}); ${change}`,
+      });
   }
 
   const holdings: Holdings = { cash: ledger.cash, shares: {}, lastClose: {} };
@@ -181,6 +206,9 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
       const open = (symbol: string) => {
         if (inPanel(symbol) && !stale(symbol, t - 1))
           return panel.open[panel.index[symbol]][t];
+        // A book symbol missing from this run's data (a failed fetch) has no
+        // bar today: its order waits one session, then is cancelled.
+        if (inBook.has(symbol) && !inPanel(symbol)) return Number.NaN;
         // A held symbol that left the book, or stopped trading long ago, will
         // not get a usable bar again: exits fill at its last mark.
         return (bySymbol.get(symbol)?.shares ?? 0) < 0
@@ -189,9 +217,12 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
       };
       const costBps = (symbol: string, side: "buy" | "sell") => {
         const i = frameIndex.get(symbol);
-        const d = dateIndex.get(bySymbol.get(symbol)?.decidedAt ?? "");
+        // Book symbols keep their own liquidity tier even when the decision
+        // session is unknown to this frame; only symbols without a frame row
+        // (left the book) fall to the top tier.
+        const d = dateIndex.get(bySymbol.get(symbol)?.decidedAt ?? "") ?? t - 1;
         const dollarVolume =
-          i === undefined || d === undefined ? Number.NaN : system.dollarVolume[i][d];
+          i === undefined || d < 0 ? Number.NaN : system.dollarVolume[i][d];
         return oneWayCostBps(config.costs, dollarVolume, side, date);
       };
       const before = { ...holdings.shares };
@@ -287,7 +318,14 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
     for (const order of decided) {
       const x = byInput.get(order.symbol)!;
       const signalId = `${ledger.book}:${date}:${order.symbol}`;
-      pending.push({ signalId, symbol: order.symbol, shares: order.shares, decidedAt: date, waited: 0 });
+      pending.push({
+        signalId,
+        symbol: order.symbol,
+        shares: order.shares,
+        decidedAt: date,
+        decisionClose: x.close,
+        waited: 0,
+      });
       if (x.reason === "removed")
         ledger.events.push({
           date,

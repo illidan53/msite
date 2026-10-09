@@ -12,8 +12,10 @@ import {
   type OutboxEntry,
   type PaperLedger,
   type PaperSummary,
+  type RuleContribution,
   type RuleFamily,
   type RunRecord,
+  type Signal,
   type SignalRecord,
   type StrategyJob,
   type StrategyState,
@@ -48,7 +50,12 @@ import { familyForecasts, ruleContributions } from "./forecast";
 import { Outbox, type Mailer } from "./mailer";
 import { createLedger, replayPaper } from "./paper";
 import { buildPortfolio } from "./portfolio";
-import { StrategyScheduler } from "./scheduler";
+import {
+  addDays,
+  newYorkClock,
+  newYorkInstant,
+  StrategyScheduler,
+} from "./scheduler";
 import { SignalLog } from "./signals";
 import { readJson, writeJsonAtomic } from "./store";
 import { computeSystem } from "./system";
@@ -67,6 +74,14 @@ const reasons: (IneligibleReason | undefined)[] = [
 const r4 = (v: number) =>
   Number.isFinite(v) ? Math.round(v * 1e4) / 1e4 : null;
 const pct = (v: number) => r4(v * 100);
+/** Unavailable symbols named in a run message; the rest are counted. */
+const NAMED_FAILURES = 10;
+
+interface ChartsFile {
+  version: number;
+  charts: Record<string, SymbolChart>;
+}
+type Failure = NonNullable<StrategyState["lastFailure"]>;
 
 export interface StrategyServiceOptions {
   market: HistorySource;
@@ -99,7 +114,14 @@ export class StrategyService {
   private readonly signalLog: SignalLog;
   private job: StrategyJob | null = null;
   private queue: Promise<unknown> = Promise.resolve();
-  private lastFailure: StrategyState["lastFailure"] = null;
+  /** Unresolved failure per job kind; a later run of that kind that does not fail clears it. */
+  private failures: Partial<Record<StrategyJob["kind"], Failure>> = {};
+  /**
+   * Parsed latest.json and charts-<book>.json. Public reads would otherwise
+   * parse megabytes per request; daily() replaces the entries as it writes.
+   */
+  private latestCache: Promise<LatestSnapshot | null> | null = null;
+  private chartCache = new Map<string, Promise<ChartsFile | null>>();
   private starts: number[] = [];
   private lastTestEmail = 0;
   private scheduler?: StrategyScheduler;
@@ -131,16 +153,8 @@ export class StrategyService {
         now: () => this.now(),
         runDaily: (trigger) => this.runDaily(trigger),
         runBacktest: (trigger) => this.runBacktest(trigger),
-        onDailyGiveUp: async (record) => {
-          if (config.email.failureAlerts)
-            await this.email(
-              "failure",
-              renderFailure(
-                { job: "daily", message: record.message ?? "FAILED", nextRetry: null },
-                { locale: config.email.locale, baseUrl: this.options.baseUrl },
-              ),
-            );
-        },
+        onDailyGiveUp: (record) => this.failureAlert("daily", record),
+        onBacktestGiveUp: (record) => this.failureAlert("backtest", record),
       });
     }
     return this.scheduler;
@@ -157,6 +171,65 @@ export class StrategyService {
     this.schedulerStarted = false;
   }
 
+  /** Sent when a scheduled job exhausts its retries and failure alerts are on. */
+  private async failureAlert(job: StrategyJob["kind"], record: RunRecord) {
+    const config = await this.config();
+    if (!config.email.failureAlerts) return;
+    await this.email(
+      "failure",
+      renderFailure(
+        {
+          job,
+          message: record.message ?? "FAILED",
+          // A daily give-up waits for tomorrow; a backtest for its next weekly slot.
+          nextRetry: job === "backtest" ? nextWeeklySlot(this.now(), config.schedule) : null,
+        },
+        {
+          locale: config.email.locale,
+          baseUrl: this.options.baseUrl,
+          configHash: await this.currentHash(config),
+        },
+      ),
+    );
+  }
+  /** Hash of the config as it stands, for emails that carry none of their own. */
+  private async currentHash(config: StrategyConfig) {
+    try {
+      return configHash(config, resolveBooks(config, await this.options.readWatchlists()));
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Keeps a parsed file; a missing one (cheap to re-check) or an I/O error is forgotten. */
+  private remember<T>(read: Promise<T | null>, forget: () => void) {
+    read.then(
+      (value) => value === null && forget(),
+      () => forget(),
+    );
+    return read;
+  }
+  private storedLatest(): Promise<LatestSnapshot | null> {
+    if (!this.latestCache) {
+      const read = readJson<LatestSnapshot>(this.file("latest.json"));
+      this.latestCache = this.remember(read, () => {
+        if (this.latestCache === read) this.latestCache = null;
+      });
+    }
+    return this.latestCache;
+  }
+  private storedCharts(book: string): Promise<ChartsFile | null> {
+    let entry = this.chartCache.get(book);
+    if (!entry) {
+      const read = readJson<ChartsFile>(this.file(`charts-${book}.json`));
+      entry = this.remember(read, () => {
+        if (this.chartCache.get(book) === read) this.chartCache.delete(book);
+      });
+      this.chartCache.set(book, entry);
+    }
+    return entry;
+  }
+
   /** Resolves when queued jobs settle (tests and shutdown). */
   settled() {
     return this.queue.then(() => undefined);
@@ -166,7 +239,7 @@ export class StrategyService {
     const config = await this.config();
     const books = resolveBooks(config, await this.options.readWatchlists());
     const scheduler = await (await this.getScheduler()).state();
-    const latest = await readJson<LatestSnapshot>(this.file("latest.json"));
+    const latest = await this.storedLatest();
     const reports = await this.reports();
     const outbox = await this.outboxStore.list();
     return {
@@ -204,12 +277,13 @@ export class StrategyService {
           : null,
       latestReport: reports[0] ?? null,
       job: this.job && { ...this.job },
-      lastFailure: this.lastFailure,
+      lastFailure:
+        Object.values(this.failures).sort((a, b) => (a.at < b.at ? 1 : -1))[0] ?? null,
     };
   }
 
   async latest(): Promise<LatestSnapshot> {
-    const latest = await readJson<LatestSnapshot>(this.file("latest.json"));
+    const latest = await this.storedLatest();
     if (latest?.version !== STRATEGY_ENGINE_VERSION)
       throw new ApiError(404, "STRATEGY_NOT_RUN", "The quant system has not run yet", {
         source: "strategy",
@@ -217,11 +291,11 @@ export class StrategyService {
     return latest;
   }
   async chart(book: string, symbol: string): Promise<SymbolChart> {
-    const charts = await readJson<{ version: number; charts: Record<string, SymbolChart> }>(
-      this.file(`charts-${book}.json`),
-    );
+    const charts = await this.storedCharts(book);
     const chart =
-      charts?.version === STRATEGY_ENGINE_VERSION ? charts.charts[symbol] : undefined;
+      charts?.version === STRATEGY_ENGINE_VERSION && Object.hasOwn(charts.charts, symbol)
+        ? charts.charts[symbol]
+        : undefined;
     if (!chart)
       throw new ApiError(404, "STRATEGY_CHART_NOT_FOUND", "No chart for this symbol", {
         source: "strategy",
@@ -276,7 +350,10 @@ export class StrategyService {
     this.starts.push(now);
     const scheduler = await this.getScheduler();
     const run = kind === "daily" ? this.runDaily("manual") : this.runBacktest("manual");
-    void run.then((record) => scheduler.record(kind, record));
+    // An unwritable state file must not become an unhandled rejection (process exit).
+    void run
+      .then((record) => scheduler.record(kind, record))
+      .catch((e: unknown) => console.error("Quant system run state not saved", e));
     // Let the job claim its slot before answering, so the response shows it.
     await new Promise((resolve) => setImmediate(resolve));
     return this.state();
@@ -296,6 +373,7 @@ export class StrategyService {
         locale: config.email.locale,
         baseUrl: this.options.baseUrl,
         transport: this.options.mailer.transport,
+        configHash: await this.currentHash(config),
       }),
     );
   }
@@ -386,25 +464,56 @@ export class StrategyService {
   }
 
   runDaily(trigger: StrategyJob["trigger"]): Promise<RunRecord> {
-    return this.enqueue("daily", trigger, (job) => this.daily(job, trigger)).catch(
-      (e: unknown) => this.failed("daily", trigger, e),
+    return this.settle(
+      "daily",
+      trigger,
+      this.enqueue("daily", trigger, (job) => this.daily(job, trigger)),
     );
   }
   runBacktest(trigger: StrategyJob["trigger"]): Promise<RunRecord> {
-    return this.enqueue("backtest", trigger, (job) => this.backtest(job, trigger)).catch(
-      (e: unknown) => this.failed("backtest", trigger, e),
+    return this.settle(
+      "backtest",
+      trigger,
+      this.enqueue("backtest", trigger, (job) => this.backtest(job, trigger)),
     );
   }
-  private failed(
+  /** Tracks failures per job kind: a skipped or complete run resolves its own kind only. */
+  private async settle(
     kind: StrategyJob["kind"],
     trigger: StrategyJob["trigger"],
-    e: unknown,
-  ): RunRecord {
-    const message = e instanceof ApiError ? e.code : "STRATEGY_FAILED";
-    if (!(e instanceof ApiError)) console.error(`Quant system ${kind} failed`, e);
-    const at = this.now().toISOString();
-    this.lastFailure = { at, job: kind, message };
-    return { at, trigger, status: "failed", message };
+    run: Promise<RunRecord>,
+  ): Promise<RunRecord> {
+    let record: RunRecord;
+    try {
+      record = await run;
+    } catch (e) {
+      const message = e instanceof ApiError ? e.code : "STRATEGY_FAILED";
+      if (!(e instanceof ApiError)) console.error(`Quant system ${kind} failed`, e);
+      record = { at: this.now().toISOString(), trigger, status: "failed", message };
+    }
+    if (record.status === "failed")
+      this.failures[kind] = {
+        at: record.at,
+        job: kind,
+        message: record.message ?? "STRATEGY_FAILED",
+      };
+    else delete this.failures[kind];
+    return record;
+  }
+
+  /** latest.json and every book's charts are current-version files covering `asOf`. */
+  private async published(asOf: string, books: string[]) {
+    const latest = await this.storedLatest();
+    if (latest?.version !== STRATEGY_ENGINE_VERSION || latest.asOf < asOf) return false;
+    if (!books.every((id) => latest.books.some((b) => b.book === id))) return false;
+    const charts = await Promise.all(books.map((id) => this.storedCharts(id)));
+    return charts.every((c) => c?.version === STRATEGY_ENGINE_VERSION);
+  }
+  /** Whether the scheduler's next daily retry still comes before today's give-up time. */
+  private retryLeft(schedule: StrategyConfig["schedule"]) {
+    const now = this.now();
+    const giveUp = newYorkInstant(newYorkClock(now).date, schedule.dailyGiveUpAt);
+    return now.getTime() + schedule.dailyRetryMinutes * 60_000 < giveUp.getTime();
   }
 
   private async daily(
@@ -421,14 +530,38 @@ export class StrategyService {
     const ledgers = await Promise.all(
       enabled.map((b) => readJson<PaperLedger>(this.file(`paper-${b.id}.json`))),
     );
-    if (ledgers.every((l) => l && l.lastSession >= asOf))
+    // Ledgers are committed last, so current ledgers alone do not prove the
+    // run finished: latest.json and the charts must also be current (a
+    // version bump or a lost file is rebuilt the same day, without trading).
+    if (
+      ledgers.every((l) => l && l.lastSession >= asOf) &&
+      (await this.published(asOf, enabled.map((b) => b.id)))
+    )
       return { at: this.now().toISOString(), trigger, status: "skipped", asOf };
 
     const { books, hash, panel, failures } = await this.load(job, benchmarkBars);
+    // Dropping symbols reweights their classmates, so a scheduled run retries
+    // while a retry is left; a symbol without history will not recover.
+    if (
+      trigger === "schedule" &&
+      failures.some((f) => f.message !== "NO_HISTORY") &&
+      this.retryLeft(config.schedule)
+    )
+      return {
+        at: this.now().toISOString(),
+        trigger,
+        status: "failed",
+        message: `SYMBOLS_UNAVAILABLE: ${unavailable(failures)}`,
+      };
+
     const snapshots: BookSnapshot[] = [];
-    const records: SignalRecord[] = [];
+    /** Books that replayed a new session: only these add records, fills and digest sections. */
+    const fresh = new Set<string>();
+    const records: Signal[] = [];
     const fillUpdates: Parameters<SignalLog["applyFills"]>[0] = [];
-    const charts: Record<string, Record<string, SymbolChart>> = {};
+    const charts: Record<string, ChartsFile> = {};
+    const ledgerWrites: PaperLedger[] = [];
+    let logged: Signal[] | null = null;
     for (const book of books) {
       const system = computeSystem(panel, book, config);
       const frame = buildPortfolio(system, config);
@@ -439,15 +572,27 @@ export class StrategyService {
         frame,
         config,
         configHash: hash,
-        drivers: (i, at) => ruleContributions(system, i, at),
+        drivers: (i, at) => topDrivers(ruleContributions(system, i, at)),
       });
       const ledger = replay.ledger;
-      fillUpdates.push(...replay.fills);
-      await writeJsonAtomic(this.file(`paper-${book.id}.json`), ledger);
-      records.push(...replay.signals.map((s) => ({ ...s, emailed: false })));
+      let signals = replay.signals;
+      if (stored && stored.lastSession >= system.dates[t]) {
+        // Already committed for this session (a book enabled after today's
+        // run, or a retry after part of the commit): replay found nothing, so
+        // keep its logged signals and leave it out of records and the digest.
+        logged ??= (await this.signalLog.list()).map(({ emailed: _emailed, ...s }) => s);
+        signals = logged.filter((s) => s.book === book.id && s.asOf === ledger.lastSession);
+        if (ledger.configHash !== stored.configHash) ledgerWrites.push(ledger);
+      } else {
+        fresh.add(book.id);
+        records.push(...replay.signals);
+        fillUpdates.push(...replay.fills);
+        ledgerWrites.push(ledger);
+      }
       snapshots.push({
         book: book.id,
         name: book.name,
+        classes: book.classes.map((c) => ({ id: c.id, name: c.name })),
         asOf: system.dates[t],
         configHash: hash,
         idm: r4(frame.idm[t]),
@@ -458,10 +603,13 @@ export class StrategyService {
         },
         gross: pct(frame.gross[t]) ?? 0,
         rows: rows(frame, t, ledger),
-        signals: replay.signals,
+        signals,
         paper: paperSummary(ledger),
       });
-      charts[book.id] = symbolCharts(frame, book.id);
+      charts[book.id] = {
+        version: STRATEGY_ENGINE_VERSION,
+        charts: symbolCharts(frame, book.id),
+      };
       await new Promise((resolve) => setImmediate(resolve));
     }
     job.step = "report";
@@ -472,29 +620,34 @@ export class StrategyService {
       trigger,
       books: snapshots,
     };
+    // Commit order: signals, charts, latest, email, then the ledgers. A run
+    // that dies before the ledgers replays the same sessions on retry, and the
+    // log dedupes the same signal ids (worst case a repeated digest).
     await this.signalLog.applyFills(fillUpdates);
     await this.signalLog.append(records);
-    for (const [id, set] of Object.entries(charts))
-      await writeJsonAtomic(this.file(`charts-${id}.json`), {
-        version: STRATEGY_ENGINE_VERSION,
-        charts: set,
-      });
+    for (const [id, file] of Object.entries(charts)) {
+      await writeJsonAtomic(this.file(`charts-${id}.json`), file);
+      this.chartCache.set(id, Promise.resolve(file));
+    }
     await writeJsonAtomic(this.file("latest.json"), snapshot);
+    this.latestCache = Promise.resolve(snapshot);
 
     job.step = "email";
     let emailed = false;
-    if (records.length || config.email.sendWhenNoSignals) {
+    const digest = snapshots.filter((b) => fresh.has(b.book));
+    if (digest.length && (records.length || config.email.sendWhenNoSignals)) {
       const entry = await this.email(
         "signals",
-        renderSignalDigest(snapshot, {
-          locale: config.email.locale,
-          baseUrl: this.options.baseUrl,
-        }),
+        renderSignalDigest(
+          { ...snapshot, books: digest },
+          { locale: config.email.locale, baseUrl: this.options.baseUrl },
+        ),
       );
       emailed = entry.status === "sent";
       if (emailed) await this.signalLog.markEmailed(records.map((r) => r.id));
     }
-    this.lastFailure = null;
+    for (const ledger of ledgerWrites)
+      await writeJsonAtomic(this.file(`paper-${ledger.book}.json`), ledger);
     return {
       at: this.now().toISOString(),
       trigger,
@@ -502,7 +655,7 @@ export class StrategyService {
       asOf: snapshot.asOf,
       emailed,
       ...(failures.length && {
-        message: `${failures.length} symbols unavailable`,
+        message: `${failures.length} symbols unavailable: ${unavailable(failures)}`,
       }),
     };
   }
@@ -574,7 +727,6 @@ export class StrategyService {
       );
       emailed = entry.status === "sent";
     }
-    this.lastFailure = null;
     return {
       at: this.now().toISOString(),
       trigger,
@@ -593,6 +745,33 @@ export class StrategyService {
         .map((f) => unlink(this.file(`reports/${f}`)).catch(() => undefined)),
     );
   }
+}
+
+/** "NVDA, ARM, XLK", naming at most NAMED_FAILURES and counting the rest. */
+function unavailable(failures: Loaded["failures"]) {
+  const more = failures.length - NAMED_FAILURES;
+  return (
+    failures
+      .slice(0, NAMED_FAILURES)
+      .map((f) => f.symbol)
+      .join(", ") + (more > 0 ? ` +${more}` : "")
+  );
+}
+
+/** Signal drivers: the three largest non-zero contributions at 4 dp (spec §7.4). */
+function topDrivers(contributions: RuleContribution[]): RuleContribution[] {
+  return contributions
+    .map((d) => ({ rule: d.rule, contribution: r4(d.contribution) }))
+    .filter((d): d is RuleContribution => d.contribution !== null && d.contribution !== 0)
+    .slice(0, 3);
+}
+
+/** The weekly backtest slot after the current one, where retries resume after a give-up. */
+function nextWeeklySlot(now: Date, schedule: StrategyConfig["schedule"]) {
+  const clock = newYorkClock(now);
+  let back = (clock.weekday - schedule.weeklyDay + 7) % 7;
+  if (back === 0 && clock.time < schedule.weeklyAt) back = 7;
+  return newYorkInstant(addDays(clock.date, 7 - back), schedule.weeklyAt).toISOString();
 }
 
 function median(values: number[]) {
