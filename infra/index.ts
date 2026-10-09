@@ -215,6 +215,6 @@ new aws.iam.RolePolicy("ec2SesSendPolicy", {
 export const repositoryUrl = repository.repositoryUrl;
 export const deployRoleArn = githubDeployRole.arn;
 export const mailIdentityArn = mailIdentity.arn;
-// PENDING until SES finds the CNAMEs; `pulumi refresh` updates it.
+// PENDING until SES finds the CNAMEs; the next `pulumi up` (after `pulumi refresh`) shows the new status.
 export const mailDkimStatus = mailIdentity.dkimSigningAttributes.status;
 export const mailFrom = mailFromAddress;

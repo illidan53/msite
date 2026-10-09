@@ -451,7 +451,7 @@ describe("paper ledger: corporate actions and removals", () => {
     ]);
   });
 
-  it("forces out symbols that left the book or turned ineligible", () => {
+  it("forces out symbols that left the book or turned ineligible, but holds through a failed fetch", () => {
     const ledger = createLedger("stocks", 100000, d(3), "h");
     ledger.lastSession = d(4);
     holding(ledger, "A", 10, 100, d(4)); // ineligible at session 5
@@ -484,9 +484,7 @@ describe("paper ledger: corporate actions and removals", () => {
       ["A", "exit", -10, "ineligible", 100, []],
       ["Z", "exit", -5, "removed", 31, []],
       ["Y", "exit", -4, "removed", 25, []],
-      ["M", "exit", -3, "ineligible", 40, []],
     ]);
-    expect(decided.signals.find((s) => s.symbol === "M")!.class).toBe("test");
     expect(decided.ledger.events.filter((e) => e.kind === "removed").map((e) => e.symbol)).toEqual([
       "Z",
       "Y",
@@ -503,11 +501,31 @@ describe("paper ledger: corporate actions and removals", () => {
       ["A", "sell", 10, 100, (10 * 100 * 3.206) / 1e4],
       ["Z", "sell", 5, 31.5, (5 * 31.5 * 30.206) / 1e4],
       ["Y", "sell", 4, 25, (4 * 25 * 30.206) / 1e4],
-      ["M", "sell", 3, 40, (3 * 40 * 30.206) / 1e4],
     ]);
-    expect(Object.keys(filled.ledger.positions)).toEqual([]);
+    // M is still in the book: a missing fetch keeps the position at its last mark.
+    expect(Object.keys(filled.ledger.positions)).toEqual(["M"]);
+    expect(filled.ledger.positions.M).toMatchObject({ shares: 3, lastClose: 40 });
     // A is eligible again at session 6 and re-enters.
     expect(filled.signals.map((s) => [s.symbol, s.action, s.shares])).toEqual([["A", "entry", 40]]);
+  });
+
+  it("exits a held book symbol at its last close after it stops trading", () => {
+    const long = sessionDates("2026-09-01", 16);
+    const closes = [...repeat(4, 20), ...repeat(12, Number.NaN)];
+    const spec: FrameSpec = {
+      dates: long,
+      symbols: [{ symbol: "H", close: closes, target: repeat(16, 0.05) }],
+    };
+    const ledger = createLedger("stocks", 100000, long[3], "h");
+    ledger.lastSession = long[3];
+    holding(ledger, "H", 50, 20, long[3]);
+    const result = replayPaper({ ledger, frame: buildFrame(spec), config, drivers: noDrivers, lot: 1 });
+    // No bar for STALE_EXIT_SESSIONS (10) sessions: the exit is decided at long[13]
+    // and fills at the last close on the next session.
+    expect(result.ledger.fills.map((f) => [f.symbol, f.date, f.shares, f.price])).toEqual([
+      ["H", long[14], 50, 20],
+    ]);
+    expect(result.ledger.positions).toEqual({});
   });
 
   it("cancels an order after waiting one session without a bar", () => {

@@ -27,6 +27,33 @@ describe("buildPanel", () => {
     bar("2026-10-02T04:00:00.000Z", 11),
     bar("2026-10-05T04:00:00.000Z", 12),
   ];
+  it("drops history before a move too large to be the same security", () => {
+    const panel = buildPanel(
+      {
+        SPY: spy,
+        META: [
+          bar("2026-10-01T04:00:00.000Z", 12),
+          bar("2026-10-02T04:00:00.000Z", 180),
+          bar("2026-10-05T04:00:00.000Z", 185),
+        ],
+        DROP: [
+          bar("2026-10-01T04:00:00.000Z", 100),
+          bar("2026-10-02T04:00:00.000Z", 25),
+          bar("2026-10-05T04:00:00.000Z", 30),
+        ],
+        REAL: [
+          bar("2026-10-01T04:00:00.000Z", 10),
+          bar("2026-10-02T04:00:00.000Z", 35),
+          bar("2026-10-05T04:00:00.000Z", 36),
+        ],
+      },
+      "SPY",
+    );
+    expectSeries(panel.close[panel.index.META], [_, 180, 185]);
+    expectSeries(panel.close[panel.index.DROP], [100, 25, 30]);
+    expectSeries(panel.close[panel.index.REAL], [10, 35, 36]);
+    expect(panel.trimmed).toEqual({ META: { date: "2026-10-02", return: 1400 } });
+  });
   it("uses the benchmark's New York sessions and NaN for missing dates", () => {
     const panel = buildPanel(
       {

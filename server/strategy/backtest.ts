@@ -355,6 +355,12 @@ async function bookReport(
   for (const symbol of core.missing)
     if (!failures.some((f) => f.symbol === symbol))
       failures.push({ symbol, message: "No bars" });
+  for (const [symbol, cut] of Object.entries(panel.trimmed ?? {}))
+    if (bookSymbols.has(symbol))
+      failures.push({
+        symbol,
+        message: `History before ${cut.date} dropped (${cut.return}% in one session)`,
+      });
   const jumps: BacktestBookReport["dataQuality"]["jumps"] = [];
   core.panelIndex.forEach((row, i) => {
     const close = panel.close[row];
@@ -403,7 +409,12 @@ async function bookReport(
   if (jumps.length)
     warnings.push({
       code: "price_jumps",
-      detail: jumps.map((j) => `${j.symbol} ${j.date} ${j.return}%`).join(", "),
+      detail: [...jumps]
+        .sort((a, b) => Math.abs(b.return) - Math.abs(a.return))
+        .slice(0, 10)
+        .map((j) => `${j.symbol} ${j.date} ${j.return}%`)
+        .concat(jumps.length > 10 ? [`… ${jumps.length} in total`] : [])
+        .join(", "),
     });
   const detracting = families.filter((f) => f.status === "detracts");
   if (detracting.length)

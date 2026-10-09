@@ -20,6 +20,11 @@ export interface Panel {
   close: Series[];
   volume: Series[];
   benchmark: string;
+  /**
+   * Symbols whose history was cut at a one-session move too large to be one
+   * security (ticker reuse or a spliced listing), with that session and move.
+   */
+  trimmed?: Record<string, { date: string; return: number }>;
 }
 
 /** Engine knobs that variants change; everything else comes from config. */

@@ -105,5 +105,11 @@ describe("container deployment assets", () => {
     // The sandbox recipient is secret config, never a literal address.
     expect(pulumiProgram).toContain('config.getSecret("alertEmailRecipient")');
     expect(pulumiProgram).not.toMatch(/[\w.+-]+@[a-z0-9-]+\.[a-z]/i);
+    // Stack config is tracked too: a recipient may only appear there encrypted.
+    const stackConfig = await readFile("infra/Pulumi.prod.yaml", "utf8");
+    expect(stackConfig).not.toMatch(/[\w.+-]+@[a-z0-9-]+\.[a-z]/i);
+    // Neither strategy config nor the deploy workflow may name a recipient.
+    for (const file of ["config/strategy.yaml", ".github/workflows/deploy.yml"])
+      expect(await readFile(file, "utf8")).not.toMatch(/ALERT_EMAIL_TO=\S+@/);
   });
 });

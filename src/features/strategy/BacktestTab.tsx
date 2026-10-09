@@ -627,7 +627,7 @@ function BookReport({
                       <small>
                         {r.scalarSource === "book"
                           ? t("book", "书中")
-                          : t("pooled", "全样本")}
+                          : t("pooled", "跨标的汇总")}
                       </small>
                     </td>
                     <td className={off ? "strategy-negative" : undefined}>
@@ -647,7 +647,7 @@ function BookReport({
         <p className="research-meta">
           {t(
             "Mean |f| should stay near 10 (flagged outside 7–13). Turnover is forecast turnover per year. Cost pass is the share of eligible symbols where the rule stays under the 0.15 SR speed limit. Rule Sharpe ratios come from pooled single-rule account curves after costs.",
-            "平均 |f| 应接近 10（超出 7–13 会标红）。换手为每年预测换手。成本通过率为该规则低于 0.15 SR 速度限制的合格标的占比。规则夏普来自扣除成本后的全样本单规则账户曲线。",
+            "平均 |f| 应接近 10（超出 7–13 会标红）。换手为每年预测换手。成本通过率为该规则低于 0.15 SR 速度限制的合格标的占比。规则夏普来自扣除成本后、跨标的汇总的单规则账户曲线。",
           )}
         </p>
       </section>

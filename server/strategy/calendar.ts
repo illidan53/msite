@@ -4,6 +4,15 @@ import type { Panel, Series } from "./types";
 import { nanSeries } from "./math";
 
 /**
+ * A close-to-close move above +300% or below −80% is treated as a different
+ * security (e.g. Polygon's META before 2022-06-09 is the old Roundhill ETF,
+ * CORZ before its 2024 relisting, COHR before II-VI took the ticker). History
+ * before the last such session is dropped so it cannot distort volatility.
+ */
+const DISCONTINUITY_UP = 3;
+const DISCONTINUITY_DOWN = -0.8;
+
+/**
  * Aligns completed bars (already through `closedBars`) to the benchmark's
  * sessions (spec §2). Bars on other dates are dropped and a missing master
  * date is NaN; symbols left without any bar are omitted from the panel.
@@ -36,6 +45,7 @@ export function buildPanel(
     close: [],
     volume: [],
     benchmark,
+    trimmed: {},
   };
   const order = [
     benchmark,
@@ -57,6 +67,22 @@ export function buildPanel(
       any = true;
     }
     if (!any) continue;
+    let cut = -1,
+      prev = -1;
+    for (let t = 0; t < dates.length; t++) {
+      if (!(close[t] > 0)) continue;
+      const move = prev < 0 ? 0 : close[t] / close[prev] - 1;
+      if (move > DISCONTINUITY_UP || move < DISCONTINUITY_DOWN) {
+        cut = t;
+        panel.trimmed![symbol] = {
+          date: dates[t],
+          return: Math.round(move * 1e6) / 1e4,
+        };
+      }
+      prev = t;
+    }
+    if (cut > 0)
+      for (const series of [open, high, low, close, volume]) series.fill(Number.NaN, 0, cut);
     panel.index[symbol] = panel.symbols.length;
     panel.symbols.push(symbol);
     panel.open.push(open);

@@ -72,7 +72,7 @@ export function RulesTab() {
                         <dt>{t("Scalar", "缩放系数")}</dt>
                         <dd>
                           {rule.scalar === null
-                            ? t("Pooled, expanding", "全样本扩展估计")
+                            ? t("Pooled, expanding", "跨标的扩展估计")
                             : number(rule.scalar, 2)}
                         </dd>
                       </div>

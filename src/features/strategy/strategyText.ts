@@ -91,7 +91,7 @@ function describeRule(rule: RuleSpec): RuleText {
       "E = SMA20(C); raw = (E − C) ÷ σp, trend-gated by EWMAC16; pooled scalar",
     intuition: {
       en: "The successor to the Bollinger lower-band study: distance below the 20-session average in volatility units, gated by the trend and scaled by a pooled expanding scalar because the book publishes none.",
-      zh: "布林下轨研究的继任者：以波动为单位衡量低于 20 日均线的距离，同样受趋势门控；书中没有公布该变换的缩放系数，因此用全样本扩展估计。",
+      zh: "布林下轨研究的继任者：以波动为单位衡量低于 20 日均线的距离，同样受趋势门控；书中没有公布该变换的缩放系数，因此用跨标的汇总、只用当时已有数据的扩展估计。",
     },
   };
 }
@@ -139,7 +139,7 @@ export const frameworkItems: FrameworkItem[] = [
     title: { en: "Forecast scaling & caps", zh: "预测缩放与上限" },
     body: {
       en: "Every rule's raw value is multiplied by a scalar so its average absolute forecast is 10, then capped at ±20. Scalars are the book's published values; a pooled, expanding estimate is used only where none is published. A rule votes only after its warm-up.",
-      zh: "每条规则的原始值乘以缩放系数，使平均绝对预测值为 10，再截断在 ±20。缩放系数采用书中公布值；只有在未公布时才使用全样本扩展估计。规则需度过预热期才参与投票。",
+      zh: "每条规则的原始值乘以缩放系数，使平均绝对预测值为 10，再截断在 ±20。缩放系数采用书中公布值；只有在未公布时才使用跨标的汇总、只用当时已有数据的扩展估计。规则需度过预热期才参与投票。",
     },
     source: "AFTS Strategy 7",
   },
@@ -148,7 +148,7 @@ export const frameworkItems: FrameworkItem[] = [
     title: { en: "Combination & FDM", zh: "组合与预测分散乘数（FDM）" },
     body: {
       en: "Capped forecasts are averaged with fixed, handcrafted weights. Weight of an unavailable rule moves first to its own family, then to other families. The weighted average is multiplied by the forecast diversification multiplier 1/√(wᵀHw), from pooled weekly forecast correlations, capped at 2.5 and smoothed, then capped again at ±20.",
-      zh: "截断后的预测值按固定的手工权重加权平均。不可用规则的权重先分给同族规则，再分给其他族。加权结果乘以预测分散乘数 1/√(wᵀHw)（来自全样本周度预测相关性，上限 2.5 并平滑），再截断在 ±20。",
+      zh: "截断后的预测值按固定的手工权重加权平均。不可用规则的权重先分给同族规则，再分给其他族。加权结果乘以预测分散乘数 1/√(wᵀHw)（来自跨标的汇总的周度预测相关性，每月只用此前数据重估，上限 2.5 并平滑），再截断在 ±20。",
     },
     source: "AFTS Strategies 9 and 11",
   },

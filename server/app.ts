@@ -3,6 +3,9 @@ import { ResearchService } from "./research/service";
 import { ModelScanService, scanUniverse } from "./research/modelScan";
 import { createResearchRoutes } from "./routes/researchRoutes";
 import { createModelRoutes } from "./routes/modelRoutes";
+import { createStrategyRoutes } from "./routes/strategyRoutes";
+import { createMailer } from "./strategy/mailer";
+import { StrategyService } from "./strategy/service";
 import { ConfigRepository } from "./config/configRepository";
 import type { Express } from "express";
 import { existsSync } from "node:fs";
@@ -78,6 +81,17 @@ export function createApp(options: CreateAppOptions = {}): Express {
       ),
     ),
   );
+  const strategy = new StrategyService({
+    market: marketDataProvider,
+    configDir,
+    dataDir: researchDir,
+    readWatchlists: () => configRepository.readWatchlists(),
+    mailer: createMailer(process.env),
+    baseUrl: process.env.PUBLIC_BASE_URL?.trim() || "https://finance.nphunter.net",
+  });
+  // server/index.ts starts the scheduler; tests and other app instances never do.
+  app.locals.strategy = strategy;
+  app.use("/api", createStrategyRoutes(strategy));
   app.use("/api", createMarketRoutes(marketDataProvider));
 
   if (nodeEnv === "production" && existsSync(indexHtml)) {

@@ -84,6 +84,8 @@ export interface PaperReplayResult {
 }
 
 const finite = (v: number) => Number.isFinite(v);
+/** A held symbol without any bar for this many sessions is exited at its last close. */
+export const STALE_EXIT_SESSIONS = 10;
 const round = (v: number, digits: number) => {
   const f = 10 ** digits;
   return Math.round(v * f) / f;
@@ -126,6 +128,13 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
   const inPanel = (symbol: string) => panel.index[symbol] !== undefined;
   const at = (series: Series[], symbol: string, t: number) =>
     inPanel(symbol) ? series[panel.index[symbol]][t] : Number.NaN;
+  /** No bar in the last STALE_EXIT_SESSIONS sessions up to t. */
+  const stale = (symbol: string, t: number) => {
+    if (!inPanel(symbol) || t < STALE_EXIT_SESSIONS - 1) return false;
+    const close = panel.close[panel.index[symbol]];
+    for (let k = t; k > t - STALE_EXIT_SESSIONS; k--) if (close[k] > 0) return false;
+    return true;
+  };
 
   // Split check once up front: after it, every mark comes from this frame.
   const firstDate = dates[start];
@@ -170,9 +179,10 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
     if (pending.length) {
       const bySymbol = new Map(pending.map((o) => [o.symbol, o]));
       const open = (symbol: string) => {
-        if (inPanel(symbol)) return panel.open[panel.index[symbol]][t];
-        // A held symbol absent from the panel (left the book, or no data at
-        // all) will never get a bar again: exits fill at its last mark.
+        if (inPanel(symbol) && !stale(symbol, t - 1))
+          return panel.open[panel.index[symbol]][t];
+        // A held symbol that left the book, or stopped trading long ago, will
+        // not get a usable bar again: exits fill at its last mark.
         return (bySymbol.get(symbol)?.shares ?? 0) < 0
           ? (holdings.lastClose[symbol] ?? Number.NaN)
           : Number.NaN;
@@ -245,9 +255,11 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
       const target = frame.targetWeight[i][t];
       const average = frame.averageWeight[i][t];
       const forced = system.eligible[i][t] !== 1 || !finite(target);
+      // Halted or delisted while still listed in the book: exit at the last mark.
+      const dead = holdings.shares[symbol] !== undefined && stale(symbol, t);
       inputs.push({
         symbol,
-        close: at(panel.close, symbol, t),
+        close: dead ? holdings.lastClose[symbol] : at(panel.close, symbol, t),
         target: forced ? 0 : target,
         average: finite(average) ? average : 0,
         forced,
@@ -257,6 +269,9 @@ export function replayPaper(input: PaperReplayInput): PaperReplayResult {
     });
     for (const symbol of Object.keys(holdings.shares)) {
       if (frameIndex.has(symbol) || waiting.has(symbol)) continue;
+      // A book symbol missing from today's data (e.g. a failed fetch) is held,
+      // not liquidated at a stale price; only symbols that left the book exit.
+      if (inBook.has(symbol)) continue;
       inputs.push({
         symbol,
         close: inPanel(symbol) ? at(panel.close, symbol, t) : holdings.lastClose[symbol],

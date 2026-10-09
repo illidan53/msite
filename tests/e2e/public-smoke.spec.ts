@@ -177,6 +177,12 @@ test("public research authorization resists spoofed source headers", async ({
       const scanDenied = await request.post("/api/models/scan", { headers });
       expect(scanDenied.status()).toBe(403);
     }
+    // An invalid job name checks authorization without starting a quant run.
+    const strategyDenied = await request.post("/api/strategy/run", {
+      headers,
+      data: { job: "invalid" },
+    });
+    expect(strategyDenied.status()).toBe(access.canRun ? 400 : 403);
   }
 });
 
@@ -188,5 +194,31 @@ test("public deployment serves saved model scans read-only", async ({
   const state = (await response.json()) as Record<string, unknown>;
   expect(Object.keys(state).sort()).toEqual(["job", "lastFailure", "scan"]);
   const invalid = await request.get("/api/models/charts/%24BAD");
+  expect(invalid.status()).toBe(400);
+});
+
+test("public deployment serves the quant system read-only", async ({
+  request,
+}) => {
+  const response = await request.get("/api/strategy/state");
+  expect(response.ok()).toBe(true);
+  const state = (await response.json()) as {
+    books: { id: string }[];
+    email: Record<string, unknown>;
+    scheduler: { enabled: boolean };
+  };
+  expect(state.books.map((b) => b.id)).toEqual(["stocks", "sectors"]);
+  expect(Object.keys(state.email).sort()).toEqual([
+    "configured",
+    "lastSent",
+    "transport",
+  ]);
+  expect(state.scheduler.enabled).toBe(true);
+  // Never reveal recipients.
+  expect(JSON.stringify(state)).not.toMatch(/[\w.+-]+@[a-z0-9-]+\.[a-z]/i);
+  const outbox = await request.get("/api/strategy/outbox");
+  expect(outbox.ok()).toBe(true);
+  expect(await outbox.text()).not.toMatch(/[\w.+-]+@[a-z0-9-]+\.[a-z]/i);
+  const invalid = await request.get("/api/strategy/charts/stocks/%24BAD");
   expect(invalid.status()).toBe(400);
 });

@@ -150,7 +150,8 @@ export function resolveBooks(
       };
       if (book.source === "symbols") {
         const symbols = [...new Set(book.symbols)];
-        const id = "class";
+        // A single class named after the book, so signals and emails read naturally.
+        const id = book.id;
         return {
           ...base,
           symbols,

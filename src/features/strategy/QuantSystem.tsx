@@ -111,6 +111,18 @@ export function QuantSystem() {
       clearTimeout(timer);
     };
   }, [jobId, refresh]);
+  // Scheduled jobs start without this page's help: look for one every minute.
+  useEffect(() => {
+    if (jobId) return;
+    const timer = setInterval(() => {
+      api<StrategyState>("/strategy/state")
+        .then((next) => {
+          if (next.job) setState(next);
+        })
+        .catch(() => undefined);
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, [jobId]);
   useEffect(() => save(tabKey, tab), [tab]);
 
   const books = state?.books ?? [];
@@ -271,8 +283,8 @@ export function QuantSystem() {
         <p className="models-scan-status">
           {state?.latest
             ? t(
-                `Signals as of ${state.latest.asOf} · ${state.latest.signals} orders`,
-                `信号截至 ${state.latest.asOf} · ${state.latest.signals} 笔订单`,
+                `Signals as of ${state.latest.asOf} · ${state.latest.signals} orders across all books`,
+                `信号截至 ${state.latest.asOf} · 所有组合共 ${state.latest.signals} 笔订单`,
               )
             : state
               ? t("No daily run yet.", "尚未运行每日信号。")

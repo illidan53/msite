@@ -437,7 +437,7 @@ it("shows the backtest report with tests, diagnostics and attribution in Chinese
   );
   expect(
     within(rules).getByRole("row", { name: /顺势均值回归（SMA20）/ }),
-  ).toHaveTextContent("全样本");
+  ).toHaveTextContent("跨标的汇总");
   expect(screen.getByRole("list", { name: "警示" })).toHaveTextContent(
     "有规则的平均 |预测值| 超出 7–13",
   );
