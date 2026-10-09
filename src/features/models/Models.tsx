@@ -343,6 +343,12 @@ export function Models() {
       className="research-page models-page"
       aria-label={t("Model fit workspace", "模型拟合工作区")}
     >
+      <p className="research-notice">
+        {t(
+          "Trading signals now come from Analytics → Quant System. These four event studies remain as research diagnostics and carry no weight in it.",
+          "交易信号现由“分析 → 量化系统”生成。这四个事件研究保留为研究诊断，在量化系统中权重为 0。",
+        )}
+      </p>
       {access && !access.canRun && (
         <p className="research-notice" role="status">
           {t(

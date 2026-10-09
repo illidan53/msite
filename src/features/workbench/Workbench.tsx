@@ -1,5 +1,6 @@
 import { Research } from "../research/Research";
 import { Models } from "../models/Models";
+import { QuantSystem } from "../strategy/QuantSystem";
 import {
   LocaleProvider,
   LanguageSwitcher,
@@ -84,7 +85,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   const { span: spanChange, dollarVolume: dollarVolumeHelp } =
     activityExplanations(locale);
   const [activePage, setActivePage] = useState<
-    "watchlist" | "analytics" | "research" | "models"
+    "watchlist" | "analytics" | "research" | "quant" | "models"
   >("watchlist");
   const [watchlistOpen, setWatchlistOpen] = useState(false);
   const [otherWatchlistsOpen, setOtherWatchlistsOpen] = useState(false);
@@ -572,21 +573,25 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           <p className="eyebrow">
             {activePage === "research"
               ? t("ANALYTICS / DIG DEEP", "分析 / 深度研究")
-              : activePage === "models"
-                ? t("ANALYTICS / MODELS", "分析 / 模型")
-                : activePage === "analytics"
-                  ? t("ANALYTICS / SECTORS")
-                  : t("WATCHLIST / MARKET OVERVIEW")}
+              : activePage === "quant"
+                ? t("ANALYTICS / QUANT SYSTEM", "分析 / 量化系统")
+                : activePage === "models"
+                  ? t("ANALYTICS / MODELS", "分析 / 模型")
+                  : activePage === "analytics"
+                    ? t("ANALYTICS / SECTORS")
+                    : t("WATCHLIST / MARKET OVERVIEW")}
           </p>
           <div className="watchlist-heading-line">
             <h2>
               {activePage === "research"
                 ? t("Dig Deep", "深度研究")
-                : activePage === "models"
-                  ? t("Models", "模型")
-                  : activePage === "analytics"
-                    ? t("Sectors & ETFs")
-                    : t(watchlist.name)}
+                : activePage === "quant"
+                  ? t("Quant System", "量化系统")
+                  : activePage === "models"
+                    ? t("Models", "模型")
+                    : activePage === "analytics"
+                      ? t("Sectors & ETFs")
+                      : t(watchlist.name)}
             </h2>
             {activePage === "watchlist" && (
               <>
@@ -632,6 +637,13 @@ function WorkbenchContent({ api }: WorkbenchProps) {
               {t(
                 "On-demand research · Quantitative data, fundamentals & news",
                 "按需研究 · 量化指标、基本面与新闻",
+              )}
+            </p>
+          ) : activePage === "quant" ? (
+            <p>
+              {t(
+                "Carver AFTS portfolio system · Daily signals, paper trading & backtests",
+                "Carver AFTS 组合系统 · 每日信号、模拟交易与回测",
               )}
             </p>
           ) : activePage === "models" ? (
@@ -933,6 +945,17 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             <button
               type="button"
               className="watchlist-button"
+              aria-pressed={activePage === "quant"}
+              onClick={() => {
+                setActivePage("quant");
+                handleCloseDetails();
+              }}
+            >
+              {t("Quant System", "量化系统")}
+            </button>
+            <button
+              type="button"
+              className="watchlist-button"
               aria-pressed={activePage === "models"}
               onClick={() => {
                 setActivePage("models");
@@ -975,6 +998,8 @@ function WorkbenchContent({ api }: WorkbenchProps) {
 
       {activePage === "research" ? (
         <Research />
+      ) : activePage === "quant" ? (
+        <QuantSystem />
       ) : activePage === "models" ? (
         <Models />
       ) : activePage === "analytics" ? (
