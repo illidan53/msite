@@ -510,6 +510,13 @@ export class StrategyService {
     return charts.every((c) => c?.version === STRATEGY_ENGINE_VERSION);
   }
   /** Whether the scheduler's next daily retry still comes before today's give-up time. */
+  /** Whether the first weekday after `asOf` has already reached its 09:30 New York open. */
+  private nextOpenPassed(asOf: string) {
+    let next = addDays(asOf, 1);
+    while ([0, 6].includes(new Date(`${next}T12:00:00Z`).getUTCDay())) next = addDays(next, 1);
+    return this.now().getTime() >= newYorkInstant(next, "09:30").getTime();
+  }
+
   private retryLeft(schedule: StrategyConfig["schedule"]) {
     const now = this.now();
     const giveUp = newYorkInstant(newYorkClock(now).date, schedule.dailyGiveUpAt);
@@ -538,6 +545,18 @@ export class StrategyService {
       (await this.published(asOf, enabled.map((b) => b.id)))
     )
       return { at: this.now().toISOString(), trigger, status: "skipped", asOf };
+
+    // A new paper ledger must start from orders published before the open they
+    // fill at. A catch-up run after the next session has opened (e.g. the
+    // first deploy in the evening) waits for the next pre-open run instead.
+    if (ledgers.some((l) => !l) && this.nextOpenPassed(asOf))
+      return {
+        at: this.now().toISOString(),
+        trigger,
+        status: "skipped",
+        asOf,
+        message: "INCEPTION_WAITS_FOR_PRE_OPEN",
+      };
 
     const { books, hash, panel, failures } = await this.load(job, benchmarkBars);
     // Dropping symbols reweights their classmates, so a scheduled run retries

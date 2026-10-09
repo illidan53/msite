@@ -106,7 +106,8 @@ async function setup(options: { count?: number; config?: (yaml: any) => void } =
       };
     }),
   };
-  let now = new Date(`${DATES[count]}T15:00:00Z`);
+  // 07:00 New York (06:00 in winter): the pre-open daily run.
+  let now = new Date(`${DATES[count]}T11:00:00Z`);
   const sent: Sent[] = [];
   /** Set to make the next sends throw (a crash in the email step). */
   const mail = { fail: false };
@@ -147,7 +148,7 @@ async function setup(options: { count?: number; config?: (yaml: any) => void } =
     },
     advance(sessionsAhead = 1) {
       count += sessionsAhead;
-      now = new Date(`${DATES[count]}T15:00:00Z`);
+      now = new Date(`${DATES[count]}T11:00:00Z`);
     },
     /** New York wall time on the current day (after the newest bar). */
     at(time: string) {
@@ -346,10 +347,29 @@ describe("StrategyService daily commit and recovery", () => {
     expect((await service.runDaily("schedule")).status).toBe("skipped");
   });
 
+  it("starts paper trading only from a run before the next open", async () => {
+    const env = await setup();
+    // A catch-up run after the fill session has opened would trade at a past open.
+    env.at("10:15");
+    expect(await env.service.runDaily("schedule")).toMatchObject({
+      status: "skipped",
+      message: "INCEPTION_WAITS_FOR_PRE_OPEN",
+    });
+    await expect(env.service.latest()).rejects.toMatchObject({ status: 404 });
+    await expect(env.service.paper("stocks")).rejects.toMatchObject({ status: 404 });
+    env.at("09:00");
+    expect((await env.service.runDaily("manual")).status).toBe("complete");
+    // Existing ledgers catch up at any time; missed sessions follow the backtest rules.
+    env.advance(2);
+    env.at("15:00");
+    expect((await env.service.runDaily("schedule")).status).toBe("complete");
+    expect((await env.service.paper("stocks")).lastSession).toBe(DATES[SESSIONS + 1]);
+  });
+
   it("retries a scheduled run while symbols are unavailable, then proceeds on the last attempt", async () => {
     const env = await setup();
     env.failing.add("CCC");
-    env.at("11:00");
+    env.at("08:00");
     const early = await env.service.runDaily("schedule");
     expect(early).toMatchObject({ status: "failed", message: "SYMBOLS_UNAVAILABLE: CCC" });
     await expect(env.service.latest()).rejects.toMatchObject({ status: 404 });
