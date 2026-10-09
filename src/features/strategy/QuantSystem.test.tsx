@@ -914,3 +914,34 @@ it("sends a test email and reports what happened", async () => {
     "one per 10 minutes",
   );
 });
+
+it("explains a daily run waiting for the pre-open run instead of showing its code", async () => {
+  const waiting: StrategyState = {
+    ...stateFixture,
+    latest: null,
+    scheduler: {
+      ...stateFixture.scheduler,
+      lastDaily: {
+        at: "2026-10-09T02:51:59.177Z",
+        trigger: "schedule",
+        status: "skipped",
+        asOf: "2026-10-07",
+        message: "INCEPTION_WAITS_FOR_PRE_OPEN",
+      },
+    },
+  };
+  mockApi(
+    routes(false, (path) =>
+      path === "/api/strategy/state"
+        ? waiting
+        : path === "/api/strategy/latest"
+          ? error(404)
+          : undefined,
+    ),
+  );
+  renderPage();
+  expect(
+    await screen.findByText(/paper trading starts at the next pre-open run/),
+  ).toBeInTheDocument();
+  expect(screen.queryByText(/INCEPTION_WAITS_FOR_PRE_OPEN/)).toBeNull();
+});

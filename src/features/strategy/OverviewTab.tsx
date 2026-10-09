@@ -70,11 +70,19 @@ function RunSummary({
 }) {
   const { t, dateTime } = useStrategyFormat();
   if (!record) return <>{t("Never", "从未运行")}</>;
+  const waiting = record.message === "INCEPTION_WAITS_FOR_PRE_OPEN";
   const status = {
     complete: t("Complete", "完成"),
-    skipped: t("Skipped · no new session", "跳过 · 无新交易日"),
+    skipped: waiting
+      ? t(
+          "Waiting · paper trading starts at the next pre-open run",
+          "等待 · 模拟盘将在下一次开盘前的运行中开始",
+        )
+      : t("Skipped · no new session", "跳过 · 无新交易日"),
     failed: t("Failed", "失败"),
   }[record.status];
+  // Known service codes are explained by the status; other messages show as is.
+  const message = waiting ? null : record.message;
   return (
     <>
       {dateTime(record.at, timezone)}
@@ -86,7 +94,7 @@ function RunSummary({
         {record.asOf &&
           t(` · data as of ${record.asOf}`, ` · 数据截至 ${record.asOf}`)}
         {record.emailed && t(" · emailed", " · 已发邮件")}
-        {record.message && ` · ${record.message}`}
+        {message && ` · ${message}`}
       </small>
     </>
   );
