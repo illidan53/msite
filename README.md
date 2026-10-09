@@ -49,7 +49,8 @@ MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e
 - Runtime: Docker container managed by systemd `msite.service`
 - Public proxy/TLS: Caddy on ports `80` and `443`
 - Runtime secrets: SSM SecureString parameters under `/msite/finance/`
-- Container registry: ECR repository `msite-finance`
+- Container registry: ECR repository `msite-finance`; the instance keeps only the three newest images (pruned on every deploy)
+- Host: t3.micro (912 MB RAM) with an 8 GB root volume, a 1 GiB `/swapfile` in `/etc/fstab` (`vm.swappiness=10`) and journald capped at 200 MB (`/etc/systemd/journald.conf.d/90-msite.conf`). These host settings are not managed by the deploy workflow; recreate them on a new instance
 
 Production infrastructure lives in `infra/` as Pulumi code. The Pulumi stack
 creates the ECR repository, the GitHub Actions OIDC deploy role, the EC2 role

@@ -57,6 +57,10 @@ describe("container deployment assets", () => {
     expect(stepText).toContain("-p 127.0.0.1:8787:8787");
     expect(stepText).toContain("docker network inspect bridge");
     expect(stepText).toContain("RESEARCH_ALLOWED_IPS=70.111.76.119");
+    // Tagged images are pruned by count, not age, so the 8 GB disk cannot fill up.
+    expect(stepText).toContain("tail -n +4");
+    expect(stepText).toContain("xargs -r docker rmi");
+    expect(stepText).not.toContain('docker image prune -f --filter "until=168h"');
     expect(stepText).toContain("RESEARCH_TRUSTED_PROXY_IPS=$proxy_ip");
     expect(stepText).toContain("OPENAI_MODEL=gpt-5.6-sol");
     expect(stepText).toContain("systemctl restart msite.service");

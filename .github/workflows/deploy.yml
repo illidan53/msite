@@ -147,7 +147,14 @@ jobs:
           systemctl daemon-reload
           systemctl restart msite.service
           systemctl is-active --quiet msite.service
-          docker image prune -f --filter "until=168h"
+          # Per-commit tags are never dangling, so an age-filtered prune keeps
+          # every deployed image and fills the 8 GB disk. Keep the newest three
+          # for rollback (never the running one), then drop dangling layers.
+          running_image="$(docker inspect --format '{{.Image}}' msite-finance 2>/dev/null || true)"
+          docker images --no-trunc --format '{{.ID}}' "${image_uri%:*}" \
+            | awk '!seen[$0]++' | tail -n +4 | grep -vxF "${running_image:-none}" \
+            | xargs -r docker rmi >/dev/null || true
+          docker image prune -f
           REMOTE_DEPLOY
 
           script_b64="$(base64 -w0 remote-deploy.sh)"
