@@ -6,3 +6,5 @@ config:
   msite-finance-infra:ec2RoleName: msite-finance-ec2-role
   msite-finance-infra:githubOwner: illidan53
   msite-finance-infra:githubRepo: msite
+  msite-finance-infra:alertEmailRecipient:
+    secure: AAABADjkQITBP8NeB+hEfkvaFBrI1gwHgUY8waXTWOWel7h3PgT4zyHbCDy9ot31h93yazAxXnoDoA==
