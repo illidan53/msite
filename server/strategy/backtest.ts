@@ -5,6 +5,7 @@ import {
   type BacktestBookReport,
   type BacktestRun,
   type BacktestTests,
+  type BacktestWarning,
   type FamilyAdmission,
   type PerformanceStats,
   type RuleFamily,
@@ -14,7 +15,7 @@ import {
 import { ruleCatalog } from "../../shared/strategyRules";
 import { configHash, type BookDefinition, type StrategyConfig } from "./config";
 import { buildPortfolio } from "./portfolio";
-import { calibratedMeanAbsForecast, ruleDiagnostics, signGatedRules } from "./ruleCurves";
+import { ruleDiagnostics } from "./ruleCurves";
 import {
   simulate,
   simulateBuyHold,
@@ -66,6 +67,8 @@ export const LEGACY_TRIALS = 4;
 const FAMILY_MIN_SESSIONS = 252;
 const SHORT_WINDOW_SESSIONS = 504;
 const JUMP_RETURN = 0.4;
+/** Largest jumps named in the price_jumps warning; the rest are counted. */
+const JUMP_DETAILS = 10;
 const PBO_BLOCKS = 10;
 
 export const trialKey = (book: string, variant: VariantId, hash: string) =>
@@ -308,10 +311,12 @@ async function bookReport(
     overfitting: { ...pbo, probability: r4(pbo.probability) },
   };
 
-  const rules = ruleDiagnostics(core, start, end).map((rule) => ({
+  const diagnostics = ruleDiagnostics(core, start, end);
+  const rules = diagnostics.map((rule) => ({
     ...rule,
     scalar: r4(rule.scalar),
     meanAbsForecast: r4(rule.meanAbsForecast),
+    gateOpenMeanAbsForecast: r4(rule.gateOpenMeanAbsForecast),
     turnover: r4(rule.turnover),
     costPassRate: r4(rule.costPassRate),
     sharpe: r4(rule.sharpe),
@@ -355,12 +360,12 @@ async function bookReport(
   for (const symbol of core.missing)
     if (!failures.some((f) => f.symbol === symbol))
       failures.push({ symbol, message: "No bars" });
-  for (const [symbol, cut] of Object.entries(panel.trimmed ?? {}))
-    if (bookSymbols.has(symbol))
-      failures.push({
-        symbol,
-        message: `History before ${cut.date} dropped (${cut.return}% in one session)`,
-      });
+  // A trimmed symbol loaded and trades on its later history: not a failure.
+  const trimmed: BacktestBookReport["dataQuality"]["trimmed"] = Object.entries(
+    panel.trimmed ?? {},
+  )
+    .filter(([symbol]) => bookSymbols.has(symbol))
+    .map(([symbol, cut]) => ({ symbol, date: cut.date, return: r4(cut.return)! }));
   const jumps: BacktestBookReport["dataQuality"]["jumps"] = [];
   core.panelIndex.forEach((row, i) => {
     const close = panel.close[row];
@@ -384,12 +389,15 @@ async function bookReport(
     return !seen || core.reason[i][start] === 2;
   });
 
-  const warnings: BacktestBookReport["warnings"] = [];
-  // Gated rules are judged with the gate open: see calibratedMeanAbsForecast.
-  const offScale = ruleCatalog.flatMap(({ id }) => {
-    const scale = core.baseWeights[id] > 0 ? calibratedMeanAbsForecast(core, id, start, end) : null;
-    return scale !== null && (scale < 7 || scale > 13)
-      ? [`${id} ${scale.toFixed(1)}${signGatedRules.has(id) ? " (gate open)" : ""}`]
+  // Details carry only symbols, dates, numbers and ids (formats on
+  // BacktestWarning), so the UI and emails can label them in either language.
+  const warnings: BacktestWarning[] = [];
+  // Gated rules are judged with the gate open, as the rule table is: see
+  // calibratedMeanAbsForecast.
+  const offScale = diagnostics.flatMap((rule) => {
+    const scale = rule.gateOpenMeanAbsForecast ?? rule.meanAbsForecast;
+    return rule.weight > 0 && scale !== null && (scale < 7 || scale > 13)
+      ? [`${rule.id} ${scale.toFixed(1)}`]
       : [];
   });
   if (offScale.length) warnings.push({ code: "forecast_scale", detail: offScale.join(", ") });
@@ -397,25 +405,32 @@ async function bookReport(
   if (costSharpe !== null && sharpe !== null && costSharpe > sharpe / 3)
     warnings.push({
       code: "cost_budget",
-      detail: `cost ${costSharpe.toFixed(2)} SR vs Sharpe ${sharpe.toFixed(2)}`,
+      detail: `${costSharpe.toFixed(2)}/${sharpe.toFixed(2)}`,
     });
   if (sessions < SHORT_WINDOW_SESSIONS)
-    warnings.push({ code: "short_window", detail: `${sessions} evaluation sessions` });
+    warnings.push({ code: "short_window", detail: String(sessions) });
   if (failures.length)
     warnings.push({
       code: "data_failures",
       detail: failures.map((f) => f.symbol).join(", "),
     });
-  if (jumps.length)
+  const move = (m: { symbol: string; date: string; return: number }) =>
+    `${m.symbol} ${m.date} ${m.return > 0 ? "+" : ""}${m.return.toFixed(1)}%`;
+  if (trimmed.length)
+    warnings.push({ code: "history_trimmed", detail: trimmed.map(move).join(", ") });
+  if (jumps.length) {
+    const largest = [...jumps]
+      .sort((a, b) => Math.abs(b.return) - Math.abs(a.return))
+      .slice(0, JUMP_DETAILS);
+    const more = jumps.length - largest.length;
     warnings.push({
       code: "price_jumps",
-      detail: [...jumps]
-        .sort((a, b) => Math.abs(b.return) - Math.abs(a.return))
-        .slice(0, 10)
-        .map((j) => `${j.symbol} ${j.date} ${j.return}%`)
-        .concat(jumps.length > 10 ? [`… ${jumps.length} in total`] : [])
+      detail: largest
+        .map(move)
+        .concat(more ? [`… +${more}`] : [])
         .join(", "),
     });
+  }
   const detracting = families.filter((f) => f.status === "detracts");
   if (detracting.length)
     warnings.push({
@@ -462,7 +477,7 @@ async function bookReport(
       average: r4(mean(fdmValues)),
     },
     warnings,
-    dataQuality: { failures, jumps, shortHistory },
+    dataQuality: { failures, trimmed, jumps, shortHistory },
   };
 }
 

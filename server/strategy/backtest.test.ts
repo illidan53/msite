@@ -216,6 +216,7 @@ describe("runBacktest", () => {
     expect(report.universe).toMatchObject({ symbols: 7, eligibleAtStart: 5 });
 
     expect(report.dataQuality.failures).toEqual([{ symbol: "ZZZ", message: "HTTP 404" }]);
+    expect(report.dataQuality.trimmed).toEqual([]);
     expect(report.dataQuality.jumps).toEqual([
       { symbol: "AAB", date: panel.dates[600], return: expect.any(Number) },
     ]);
@@ -289,10 +290,72 @@ describe("family admission and report warnings", () => {
 
     const warnings = Object.fromEntries(report.warnings.map((w) => [w.code, w.detail]));
     expect(warnings.family_detracts).toBe("mean_reversion");
-    expect(warnings.forecast_scale).toBe("ewmac8 5.0, mr20 16.0 (gate open)");
-    expect(warnings.short_window).toBe("380 evaluation sessions");
-    // The report still shows mr5's realised scale, gate-closed zeros included.
-    expect(report.rules.find((r) => r.id === "mr5")!.meanAbsForecast).toBeCloseTo(5, 1);
+    // Locale-neutral details: ids and 1-dp numbers, no English words.
+    expect(warnings.forecast_scale).toBe("ewmac8 5.0, mr20 16.0");
+    expect(warnings.short_window).toBe("380");
+    // The report still shows mr5's realised scale, gate-closed zeros included,
+    // next to the gate-open scale that the warning (and the 7–13 check) uses.
+    const rule = (id: string) => report.rules.find((r) => r.id === id)!;
+    expect(rule("mr5").meanAbsForecast).toBeCloseTo(5, 1);
+    expect(rule("mr5").gateOpenMeanAbsForecast).toBe(10);
+    expect(rule("mr20").gateOpenMeanAbsForecast).toBe(16);
+    expect(rule("ewmac8").gateOpenMeanAbsForecast).toBeNull();
+    expect(rule("ewmac8").meanAbsForecast).toBe(5);
+  });
+
+  it("reports trimmed history apart from load failures, with locale-neutral details", async () => {
+    // AAA gaps up 50% on twelve sessions (and eases back ten sessions later).
+    const jumpy = testPanel({ symbols, sessions: 700, close: wave });
+    const aaa = jumpy.index.AAA;
+    for (let k = 0; k < 12; k++)
+      for (let t = 400 + 20 * k; t < 410 + 20 * k; t++) jumpy.close[aaa][t] *= 1.5;
+    // AAB's history before session 100 was dropped at a 1394.7197% print.
+    jumpy.close[jumpy.index.AAB].fill(Number.NaN, 0, 100);
+    jumpy.trimmed = {
+      AAB: { date: jumpy.dates[100], return: 1394.7197 },
+      QQQ: { date: jumpy.dates[50], return: -83.7503 },
+    };
+    const withMissing = testBook([...defaultClasses, { id: "z", rows: [["ZZZ"]] }]);
+    // Costs far over budget: 3% a trade on a forecast that flips every session.
+    const costly = testConfig();
+    for (const tier of costly.costs.tiers) tier.bps = 300;
+    const flipping: ComputeSystem = (p, b, c, options) =>
+      systemFromPanel(p, b, c, { forecast: (i, t) => (t % 2 ? 20 : -20) }, options);
+    const { books } = await runBacktest({
+      panel: jumpy,
+      books: [withMissing],
+      config: costly,
+      computeSystem: flipping,
+      priorTrials: [],
+      failures: [],
+    });
+    const [report] = books;
+
+    // AAB loaded and is traded: it is trimmed, not a failure; QQQ is not in the book.
+    expect(report.dataQuality.failures).toEqual([{ symbol: "ZZZ", message: "No bars" }]);
+    expect(report.dataQuality.trimmed).toEqual([
+      { symbol: "AAB", date: jumpy.dates[100], return: 1394.7197 },
+    ]);
+    expect(report.symbols.find((s) => s.symbol === "AAB")!.trades).toBeGreaterThan(0);
+    expect(report.dataQuality.jumps).toHaveLength(12);
+
+    const warnings = Object.fromEntries(report.warnings.map((w) => [w.code, w.detail]));
+    expect(warnings.data_failures).toBe("ZZZ");
+    expect(warnings.history_trimmed).toBe(`AAB ${jumpy.dates[100]} +1394.7%`);
+    // The ten largest jumps to 1 dp, then how many more.
+    const jumps = warnings.price_jumps.split(", ");
+    expect(jumps).toHaveLength(11);
+    for (const jump of jumps.slice(0, 10))
+      expect(jump).toMatch(/^AAA \d{4}-\d{2}-\d{2} \+\d+\.\d%$/);
+    expect(jumps[10]).toBe("… +2");
+    const sizes = jumps.slice(0, 10).map((j) => Number(j.split(" ")[2].slice(0, -1)));
+    expect(sizes).toEqual([...sizes].sort((a, b) => b - a));
+    const core = report.runs.find((r) => r.id === "core")!.stats;
+    expect(core.costSharpe!).toBeGreaterThan(core.sharpe! / 3);
+    expect(warnings.cost_budget).toBe(`${core.costSharpe!.toFixed(2)}/${core.sharpe!.toFixed(2)}`);
+    expect(warnings.short_window).toBe("380");
+    for (const { detail } of report.warnings)
+      expect(detail).not.toMatch(/total|gate|session|cost|Sharpe|SR|History|dropped|\d\.\d{2,}%/);
   });
 
   it("reports no intervals and no admission on a window shorter than two blocks", async () => {
