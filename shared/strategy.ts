@@ -135,8 +135,14 @@ export interface RuleDiagnostics {
   /** Scalar in force at the window end; null while a pooled scalar is still warming up. */
   scalar: number | null;
   scalarSource: "book" | "pooled";
-  /** Realised mean |capped forecast|, pooled; Carver's target is 10 (alert outside 7–13). */
+  /** Realised mean |capped forecast|, pooled, zeros included. */
   meanAbsForecast: number | null;
+  /**
+   * Sign-gated rules (mr5, mr20) only: mean |f| on gate-open sessions, the
+   * population their scalars are calibrated on; null for other rules. The
+   * 7–13 scale check uses this when present, else meanAbsForecast.
+   */
+  gateOpenMeanAbsForecast: number | null;
   /** Pooled forecast turnover per year: 256 × mean|Δf| ÷ 10. */
   turnover: number | null;
   /** Share of eligible symbols where the rule passes the 0.15 SR speed limit. */
@@ -185,8 +191,22 @@ export type WarningCode =
   | "cost_budget"
   | "short_window"
   | "data_failures"
+  | "history_trimmed"
   | "price_jumps"
   | "family_detracts";
+
+/**
+ * Warning details are locale-neutral (symbols, dates, numbers, rule and
+ * family ids) so the UI and emails can label them in either language:
+ * forecast_scale "ewmac64 7.0, mr20 16.0"; cost_budget "0.12/1.42" (cost SR /
+ * Sharpe); short_window "312" (sessions); data_failures and history_trimmed
+ * symbol lists; price_jumps "META 2022-06-09 +1394.7%, … +64" (top 10 by size,
+ * then how many more); family_detracts family ids.
+ */
+export interface BacktestWarning {
+  code: WarningCode;
+  detail: string;
+}
 
 export interface BacktestBookReport {
   book: string;
@@ -224,9 +244,12 @@ export interface BacktestBookReport {
   }[];
   idm: { last: number | null; average: number | null };
   fdm: { last: number | null; average: number | null };
-  warnings: { code: WarningCode; detail: string }[];
+  warnings: BacktestWarning[];
   dataQuality: {
+    /** Symbols without usable bars (failed fetch or no history). */
     failures: { symbol: string; message: string }[];
+    /** Symbols whose history before `date` was dropped as a different security. */
+    trimmed: { symbol: string; date: string; return: number }[];
     jumps: { symbol: string; date: string; return: number }[];
     shortHistory: string[];
   };
@@ -284,6 +307,7 @@ export interface Signal {
   fromWeight: number;
   toWeight: number;
   forecast: number | null;
+  /** The (at most) three non-zero rule contributions largest in size. */
   drivers: RuleContribution[];
   reason: "forecast" | "removed" | "ineligible";
   fill?: { date: string; price: number; cost: number } | { cancelled: string };
@@ -339,6 +363,8 @@ export interface PaperSummary {
 export interface BookSnapshot {
   book: string;
   name: Bilingual;
+  /** Class ids used by rows and signals, with their display names. */
+  classes: { id: string; name: string }[];
   asOf: string;
   configHash: string;
   idm: number | null;
@@ -387,6 +413,8 @@ export interface PaperOrder {
   /** Signed share change, filled at the next open. */
   shares: number;
   decidedAt: string;
+  /** Decision-session close, to rescale the order if a split lands before the fill. */
+  decisionClose?: number;
   /** Sessions this order has already waited for a bar (cancelled after one). */
   waited: number;
 }
