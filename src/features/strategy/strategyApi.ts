@@ -21,14 +21,17 @@ export async function api<T>(
   method: "GET" | "POST" = "GET",
   body?: unknown,
 ) {
+  // POSTs always send JSON: the content type forces a CORS preflight, so a
+  // cross-site page cannot replay them from an allowed IP.
+  const payload = body ?? (method === "POST" ? {} : undefined);
   const response = await fetch(`/api${path}`, {
     method,
     cache: "no-store",
-    ...(body === undefined
+    ...(payload === undefined
       ? {}
       : {
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify(payload),
         }),
   });
   if (!response.ok) {

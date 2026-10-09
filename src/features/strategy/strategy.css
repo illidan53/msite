@@ -217,8 +217,14 @@
 .strategy-table-wrap tr.is-selected {
   background: var(--accent-soft);
 }
-.strategy-negative {
+.strategy-negative,
+.strategy-table-wrap td small.strategy-negative {
   color: var(--negative);
+}
+/* The picker gets its own row so the closed select shows the whole label. */
+.research-toolbar.strategy-report-toolbar .models-picker {
+  flex: 1 1 100%;
+  min-width: 0;
 }
 .strategy-action {
   display: inline-block;

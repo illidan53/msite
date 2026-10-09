@@ -16,6 +16,7 @@ import {
   Empty,
   Pending,
   RunButton,
+  classNamer,
   reportPath,
   type RunControls,
 } from "./parts";
@@ -24,6 +25,7 @@ import {
   admissionLabels,
   benchmarkOrder,
   runLabels,
+  warningDetail,
   warningLabels,
 } from "./strategyText";
 
@@ -75,6 +77,22 @@ export function BacktestTab({
     report?.status === "ready"
       ? report.value.books.find((b) => b.book === book)
       : undefined;
+  // Labels stay short enough for a phone-width picker: the data date tells
+  // reports apart, and the run time is added only when it is needed to.
+  const label = (s: BacktestReportSummary) => {
+    const twin = summaries.some(
+      (o) => o !== s && o.asOf === s.asOf && o.trigger === s.trigger,
+    );
+    return [
+      `${t("Data to", "数据至")} ${s.asOf}`,
+      s.trigger === "manual" && t("manual", "手动"),
+      twin && dateTime(s.createdAt, tz),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
+  const selected = summaries.find((s) => s.id === id)!;
+  const created = dateTime(selected.createdAt, tz);
   return (
     <>
       <div className="research-toolbar strategy-report-toolbar">
@@ -83,13 +101,15 @@ export function BacktestTab({
           <select value={id} onChange={(e) => setPicked(e.target.value)}>
             {summaries.map((s) => (
               <option key={s.id} value={s.id}>
-                {dateTime(s.createdAt, tz)} · {t("data to", "数据至")} {s.asOf}
-                {s.trigger === "manual" ? t(" · manual", " · 手动") : ""}
+                {label(s)}
               </option>
             ))}
           </select>
         </label>
         <p className="research-meta">
+          {selected.trigger === "manual"
+            ? t(`Run manually ${created}. `, `${created} 手动运行。`)
+            : t(`Scheduled run ${created}. `, `${created} 定时运行。`)}
           {t(
             "Price returns after costs. The universe is today's watchlist (survivorship bias), so judge alpha against risk-parity buy & hold of the same symbols, not against zero.",
             "扣除成本后的价格收益。标的池为当前自选列表（存在幸存者偏差），请以同一批标的的风险平价买入持有为基准判断超额收益，而非与零比较。",
@@ -241,6 +261,24 @@ const statColumns: Column[] = [
   },
 ];
 
+type DataQuality = BacktestBookReport["dataQuality"];
+const legacyTrim =
+  /^History before (\d{4}-\d{2}-\d{2}) dropped \((-?\d+(?:\.\d+)?)% in one session\)$/;
+/**
+ * Reports saved before `trimmed` existed listed trimmed symbols as load
+ * failures with an English message; split them back out.
+ */
+function dataQuality(quality: DataQuality): DataQuality {
+  if (quality.trimmed) return quality;
+  const trimmed: DataQuality["trimmed"] = [];
+  const failures = quality.failures.filter((f) => {
+    const [, date, value] = f.message.match(legacyTrim) ?? [];
+    if (date) trimmed.push({ symbol: f.symbol, date, return: Number(value) });
+    return !date;
+  });
+  return { ...quality, failures, trimmed };
+}
+
 function BookReport({
   report,
   book,
@@ -276,7 +314,8 @@ function BookReport({
   );
   const shownSymbols = allSymbols ? symbols : symbols.slice(0, 15);
   const { deflatedSharpe: dsr, overfitting: pbo } = book.tests;
-  const quality = book.dataQuality;
+  const classLabel = classNamer(book.universe.classes);
+  const quality = dataQuality(book.dataQuality);
   return (
     <>
       <section
@@ -335,7 +374,10 @@ function BookReport({
           <ul className="strategy-warnings" aria-label={t("Warnings", "警示")}>
             {book.warnings.map((w) => (
               <li key={`${w.code}:${w.detail}`}>
-                <strong>{tr(warningLabels[w.code])}</strong> {w.detail}
+                <strong>
+                  {tr(warningLabels[w.code] ?? { en: w.code, zh: w.code })}
+                </strong>{" "}
+                {warningDetail(w, format)}
               </li>
             ))}
           </ul>
@@ -612,9 +654,14 @@ function BookReport({
             </thead>
             <tbody>
               {book.rules.map((r) => {
-                const off =
-                  r.meanAbsForecast !== null &&
-                  (r.meanAbsForecast < 7 || r.meanAbsForecast > 13);
+                // Sign-gated rules are checked on gate-open sessions, as the
+                // forecast_scale warning is. Older reports lack that mean, and
+                // the zero-heavy all-session one says nothing about scale.
+                const gateOpen = r.gateOpenMeanAbsForecast ?? null;
+                const gated = ruleById[r.id]?.params.gate !== undefined;
+                const scale = gateOpen ?? (gated ? null : r.meanAbsForecast);
+                const off = scale !== null && (scale < 7 || scale > 13);
+                const flag = off ? "strategy-negative" : undefined;
                 return (
                   <tr key={r.id}>
                     <th scope="row">
@@ -630,9 +677,16 @@ function BookReport({
                           : t("pooled", "跨标的汇总")}
                       </small>
                     </td>
-                    <td className={off ? "strategy-negative" : undefined}>
-                      {number(r.meanAbsForecast, 1)}
-                    </td>
+                    {gateOpen === null ? (
+                      <td className={flag}>{number(r.meanAbsForecast, 1)}</td>
+                    ) : (
+                      <td>
+                        {number(r.meanAbsForecast, 1)}
+                        <small className={flag}>
+                          {t("gate open", "门控开启")} {number(gateOpen, 1)}
+                        </small>
+                      </td>
+                    )}
                     <td>{number(r.turnover, 1)}</td>
                     <td>{pct(r.costPassRate)}</td>
                     <td>{number(r.sharpe, 2)}</td>
@@ -646,8 +700,8 @@ function BookReport({
         </div>
         <p className="research-meta">
           {t(
-            "Mean |f| should stay near 10 (flagged outside 7–13). Turnover is forecast turnover per year. Cost pass is the share of eligible symbols where the rule stays under the 0.15 SR speed limit. Rule Sharpe ratios come from pooled single-rule account curves after costs.",
-            "平均 |f| 应接近 10（超出 7–13 会标红）。换手为每年预测换手。成本通过率为该规则低于 0.15 SR 速度限制的合格标的占比。规则夏普来自扣除成本后、跨标的汇总的单规则账户曲线。",
+            "Mean |f| should stay near 10 (flagged outside 7–13). Trend-gated reversion forecasts are 0 while the gate is closed, so their all-session mean sits far below 10; they are checked on gate-open sessions instead. Turnover is forecast turnover per year. Cost pass is the share of eligible symbols where the rule stays under the 0.15 SR speed limit. Rule Sharpe ratios come from pooled single-rule account curves after costs.",
+            "平均 |f| 应接近 10（超出 7–13 会标红）。顺势均值回归在门控关闭时预测值为 0，全时段均值因此远低于 10，故改按门控开启的交易日检查。换手为每年预测换手。成本通过率为该规则低于 0.15 SR 速度限制的合格标的占比。规则夏普来自扣除成本后、跨标的汇总的单规则账户曲线。",
           )}
         </p>
       </section>
@@ -701,7 +755,7 @@ function BookReport({
                   <tr key={s.symbol}>
                     <th scope="row">
                       {s.symbol}
-                      <small>{s.class}</small>
+                      <small>{classLabel(s.class)}</small>
                     </th>
                     <td>{signedPct(s.contribution, 2)}</td>
                     <td>{pct(s.averageWeight, 2)}</td>
@@ -749,6 +803,22 @@ function BookReport({
             </dd>
           </div>
           <div>
+            <dt>{t("Early history trimmed", "早期历史已截断")}</dt>
+            <dd>
+              {quality.trimmed.length
+                ? quality.trimmed
+                    .map((c) => {
+                      const jump = signedPct(c.return);
+                      return t(
+                        `${c.symbol} before ${c.date} (${jump} in one session)`,
+                        `${c.symbol} ${c.date} 之前（单日 ${jump}）`,
+                      );
+                    })
+                    .join(" · ")
+                : t("None", "无")}
+            </dd>
+          </div>
+          <div>
             <dt>{t("Price jumps over 40%", "超过 40% 的价格跳变")}</dt>
             <dd>
               {quality.jumps.length
@@ -769,8 +839,8 @@ function BookReport({
         </dl>
         <p className="research-meta">
           {t(
-            "Bars are split-adjusted, price-only daily closes on SPY's session calendar; dividends are excluded and idle cash earns nothing.",
-            "日线为按 SPY 交易日历对齐、拆股调整后的价格（不含分红），闲置现金不计利息。",
+            "Bars are split-adjusted, price-only daily closes on SPY's session calendar; dividends are excluded and idle cash earns nothing. A one-session move above +300% or below −80% is treated as a different security, so the history before it is dropped; the symbol still trades on the rest.",
+            "日线为按 SPY 交易日历对齐、拆股调整后的价格（不含分红），闲置现金不计利息。单日涨幅超过 +300% 或跌幅超过 −80% 视为不同证券，之前的历史被舍弃；该标的仍按其余历史正常交易。",
           )}
         </p>
       </section>

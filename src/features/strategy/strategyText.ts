@@ -1,4 +1,5 @@
 import type {
+  BacktestWarning,
   BenchmarkId,
   Bilingual,
   FamilyAdmission,
@@ -11,7 +12,13 @@ import type {
   StrategyJob,
   WarningCode,
 } from "../../../shared/strategy";
-import { ruleCatalog, type RuleSpec } from "../../../shared/strategyRules";
+import {
+  familyLabels,
+  ruleById,
+  ruleCatalog,
+  type RuleSpec,
+} from "../../../shared/strategyRules";
+import type { StrategyFormat } from "./format";
 
 export const bookCitation: Bilingual = {
   en: "Robert Carver, Advanced Futures Trading Strategies (Harriman House, 2023), ISBN 9780857199683",
@@ -272,12 +279,102 @@ export const warningLabels: Record<WarningCode, Bilingual> = {
     en: "Some symbols failed to load",
     zh: "部分标的数据加载失败",
   },
+  history_trimmed: {
+    en: "Early history trimmed at a one-session break",
+    zh: "早期历史已在单日断点处截断",
+  },
   price_jumps: {
     en: "Daily price jumps over 40%",
     zh: "存在超过 40% 的单日价格跳变",
   },
   family_detracts: { en: "A rule family detracts", zh: "有规则族拖累表现" },
 };
+
+/** Current detail formats, plus the English ones older reports stored. */
+const decimal = String.raw`-?\d+(?:\.\d+)?`;
+const patterns = {
+  scale: new RegExp(String.raw`^(\w+) (${decimal})(?: \(gate open\))?$`),
+  cost: new RegExp(
+    `^(?:cost )?(${decimal})(?:/| SR vs Sharpe )(${decimal})$`,
+  ),
+  sessions: /^(\d+)(?: evaluation sessions)?$/,
+  jump: new RegExp(
+    String.raw`^(\S+) (\d{4}-\d{2}-\d{2}) \+?(${decimal})%$`,
+  ),
+  more: /^… \+(\d+)$/,
+  total: /^… (\d+) in total$/,
+};
+/**
+ * Labels a warning's locale-neutral detail (see BacktestWarning) in the page
+ * language. Older reports stored English sentences; pieces that do not parse
+ * show as stored.
+ */
+export function warningDetail(
+  warning: BacktestWarning,
+  f: StrategyFormat,
+): string {
+  const { t, tr } = f;
+  const { detail } = warning;
+  const parts = detail.split(/,\s*/).filter(Boolean);
+  const list = (items: string[]) => items.join(t(", ", "、"));
+  const count = (n: string) => f.number(Number(n), 0);
+  switch (warning.code) {
+    case "forecast_scale":
+      return list(
+        parts.map((part) => {
+          const [, id, value] = part.match(patterns.scale) ?? [];
+          const rule = id ? ruleById[id as RuleId] : undefined;
+          if (!rule) return part;
+          const text = `${tr(rule.label)} ${f.number(Number(value), 1)}`;
+          // Sign-gated rules are judged on gate-open sessions: the closed
+          // gate's zeros would hold the all-session mean far below 10.
+          return rule.params.gate === undefined
+            ? text
+            : t(`${text} on gate-open sessions`, `${text}（门控开启日）`);
+        }),
+      );
+    case "cost_budget": {
+      const [, cost, sharpe] = detail.match(patterns.cost) ?? [];
+      if (cost === undefined) return detail;
+      const [c, s] = [f.number(Number(cost), 2), f.number(Number(sharpe), 2)];
+      return t(`cost ${c} SR vs Sharpe ${s}`, `成本 ${c} SR，夏普 ${s}`);
+    }
+    case "short_window": {
+      const [, sessions] = detail.match(patterns.sessions) ?? [];
+      if (sessions === undefined) return detail;
+      const n = count(sessions);
+      return t(`${n} evaluation sessions`, `评估期 ${n} 个交易日`);
+    }
+    case "data_failures":
+    case "history_trimmed":
+      return list(parts);
+    case "price_jumps":
+      return list(
+        parts.map((part) => {
+          const [, symbol, date, value] = part.match(patterns.jump) ?? [];
+          if (symbol)
+            return `${symbol} ${date} ${f.signedPct(Number(value), 1)}`;
+          const [, more] = part.match(patterns.more) ?? [];
+          if (more)
+            return t(`… ${count(more)} more`, `… 另有 ${count(more)} 处`);
+          const [, total] = part.match(patterns.total) ?? [];
+          if (total)
+            return t(`… ${count(total)} in total`, `… 共 ${count(total)} 处`);
+          return part;
+        }),
+      );
+    case "family_detracts":
+      return list(
+        parts.map((id) =>
+          Object.hasOwn(familyLabels, id)
+            ? tr(familyLabels[id as RuleFamily])
+            : id,
+        ),
+      );
+    default:
+      return detail;
+  }
+}
 
 export const admissionLabels: Record<FamilyAdmission, Bilingual> = {
   adds: { en: "Adds", zh: "有贡献" },

@@ -164,6 +164,15 @@ export function LatestGate({
   return <>{children(snapshot)}</>;
 }
 
+/**
+ * Class display names by id. Ids stay the stored keys and filter values;
+ * classes without a name (or snapshots saved before names) show the id.
+ */
+export function classNamer(classes: { id: string; name: string }[] = []) {
+  const names = new Map(classes.map((c) => [c.id, c.name]));
+  return (id: string) => names.get(id) ?? id;
+}
+
 export function ActionBadge({ action }: { action: SignalAction }) {
   const { tr } = useStrategyFormat();
   return (

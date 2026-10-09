@@ -1,11 +1,19 @@
 import type {
+  BookSnapshot,
   OutboxEntry,
+  RuleContribution,
   Signal,
   SignalRecord,
 } from "../../../shared/strategy";
 import { ruleById } from "../../../shared/strategyRules";
 import { useStrategyFormat } from "./format";
-import { ActionBadge, LatestGate, Pending, type RunControls } from "./parts";
+import {
+  ActionBadge,
+  LatestGate,
+  Pending,
+  classNamer,
+  type RunControls,
+} from "./parts";
 import { useResource } from "./strategyApi";
 import { reasonLabels } from "./strategyText";
 
@@ -46,7 +54,10 @@ export function SignalsTab({
               {t("Latest orders", "最新订单")}
             </h3>
             {snapshot.signals.length ? (
-              <SignalTable signals={snapshot.signals} />
+              <SignalTable
+                signals={snapshot.signals}
+                classes={snapshot.classes}
+              />
             ) : (
               <p className="quant-model-empty">
                 {t(
@@ -70,15 +81,28 @@ export function SignalsTab({
   );
 }
 
+/**
+ * The three largest non-zero contributions. New signals store only these;
+ * records saved earlier carry every rule, zeros included.
+ */
+export const topDrivers = (drivers: RuleContribution[]) =>
+  drivers
+    .filter((d) => Number.isFinite(d.contribution) && d.contribution !== 0)
+    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+    .slice(0, 3);
+
 /** Orders with their sizing context; compact drops the driver breakdown. */
 export function SignalTable({
   signals,
+  classes,
   compact = false,
 }: {
   signals: Signal[];
+  classes: BookSnapshot["classes"] | undefined;
   compact?: boolean;
 }) {
   const { t, tr, signed, money, shares, pct } = useStrategyFormat();
+  const classLabel = classNamer(classes);
   return (
     <div className="ema-table-wrap strategy-table-wrap" tabIndex={0}>
       <table aria-label={t("Signals", "信号")}>
@@ -108,7 +132,7 @@ export function SignalTable({
               </td>
               <th scope="row">
                 {s.symbol}
-                <small>{s.class}</small>
+                <small>{classLabel(s.class)}</small>
               </th>
               <td>{shares(s.shares)}</td>
               <td>{money(s.notional)}</td>
@@ -119,7 +143,7 @@ export function SignalTable({
               {!compact && (
                 <td>
                   <ul className="strategy-drivers">
-                    {s.drivers.map((d) => (
+                    {topDrivers(s.drivers).map((d) => (
                       <li key={d.rule}>
                         {tr(
                           ruleById[d.rule]?.label ?? { en: d.rule, zh: d.rule },

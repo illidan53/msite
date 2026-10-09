@@ -482,7 +482,11 @@ function TodaySignals({
         </button>
       </div>
       {snapshot.signals.length ? (
-        <SignalTable signals={snapshot.signals} compact />
+        <SignalTable
+          signals={snapshot.signals}
+          classes={snapshot.classes}
+          compact
+        />
       ) : (
         <p className="quant-model-empty">
           {t(
