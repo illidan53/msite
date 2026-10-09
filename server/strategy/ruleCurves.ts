@@ -168,6 +168,11 @@ export function ruleDiagnostics(
       scalar: nullable(system.scalars[rule.id][endIndex]),
       scalarSource: rule.scalar === null ? "pooled" : "book",
       meanAbsForecast: meanAbsForecast(system, rule.id, startIndex, endIndex),
+      // The scale a gated rule is calibrated on, so the table's 7–13 check agrees
+      // with the forecast_scale warning.
+      gateOpenMeanAbsForecast: signGatedRules.has(rule.id)
+        ? calibratedMeanAbsForecast(system, rule.id, startIndex, endIndex)
+        : null,
       turnover: nullable(system.turnover[rule.id][endIndex]),
       costPassRate: live ? (passing / live) * 100 : null,
       sharpe: nullable(dailySharpe(curve.signed) * 16),

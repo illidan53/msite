@@ -81,9 +81,17 @@ describe("rule account curves", () => {
     // An ungated rule's zeros are real forecasts and still count.
     expect(calibratedMeanAbsForecast(gated, "breakout40", 10, 29)).toBeCloseTo(6, 12);
     expect(calibratedMeanAbsForecast(gated, "ewmac8", 10, 29)).toBe(5);
-    // The report keeps the realised mean, zeros included.
-    const mr5 = ruleDiagnostics(gated, 10, 29).find((r) => r.id === "mr5")!;
+    // The report keeps the realised mean, zeros included, and adds the gate-open
+    // mean that the 7–13 check uses for gated rules only.
+    const rules = ruleDiagnostics(gated, 10, 29);
+    const mr5 = rules.find((r) => r.id === "mr5")!;
     expect(mr5.meanAbsForecast).toBeCloseTo(6, 12);
+    expect(mr5.gateOpenMeanAbsForecast).toBeCloseTo(12, 12);
+    expect(rules.find((r) => r.id === "mr20")!.gateOpenMeanAbsForecast).toBe(10);
+    const breakout40 = rules.find((r) => r.id === "breakout40")!;
+    expect(breakout40.meanAbsForecast).toBeCloseTo(6, 12);
+    expect(breakout40.gateOpenMeanAbsForecast).toBeNull();
+    expect(rules.find((r) => r.id === "ewmac8")!.gateOpenMeanAbsForecast).toBeNull();
   });
 
   it("summarises scale, turnover, cost passes and Sharpe per rule", () => {
