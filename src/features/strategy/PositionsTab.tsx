@@ -13,6 +13,7 @@ import {
   FamilyLegend,
   LatestGate,
   Pending,
+  classNamer,
   type RunControls,
 } from "./parts";
 import { useResource } from "./strategyApi";
@@ -21,15 +22,22 @@ import { SymbolStrategyChart } from "./SymbolStrategyChart";
 
 type SortKey = "symbol" | "class" | "forecast" | "target" | "held";
 type Status = "all" | "eligible" | "ineligible" | "held";
-const sortValue: Record<SortKey, (r: SymbolRow) => number | string | null> = {
+type Value = (r: SymbolRow) => number | string | null;
+const sortValue: Record<Exclude<SortKey, "class">, Value> = {
   symbol: (r) => r.symbol,
-  class: (r) => r.class,
   forecast: (r) => r.forecast,
   target: (r) => r.targetWeight,
   held: (r) => r.heldWeight,
 };
-function sortRows(rows: SymbolRow[], key: SortKey, desc: boolean) {
-  const value = sortValue[key];
+function sortRows(
+  rows: SymbolRow[],
+  key: SortKey,
+  desc: boolean,
+  classLabel: (id: string) => string,
+) {
+  // Classes sort by the name shown, not the id.
+  const value: Value =
+    key === "class" ? (r) => classLabel(r.class) : sortValue[key];
   return [...rows].sort((a, b) => {
     const [x, y] = [value(a), value(b)];
     // Missing values stay last in either direction.
@@ -64,7 +72,10 @@ function Positions({ snapshot }: { snapshot: BookSnapshot }) {
   });
   const [picked, setPicked] = useState<string | null>(null);
   const detailRef = useRef<HTMLElement>(null);
-  const classes = [...new Set(snapshot.rows.map((r) => r.class))].sort();
+  const classLabel = classNamer(snapshot.classes);
+  const classes = [...new Set(snapshot.rows.map((r) => r.class))].sort(
+    (a, b) => classLabel(a).localeCompare(classLabel(b)),
+  );
   const visible = sortRows(
     snapshot.rows.filter(
       (r) =>
@@ -76,6 +87,7 @@ function Positions({ snapshot }: { snapshot: BookSnapshot }) {
     ),
     sort.key,
     sort.desc,
+    classLabel,
   );
   const selected = snapshot.rows.find((r) => r.symbol === picked) ?? null;
   const eligible = snapshot.rows.filter((r) => r.eligible).length;
@@ -176,7 +188,7 @@ function Positions({ snapshot }: { snapshot: BookSnapshot }) {
               <option value="all">{t("All classes", "全部类别")}</option>
               {classes.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {classLabel(c)}
                 </option>
               ))}
             </select>
@@ -235,7 +247,7 @@ function Positions({ snapshot }: { snapshot: BookSnapshot }) {
                       {r.symbol}
                     </button>
                   </th>
-                  <td>{r.class}</td>
+                  <td>{classLabel(r.class)}</td>
                   <td
                     className={
                       r.forecast !== null && r.forecast < 0
@@ -288,6 +300,7 @@ function Positions({ snapshot }: { snapshot: BookSnapshot }) {
           ref={detailRef}
           book={snapshot.book}
           row={selected}
+          classLabel={classLabel(selected.class)}
           onClose={() => setPicked(null)}
         />
       )}
@@ -299,11 +312,13 @@ function SymbolDetail({
   ref,
   book,
   row,
+  classLabel,
   onClose,
 }: {
   ref: Ref<HTMLElement>;
   book: string;
   row: SymbolRow;
+  classLabel: string;
   onClose: () => void;
 }) {
   const { t, tr, number, signed, pct, shares } = useStrategyFormat();
@@ -317,7 +332,7 @@ function SymbolDetail({
     >
       <div className="models-section-heading">
         <div>
-          <p className="eyebrow">{row.class}</p>
+          <p className="eyebrow">{classLabel}</p>
           <h3 id="strategy-detail-heading">{row.symbol}</h3>
         </div>
         <button type="button" onClick={onClose}>

@@ -8,7 +8,12 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { SignalRecord, StrategyState } from "../../../shared/strategy";
+import type {
+  BacktestBookReport,
+  BacktestReport,
+  SignalRecord,
+  StrategyState,
+} from "../../../shared/strategy";
 import { ruleCatalog } from "../../../shared/strategyRules";
 import { LanguageSwitcher, LocaleProvider } from "../../shared/locale";
 import {
@@ -23,6 +28,7 @@ import {
   stateFixture,
 } from "./fixtures";
 import { QuantSystem } from "./QuantSystem";
+import { api } from "./strategyApi";
 
 type Reply = unknown;
 type Handler = (path: string, method: string, body: unknown) => Reply;
@@ -237,6 +243,10 @@ it("lists latest orders with drivers, fill history and the email outbox", async 
   const nvda = within(orders).getByRole("row", { name: /NVDA/ });
   expect(nvda).toHaveTextContent("Breakout 80 +1.31");
   expect(nvda).toHaveTextContent("$2,535");
+  // Class display names, not ids.
+  expect(
+    within(orders).getByRole("row", { name: /MSFT/ }),
+  ).toHaveTextContent("MSFTMega-Cap Tech");
   expect(within(orders).getByRole("row", { name: /INTC/ })).toHaveTextContent(
     "Exit",
   );
@@ -269,6 +279,36 @@ it("lists latest orders with drivers, fill history and the email outbox", async 
   expect(calls(fetcher, "/api/strategy/signals?book=stocks&limit=1000")).toBe(
     1,
   );
+});
+
+it("shows at most three drivers and class ids for records saved before the fixes", async () => {
+  // Older daily runs stored every voting rule (17, zeros included) unsorted,
+  // and snapshots without class names.
+  const [nvda, ...rest] = latestFixture.books[0].signals;
+  const drivers = ruleCatalog.map((rule, i) => ({
+    rule: rule.id,
+    contribution: [0.4, -2.1, 0, 1.7, 0.9, -1.8][i] ?? 0,
+  }));
+  const { classes: _names, ...legacy } = latestFixture.books[0];
+  const latest = {
+    ...latestFixture,
+    books: [{ ...legacy, signals: [{ ...nvda, drivers }, ...rest] }],
+  };
+  storage.set("msite-strategy-tab", "signals");
+  mockApi(
+    routes(false, (path) =>
+      path === "/api/strategy/latest" ? latest : undefined,
+    ),
+  );
+  renderPage();
+  const orders = await screen.findByRole("table", { name: "Signals" });
+  const row = within(orders).getByRole("row", { name: /NVDA/ });
+  expect(
+    within(row)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent),
+  ).toEqual(["EWMAC 16/64 -2.10", "Breakout 80 -1.80", "EWMAC 64/256 +1.70"]);
+  expect(row).toHaveTextContent("NVDAsemiconductors");
 });
 
 it("keeps a quiet book's signal history when the busy book fills the log", async () => {
@@ -360,6 +400,20 @@ it("sorts and filters positions and drills into a symbol chart", async () => {
     ),
   ).toBeInTheDocument();
 
+  // Options show class names; their values stay the ids.
+  const options = within(screen.getByLabelText("Class")).getAllByRole(
+    "option",
+  ) as HTMLOptionElement[];
+  expect(options.map((o) => [o.value, o.textContent])).toEqual([
+    ["all", "All classes"],
+    ["consumer-staples", "Consumer Staples"],
+    ["energy", "Energy"],
+    ["mega-cap-tech", "Mega-Cap Tech"],
+    ["semiconductors", "Semiconductors"],
+  ]);
+  expect(within(table).getByRole("row", { name: /MSFT/ })).toHaveTextContent(
+    "MSFTMega-Cap Tech",
+  );
   await user.selectOptions(screen.getByLabelText("Class"), "energy");
   expect(symbols()).toEqual(["XOM", "TECK"]);
   await user.selectOptions(screen.getByLabelText("Class"), "all");
@@ -383,13 +437,16 @@ it("sorts and filters positions and drills into a symbol chart", async () => {
     }),
   ).toBeInTheDocument();
   expect(calls(fetcher, "/api/strategy/charts/stocks/NVDA")).toBe(1);
+  expect(
+    screen.getByRole("heading", { name: "NVDA" }).previousElementSibling,
+  ).toHaveTextContent(/^Semiconductors$/);
   const rules = screen.getByRole("table", { name: "NVDA rule forecasts" });
   expect(within(rules).getAllByRole("row")).toHaveLength(
     ruleCatalog.length + 1,
   );
   // A row click works too, and cost-filtered rules are flagged.
   await user.click(
-    within(within(table).getByRole("row", { name: /XOM/ })).getByText("energy"),
+    within(within(table).getByRole("row", { name: /XOM/ })).getByText("Energy"),
   );
   expect(
     await screen.findByRole("img", { name: /^XOM · Quant System/ }),
@@ -435,16 +492,44 @@ it("shows the backtest report with tests, diagnostics and attribution in Chinese
   expect(within(rules).getAllByRole("row")).toHaveLength(
     ruleCatalog.length + 1,
   );
+  const mr20 = within(rules).getByRole("row", {
+    name: /顺势均值回归（SMA20）/,
+  });
+  expect(mr20).toHaveTextContent("跨标的汇总");
+  // Gated rules are flagged on their gate-open mean, not the zero-heavy one.
+  const flagged = (row: HTMLElement) =>
+    [...row.querySelectorAll(".strategy-negative")].map((e) => e.textContent);
+  expect(flagged(mr20)).toEqual(["门控开启 13.6"]);
+  expect(mr20).toHaveTextContent("3.6门控开启 13.6");
+  const mr5 = within(rules).getByRole("row", { name: /顺势均值回归（com 5）/ });
+  expect(mr5).toHaveTextContent("3.1门控开启 9.8");
+  expect(flagged(mr5)).toEqual([]);
+  expect(flagged(rules)).toEqual(["门控开启 13.6"]);
   expect(
-    within(rules).getByRole("row", { name: /顺势均值回归（SMA20）/ }),
-  ).toHaveTextContent("跨标的汇总");
-  expect(screen.getByRole("list", { name: "警示" })).toHaveTextContent(
-    "有规则的平均 |预测值| 超出 7–13",
-  );
+    within(screen.getByRole("list", { name: "警示" }))
+      .getAllByRole("listitem")
+      .map((li) => li.textContent),
+  ).toEqual([
+    "有规则的平均 |预测值| 超出 7–13 顺势均值回归（SMA20） 13.6（门控开启日）",
+    "有规则族拖累表现 顺势均值回归",
+    "部分标的数据加载失败 NVTS",
+    "早期历史已在单日断点处截断 META",
+    "存在超过 40% 的单日价格跳变 SMCI 2025-02-18 +41.6%",
+  ]);
   expect(screen.getByRole("table", { name: "类别归因" })).toHaveTextContent(
     "Semiconductors",
   );
-  expect(screen.getByText(/NVTS \(PROVIDER_404\)/)).toBeInTheDocument();
+  expect(
+    within(screen.getByRole("table", { name: "个股归因" })).getByRole("row", {
+      name: /MSFT/,
+    }),
+  ).toHaveTextContent("MSFTMega-Cap Tech");
+  // Trimmed symbols loaded and trade: they are not load failures.
+  const fact = (term: string) => screen.getByText(term).nextElementSibling;
+  expect(fact("加载失败")).toHaveTextContent(/^NVTS \(PROVIDER_404\)$/);
+  expect(fact("早期历史已截断")).toHaveTextContent(
+    /^META 2022-06-09 之前（单日 \+1,394\.7%）$/,
+  );
 
   await user.selectOptions(screen.getByLabelText("对比变体"), "without_trend");
   expect(
@@ -453,7 +538,16 @@ it("shows the backtest report with tests, diagnostics and attribution in Chinese
     ),
   ).toBeInTheDocument();
   const picker = screen.getByLabelText("报告");
-  expect(within(picker).getAllByRole("option")).toHaveLength(2);
+  // Short labels led by the data cut-off fit a phone-width picker; the run
+  // time of the selected report is spelled out beside it.
+  expect(
+    within(picker)
+      .getAllByRole("option")
+      .map((o) => o.textContent),
+  ).toEqual(["数据至 2026-10-02", "数据至 2026-09-25"]);
+  expect(screen.getByText(/定时运行。/)).toHaveTextContent(
+    /^2026年10月3日.*09:00 定时运行。/,
+  );
   await user.selectOptions(picker, "bt-20260926");
   await waitFor(() =>
     expect(calls(fetcher, "/api/strategy/reports/bt-20260926")).toBe(1),
@@ -461,6 +555,149 @@ it("shows the backtest report with tests, diagnostics and attribution in Chinese
   expect(
     await screen.findByText(/评估区间 .* – 2026-09-25/),
   ).toBeInTheDocument();
+});
+
+it("labels locale-neutral warning details in either language and reads older reports", async () => {
+  const [current, older] = reportFixtures;
+  const withBook = (
+    report: BacktestReport,
+    change: (book: BacktestBookReport) => BacktestBookReport,
+  ) => ({ ...report, books: [change(report.books[0]), report.books[1]] });
+  const latest = withBook(current, (book) => ({
+    ...book,
+    warnings: [
+      { code: "forecast_scale", detail: "ewmac64 6.9, mr5 16.0" },
+      { code: "cost_budget", detail: "0.42/0.92" },
+      { code: "short_window", detail: "312" },
+      { code: "history_trimmed", detail: "COHR, META" },
+      {
+        code: "price_jumps",
+        detail: "LUNR 2023-02-16 +251.4%, COHR 2022-09-08 -83.8%, … +64",
+      },
+      { code: "family_detracts", detail: "mean_reversion, trend" },
+    ],
+  }));
+  // Saved before the contract change: English details, trimmed symbols
+  // reported as failures and no gate-open means.
+  const legacy = withBook(older, (book) => {
+    const { trimmed: _trimmed, ...quality } = book.dataQuality;
+    return {
+      ...book,
+      rules: book.rules.map(({ gateOpenMeanAbsForecast: _gate, ...r }) =>
+        r.id === "ewmac64" ? { ...r, meanAbsForecast: 6.9 } : r,
+      ),
+      warnings: [
+        { code: "forecast_scale", detail: "mr20 16.0 (gate open)" },
+        { code: "cost_budget", detail: "cost 0.42 SR vs Sharpe 0.92" },
+        { code: "short_window", detail: "312 evaluation sessions" },
+        {
+          code: "price_jumps",
+          detail: "LUNR 2023-02-16 251.4129%, … 74 in total",
+        },
+      ],
+      dataQuality: {
+        ...quality,
+        failures: [
+          ...quality.failures,
+          {
+            symbol: "COHR",
+            message:
+              "History before 2022-09-08 dropped (-83.7503% in one session)",
+          },
+        ],
+      },
+    } as BacktestBookReport;
+  });
+  // Two manual runs on the same data need their run times to tell apart.
+  const [currentSummary, olderSummary] = reportSummariesFixture;
+  const manual = (id: string, createdAt: string) => ({
+    ...currentSummary,
+    id,
+    createdAt,
+    trigger: "manual",
+  });
+  const summaries = [
+    currentSummary,
+    manual("bt-manual-1", "2026-10-02T22:00:00.000Z"),
+    manual("bt-manual-2", "2026-10-02T23:30:00.000Z"),
+    olderSummary,
+  ];
+  storage.set("msite-strategy-tab", "backtest");
+  mockApi(
+    routes(false, (path) =>
+      path === "/api/strategy/reports"
+        ? summaries
+        : path === `/api/strategy/reports/${current.id}`
+          ? latest
+          : path === `/api/strategy/reports/${older.id}`
+            ? legacy
+            : undefined,
+    ),
+  );
+  const user = userEvent.setup();
+  renderPage();
+  const warnings = async (name: string) =>
+    within(await screen.findByRole("list", { name }))
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+  expect(
+    within(await screen.findByLabelText("Report"))
+      .getAllByRole("option")
+      .map((o) => o.textContent),
+  ).toEqual([
+    "Data to 2026-10-02",
+    "Data to 2026-10-02 · manual · Oct 2, 2026, 7:30 PM EDT",
+    "Data to 2026-10-02 · manual · Oct 2, 2026, 6:00 PM EDT",
+    "Data to 2026-09-25",
+  ]);
+  expect(screen.getByText(/^Scheduled run/)).toHaveTextContent(
+    "Scheduled run Oct 3, 2026, 9:00 AM EDT. Price returns after costs.",
+  );
+  expect(await warnings("Warnings")).toEqual([
+    "A rule's mean |forecast| is outside 7–13 EWMAC 64/256 6.9, Trend-gated reversion (com 5) 16.0 on gate-open sessions",
+    "Costs exceed one-third of the core Sharpe ratio cost 0.42 SR vs Sharpe 0.92",
+    "Evaluation window under two years 312 evaluation sessions",
+    "Early history trimmed at a one-session break COHR, META",
+    "Daily price jumps over 40% LUNR 2023-02-16 +251.4%, COHR 2022-09-08 -83.8%, … 64 more",
+    "A rule family detracts Trend-gated mean reversion, Absolute trend",
+  ]);
+  await user.selectOptions(
+    screen.getByRole("combobox", { name: "Language" }),
+    "zh",
+  );
+  expect(await warnings("警示")).toEqual([
+    "有规则的平均 |预测值| 超出 7–13 EWMAC 64/256 均线交叉 6.9、顺势均值回归（com 5） 16.0（门控开启日）",
+    "成本超过核心夏普比率的三分之一 成本 0.42 SR，夏普 0.92",
+    "评估窗口不足两年 评估期 312 个交易日",
+    "早期历史已在单日断点处截断 COHR、META",
+    "存在超过 40% 的单日价格跳变 LUNR 2023-02-16 +251.4%、COHR 2022-09-08 -83.8%、… 另有 64 处",
+    "有规则族拖累表现 顺势均值回归、绝对趋势",
+  ]);
+
+  await user.selectOptions(screen.getByLabelText("报告"), older.id);
+  expect(await screen.findByText(/评估区间 .* – 2026-09-25/)).toBeVisible();
+  expect(await warnings("警示")).toEqual([
+    "有规则的平均 |预测值| 超出 7–13 顺势均值回归（SMA20） 16.0（门控开启日）",
+    "成本超过核心夏普比率的三分之一 成本 0.42 SR，夏普 0.92",
+    "评估窗口不足两年 评估期 312 个交易日",
+    "存在超过 40% 的单日价格跳变 LUNR 2023-02-16 +251.4%、… 共 74 处",
+  ]);
+  const fact = (term: string) => screen.getByText(term).nextElementSibling;
+  expect(fact("加载失败")).toHaveTextContent(/^NVTS \(PROVIDER_404\)$/);
+  expect(fact("早期历史已截断")).toHaveTextContent(
+    /^COHR 2022-09-08 之前（单日 -83\.8%）$/,
+  );
+  // Without gate-open means, other rules are still checked on their mean,
+  // and the gated ones are not flagged for their closed-gate zeros.
+  const rules = screen.getByRole("table", { name: "规则诊断" });
+  expect(
+    [...rules.querySelectorAll(".strategy-negative")].map(
+      (e) => e.closest("tr")?.querySelector("th")?.firstChild?.textContent,
+    ),
+  ).toEqual(["EWMAC 64/256 均线交叉"]);
+  expect(
+    within(rules).getByRole("row", { name: /顺势均值回归（SMA20）/ }),
+  ).not.toHaveTextContent("门控开启");
 });
 
 it("explains every rule and the framework with the book source", async () => {
@@ -556,9 +793,9 @@ it("offers the first daily run on an empty system and explains rejected runs", a
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Another job is already running",
   );
-  expect(JSON.parse(String(fetcher.mock.calls.at(-1)?.[1]?.body))).toEqual({
-    job: "backtest",
-  });
+  const [, run] = fetcher.mock.calls.at(-1)!;
+  expect(run?.headers).toEqual({ "Content-Type": "application/json" });
+  expect(JSON.parse(String(run?.body))).toEqual({ job: "backtest" });
   await user.click(screen.getAllByRole("button", { name: "Run daily" })[0]);
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Your IP is not authorized",
@@ -622,6 +859,20 @@ it("polls state while a job runs, stops when it finishes and reloads the data", 
   expect(polls).toBe(2);
 }, 15000);
 
+it("sends every POST as JSON, with an empty object when there is no body", async () => {
+  const fetcher = mockApi(() => ({}));
+  await api("/strategy/test-email", "POST");
+  await api("/strategy/state");
+  const [[, post], [, get]] = fetcher.mock.calls;
+  expect(post).toMatchObject({
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  expect(get).not.toHaveProperty("body");
+  expect(get).not.toHaveProperty("headers");
+});
+
 it("sends a test email and reports what happened", async () => {
   let sent = 0;
   const fetcher = mockApi(
@@ -649,6 +900,15 @@ it("sends a test email and reports what happened", async () => {
     await screen.findByText(/test message was logged to the outbox only/),
   ).toBeInTheDocument();
   await waitFor(() => expect(calls(fetcher, "/api/strategy/outbox")).toBe(2));
+  // A JSON body forces a CORS preflight, so other sites cannot send this POST.
+  const [, init] = fetcher.mock.calls.find(
+    ([url]) => url === "/api/strategy/test-email",
+  )!;
+  expect(init).toMatchObject({
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
   await user.click(screen.getByRole("button", { name: "Send test email" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "one per 10 minutes",

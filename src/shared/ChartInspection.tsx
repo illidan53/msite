@@ -37,17 +37,29 @@ export function ChartInspection({
   const last = dates.length - 1;
   const left = x(0),
     right = x(last);
+  // About a year or more reads in months with the year: a 252-session window
+  // spans 364–366 days, so MM-DD would print (nearly) the same date at both
+  // ends with no year.
+  const monthly =
+    dates.length >= 250 ||
+    Date.parse(dates[last]) - Date.parse(dates[0]) >= 365 * 86400000;
+  const label = (i: number) =>
+    monthly ? dates[i].slice(0, 7) : dates[i].slice(5);
+  // YYYY-MM is wider than MM-DD; the edge labels hang inwards, so space more.
+  const spacing = (monthly ? 110 : 78) * scale;
   const count = Math.min(
     dates.length,
-    Math.max(2, Math.floor((right - left) / (78 * scale)) + 1),
+    Math.max(2, Math.floor((right - left) / spacing) + 1),
   );
-  const ticks = [
-    ...new Set(
-      Array.from({ length: count }, (_, i) =>
-        Math.round((i * last) / Math.max(1, count - 1)),
-      ),
-    ),
-  ];
+  // Month labels repeat when two ticks land in one month; keep one of each,
+  // and keep the last tick so the axis still ends at the newest date.
+  const ticks: number[] = [];
+  for (let k = 0; k < count; k++) {
+    const i = Math.round((k * last) / Math.max(1, count - 1));
+    const previous = ticks.at(-1);
+    if (previous === undefined || label(previous) !== label(i)) ticks.push(i);
+    else if (i === last && previous !== 0) ticks[ticks.length - 1] = i;
+  }
   const index = Math.min(last, active ?? last);
   const choose = (i: number) => {
     const next = Math.max(0, Math.min(last, i));
@@ -101,9 +113,7 @@ export function ChartInspection({
             style={{ fontSize: font }}
             fill="var(--muted)"
           >
-            {Date.parse(dates[last]) - Date.parse(dates[0]) > 366 * 86400000
-              ? dates[i].slice(0, 7)
-              : dates[i].slice(5)}
+            {label(i)}
           </text>
         </g>
       ))}

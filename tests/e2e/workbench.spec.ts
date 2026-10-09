@@ -1790,6 +1790,27 @@ for (const width of [1440, 390]) {
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
+    // The closed report picker shows its whole label: a shrink-to-fit copy
+    // holding only the selected label is no wider than the picker.
+    const pickerFits = async () => {
+      const { need, have } = await page
+        .locator(".strategy-report-toolbar select")
+        .evaluate((select: HTMLSelectElement) => {
+          const copy = select.cloneNode(false) as HTMLSelectElement;
+          copy.append(new Option(select.selectedOptions[0].text));
+          Object.assign(copy.style, {
+            width: "auto",
+            maxWidth: "none",
+            position: "absolute",
+            visibility: "hidden",
+          });
+          select.after(copy);
+          const need = copy.getBoundingClientRect().width;
+          copy.remove();
+          return { need, have: select.getBoundingClientRect().width };
+        });
+      expect(need).toBeLessThanOrEqual(have);
+    };
 
     await page.goto("/");
     await expect(
@@ -1843,6 +1864,9 @@ for (const width of [1440, 390]) {
 
     await tabs.getByRole("tab", { name: "Positions" }).click();
     const positions = page.getByRole("table", { name: "Positions" });
+    await expect(positions.getByRole("row", { name: /MSFT/ })).toContainText(
+      "Mega-Cap Tech",
+    );
     await positions.getByRole("button", { name: "Show NVDA chart" }).click();
     await expect(
       page.getByRole("img", {
@@ -1852,6 +1876,10 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByRole("table", { name: "NVDA rule forecasts" }),
     ).toBeVisible();
+    // A year of sessions is labelled by month, so the two ends differ.
+    const axis = page.locator(".strategy-detail .chart-inspection text");
+    await expect(axis.first()).toHaveText("2025-10");
+    await expect(axis.last()).toHaveText("2026-10");
     await noOverflow();
 
     await tabs.getByRole("tab", { name: "Backtest" }).click();
@@ -1862,6 +1890,10 @@ for (const width of [1440, 390]) {
     await expect(
       page.getByRole("table", { name: "Family admission" }),
     ).toContainText("Detracts");
+    await expect(page.getByRole("list", { name: "Warnings" })).toContainText(
+      "Early history trimmed at a one-session break META",
+    );
+    await pickerFits();
     await noOverflow();
 
     await tabs.getByRole("tab", { name: "Rules" }).click();
@@ -1890,6 +1922,7 @@ for (const width of [1440, 390]) {
         .getByRole("table", { name: "回测统计" })
         .getByRole("row", { name: /核心（实盘系统）/ }),
     ).toBeVisible();
+    await pickerFits();
     await zhTabs.getByRole("tab", { name: "信号" }).click();
     await expect(
       page

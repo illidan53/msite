@@ -332,6 +332,15 @@ const sectorRows: SymbolRow[] = [
   ),
 ];
 
+/** Display names for the class ids rows and signals carry. */
+const classNames: Record<string, string> = {
+  semiconductors: "Semiconductors",
+  "mega-cap-tech": "Mega-Cap Tech",
+  energy: "Energy",
+  "consumer-staples": "Consumer Staples",
+  "SPDR sectors": "SPDR sectors",
+};
+
 function snapshot(
   book: string,
   name: BookSnapshot["name"],
@@ -343,6 +352,10 @@ function snapshot(
   return {
     book,
     name,
+    classes: [...new Set(rows.map((r) => r.class))].map((id) => ({
+      id,
+      name: classNames[id],
+    })),
     asOf: fixtureAsOf,
     configHash: "c9f2a41d",
     idm: book === "stocks" ? 2.31 : 1.62,
@@ -551,7 +564,7 @@ function bookReport(
       classes: stocks
         ? [
             { id: "semiconductors", name: "Semiconductors", symbols: 24 },
-            { id: "mega-cap-tech", name: "Mega-cap Tech", symbols: 12 },
+            { id: "mega-cap-tech", name: "Mega-Cap Tech", symbols: 12 },
             { id: "energy", name: "Energy", symbols: 19 },
             { id: "consumer-staples", name: "Consumer Staples", symbols: 18 },
           ]
@@ -640,7 +653,16 @@ function bookReport(
       family: rule.family,
       scalar: rule.scalar ?? 8.42,
       scalarSource: rule.scalar === null ? "pooled" : "book",
-      meanAbsForecast: rule.id === "mr20" ? 13.6 : round(9.2 + (i % 5) * 0.4),
+      // The trend gate's zeros hold mr5/mr20's all-session mean near 3; the
+      // scale check uses their gate-open mean.
+      meanAbsForecast:
+        rule.id === "mr5"
+          ? 3.1
+          : rule.id === "mr20"
+            ? 3.6
+            : round(9.2 + (i % 5) * 0.4),
+      gateOpenMeanAbsForecast:
+        rule.id === "mr5" ? 9.8 : rule.id === "mr20" ? 13.6 : null,
       turnover: round(
         rule.id.startsWith("mr")
           ? 58 - i
@@ -667,7 +689,7 @@ function bookReport(
           },
           {
             id: "mega-cap-tech",
-            name: "Mega-cap Tech",
+            name: "Mega-Cap Tech",
             contribution: 6.11,
             averageWeight: 9.8,
           },
@@ -701,20 +723,24 @@ function bookReport(
     })),
     idm: { last: stocks ? 2.31 : 1.62, average: stocks ? 2.24 : 1.58 },
     fdm: { last: 1.38, average: 1.35 },
+    // Locale-neutral details, as BacktestWarning documents.
     warnings: stocks
       ? [
-          { code: "forecast_scale", detail: "mr20 mean |f| 13.6" },
+          { code: "forecast_scale", detail: "mr20 13.6" },
           { code: "family_detracts", detail: "mean_reversion" },
-          { code: "data_failures", detail: "1 symbol" },
+          { code: "data_failures", detail: "NVTS" },
+          { code: "history_trimmed", detail: "META" },
+          { code: "price_jumps", detail: "SMCI 2025-02-18 +41.6%" },
         ]
       : [],
     dataQuality: stocks
       ? {
           failures: [{ symbol: "NVTS", message: "PROVIDER_404" }],
+          trimmed: [{ symbol: "META", date: "2022-06-09", return: 1394.7197 }],
           jumps: [{ symbol: "SMCI", date: "2025-02-18", return: 41.6 }],
           shortHistory: ["CRWV", "SNDK"],
         }
-      : { failures: [], jumps: [], shortHistory: [] },
+      : { failures: [], trimmed: [], jumps: [], shortHistory: [] },
   };
 }
 
@@ -930,6 +956,7 @@ export const paperFixture = (book = "stocks"): PaperLedger => ({
     symbol: s.symbol,
     shares: s.shares,
     decidedAt: s.asOf,
+    decisionClose: s.price,
     waited: 0,
   })),
   lastSession: fixtureAsOf,

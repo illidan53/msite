@@ -152,7 +152,9 @@ export function QuantSystem() {
     setFailure(null);
     setEmailResult(null);
     try {
-      setEmailResult(await api<OutboxEntry>("/strategy/test-email", "POST"));
+      setEmailResult(
+        await api<OutboxEntry>("/strategy/test-email", "POST", {}),
+      );
       refresh();
       const next = await api<StrategyState>("/strategy/state").catch(
         () => null,
