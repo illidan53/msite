@@ -64,6 +64,14 @@ describe("container deployment assets", () => {
       "MSITE_PUBLIC_BASE_URL=https://finance.nphunter.net npx playwright test tests/e2e/public-smoke.spec.ts",
     );
     expect(stepText).not.toContain("aws s3 cp");
+
+    // The Quant System scheduler and SES client run only inside the container.
+    const dockerRun = stepText
+      .split("\n")
+      .find((line) => line.includes("ExecStart=/usr/bin/docker run"));
+    expect(dockerRun).toContain("-e STRATEGY_SCHEDULER=on");
+    expect(dockerRun).toContain("-e AWS_REGION=us-east-1");
+    expect(dockerRun).toContain("--env-file /etc/msite/msite.env");
   });
 
   it("keeps ECR and deployment roles in Pulumi", async () => {
@@ -80,5 +88,22 @@ describe("container deployment assets", () => {
     expect(pulumiProgram).toContain(
       'new aws.iam.RolePolicy("ec2EcrPullPolicy"',
     );
+  });
+
+  it("keeps the SES alert identity, DKIM records and send policy in Pulumi", async () => {
+    const pulumiProgram = await readFile("infra/index.ts", "utf8");
+
+    expect(pulumiProgram).toContain("new aws.sesv2.EmailIdentity");
+    expect(pulumiProgram).toContain("finance.nphunter.net");
+    expect(pulumiProgram).toContain("_domainkey");
+    expect(pulumiProgram).toContain(".dkim.amazonses.com");
+    expect(pulumiProgram).toContain('new aws.iam.RolePolicy("ec2SesSendPolicy"');
+    expect(pulumiProgram).toContain("ses:SendEmail");
+    expect(pulumiProgram).toContain("ses:SendRawEmail");
+    expect(pulumiProgram).toContain('"ses:FromAddress"');
+    expect(pulumiProgram).toContain("signals@${mailDomain}");
+    // The sandbox recipient is secret config, never a literal address.
+    expect(pulumiProgram).toContain('config.getSecret("alertEmailRecipient")');
+    expect(pulumiProgram).not.toMatch(/[\w.+-]+@[a-z0-9-]+\.[a-z]/i);
   });
 });

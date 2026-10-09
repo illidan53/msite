@@ -14,6 +14,11 @@ const defaultGithubSubject = "repo:illidan53/msite:ref:refs/heads/main";
 const githubOidcProviderArn =
   config.get("githubOidcProviderArn") ??
   `arn:aws:iam::${accountId}:oidc-provider/token.actions.githubusercontent.com`;
+const mailDomain = config.get("mailDomain") ?? "finance.nphunter.net";
+const hostedZoneName = config.get("hostedZoneName") ?? "nphunter.net";
+const mailFromAddress = `signals@${mailDomain}`;
+// Secret so the address stays out of the repo and Pulumi.prod.yaml plaintext.
+const alertEmailRecipient = config.getSecret("alertEmailRecipient");
 
 const repository = new aws.ecr.Repository("financeRepository", {
   name: ecrRepositoryName,
@@ -153,5 +158,63 @@ new aws.iam.RolePolicy("ec2EcrPullPolicy", {
   ),
 });
 
+// Quant System alerts: SES domain identity with Easy DKIM in the public zone.
+const mailIdentity = new aws.sesv2.EmailIdentity("mailIdentity", {
+  emailIdentity: mailDomain,
+});
+
+const hostedZone = aws.route53.getZoneOutput({
+  name: hostedZoneName,
+  privateZone: false,
+});
+
+// Easy DKIM always issues exactly three tokens.
+for (let i = 0; i < 3; i++) {
+  const token = mailIdentity.dkimSigningAttributes.apply(
+    (attributes) => attributes.tokens[i],
+  );
+  new aws.route53.Record(`mailDkimRecord${i}`, {
+    zoneId: hostedZone.zoneId,
+    name: pulumi.interpolate`${token}._domainkey.${mailDomain}`,
+    type: "CNAME",
+    ttl: 1800,
+    records: [pulumi.interpolate`${token}.dkim.amazonses.com`],
+  });
+}
+
+// SES sandbox only delivers to verified recipients; AWS emails a link to click.
+if (alertEmailRecipient)
+  new aws.sesv2.EmailIdentity(
+    "alertRecipientIdentity",
+    { emailIdentity: alertEmailRecipient },
+    { additionalSecretOutputs: ["arn", "emailIdentity"] },
+  );
+
+new aws.iam.RolePolicy("ec2SesSendPolicy", {
+  role: ec2RoleName,
+  policy: currentRegion.region.apply((region) =>
+    JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Sid: "SendStrategyAlerts",
+          Effect: "Allow",
+          Action: ["ses:SendEmail", "ses:SendRawEmail"],
+          // Every identity, because the sandbox also authorises against the
+          // verified recipient; the From condition is the real restriction.
+          Resource: `arn:aws:ses:${region}:${accountId}:identity/*`,
+          Condition: {
+            StringEquals: { "ses:FromAddress": mailFromAddress },
+          },
+        },
+      ],
+    }),
+  ),
+});
+
 export const repositoryUrl = repository.repositoryUrl;
 export const deployRoleArn = githubDeployRole.arn;
+export const mailIdentityArn = mailIdentity.arn;
+// PENDING until SES finds the CNAMEs; `pulumi refresh` updates it.
+export const mailDkimStatus = mailIdentity.dkimSigningAttributes.status;
+export const mailFrom = mailFromAddress;
