@@ -56,13 +56,6 @@ import type { Panel, PortfolioFrame } from "./types";
 
 const CHART_SESSIONS = 252;
 const REPORTS_KEPT = 26;
-/** Legacy event studies count as trials for the deflated Sharpe ratio. */
-const LEGACY_TRIALS = [
-  "legacy:ema200",
-  "legacy:sma50",
-  "legacy:rsi2",
-  "legacy:bollinger",
-];
 const reasons: (IneligibleReason | undefined)[] = [
   undefined,
   "no_bar",
@@ -519,8 +512,8 @@ export class StrategyService {
     trigger: StrategyJob["trigger"],
   ): Promise<RunRecord> {
     const { config, books, hash, panel, failures } = await this.load(job);
-    const trials =
-      (await readJson<string[]>(this.file("trials.json"))) ?? [...LEGACY_TRIALS];
+    // runBacktest adds the four legacy event studies to this persistent log.
+    const trials = (await readJson<string[]>(this.file("trials.json"))) ?? [];
     job.step = "simulate";
     const createdAt = this.now().toISOString();
     const result = await runBacktest({
