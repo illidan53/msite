@@ -963,6 +963,100 @@ for (const width of [1440, 390]) {
   });
 }
 
+for (const width of [1440, 390]) {
+  test(`lets the owner keep an Owner Focus list that visitors only read at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const mocks = await mockWorkbenchApis(page);
+    const ownerFocus = {
+      id: "owner-focus",
+      name: "Owner Focus",
+      description: "Stocks the site owner is watching",
+      navigationGroup: "primary" as const,
+      pinnedSymbols: [],
+      symbolDescriptions: {} as Record<string, string>,
+      rows: [{ id: "focus", name: "Focus", expandedByDefault: true, symbols: ["PLTR"] }],
+      ownerManaged: { canEdit: true },
+    };
+    const lists = (): WatchlistsConfig => ({
+      watchlists: [structuredClone(ownerFocus), ...workbenchConfig.watchlists.watchlists],
+    });
+    await page.route("**/api/config", (route) =>
+      route.fulfill({ json: { ...workbenchConfig, watchlists: lists() } }),
+    );
+    const edits: string[] = [];
+    await page.route("**/api/watchlists/owner-focus/symbols**", async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      edits.push(`${request.method()} ${path}`);
+      const focus = ownerFocus.rows[0];
+      if (request.method() === "POST") {
+        const body = request.postDataJSON() as { symbol: string; rowId: string; description?: string };
+        expect(body.rowId).toBe("focus");
+        focus.symbols.push(body.symbol);
+        if (body.description) ownerFocus.symbolDescriptions[body.symbol] = body.description;
+        await route.fulfill({
+          status: 201,
+          json: { symbol: body.symbol, name: `${body.symbol} Inc.`, watchlists: lists() },
+        });
+        return;
+      }
+      const symbol = decodeURIComponent(path.split("/").at(-1) ?? "");
+      focus.symbols = focus.symbols.filter((s) => s !== symbol);
+      await route.fulfill({ json: { symbol, watchlists: lists() } });
+    });
+
+    await page.goto("/");
+    // A non-empty Owner Focus is the landing list.
+    await expect(page.getByRole("heading", { name: "Owner Focus", exact: true })).toBeVisible();
+    const quotes = page.getByRole("table", { name: "Owner Focus quotes" });
+    await expect(quotes.getByRole("button", { name: "PLTR", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Edit list", exact: true }).click();
+    const editor = page.getByRole("region", { name: "Edit watchlist" });
+    await expect(editor.getByLabel("Segment")).toHaveCount(0);
+    await expect(editor.getByRole("button", { name: "Reset to default list" })).toHaveCount(0);
+    await editor.getByLabel("Symbol").fill("cls");
+    await editor.getByLabel("Business (optional)").fill("AI hardware manufacturing");
+    await editor.getByRole("button", { name: "Add stock" }).click();
+    await expect(editor.getByRole("status")).toHaveText("Added CLS (CLS Inc.) to Owner Focus.");
+    await expect(quotes.getByRole("button", { name: "CLS", exact: true })).toBeVisible();
+    await expect
+      .poll(() => mocks.snapshotRequests.some((symbols) => symbols.includes("CLS")))
+      .toBe(true);
+
+    await quotes.getByRole("button", { name: "Remove PLTR", exact: true }).click();
+    await expect(editor.getByRole("status")).toContainText("Removed PLTR from Owner Focus.");
+    await quotes.getByRole("button", { name: "Remove CLS", exact: true }).click();
+    await expect(
+      page.getByText("No stocks yet. Use Edit list to add the ones you want to watch."),
+    ).toBeVisible();
+    expect(edits).toEqual([
+      "POST /api/watchlists/owner-focus/symbols",
+      "DELETE /api/watchlists/owner-focus/symbols/PLTR",
+      "DELETE /api/watchlists/owner-focus/symbols/CLS",
+    ]);
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(page.getByRole("heading", { name: "站长关注", exact: true })).toBeVisible();
+    await expect(page.getByText("还没有股票。点「编辑列表」添加想观察的股票。")).toBeVisible();
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+
+    // Visitors see the owner's stocks without an editor.
+    ownerFocus.rows[0].symbols = ["NVDA"];
+    ownerFocus.ownerManaged = { canEdit: false };
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "站长关注", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("table", { name: "站长关注行情" }).getByRole("button", { name: "NVDA", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "编辑列表", exact: true })).toHaveCount(0);
+  });
+}
+
 async function mockWorkbenchApis(page: Page) {
   const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];

@@ -21,6 +21,16 @@ test("public deployment serves the workbench shell and health endpoint", async (
   const configResponse = await request.get("/api/watchlists");
   expect(configResponse.ok()).toBe(true);
   const config = (await configResponse.json()) as WatchlistsConfig;
+  // Owner Focus comes first; only the research allowlist may edit it.
+  const access = (await (await request.get("/api/research/access")).json()) as {
+    canRun: boolean;
+  };
+  expect(config.watchlists[0]).toMatchObject({
+    id: "owner-focus",
+    name: "Owner Focus",
+    rows: [{ id: "focus" }],
+    ownerManaged: { canEdit: access.canRun },
+  });
   const cloud = config.watchlists.find(
     (list) => list.id === "ai-cloud-infrastructure",
   );
@@ -55,15 +65,22 @@ test("public deployment serves the workbench shell and health endpoint", async (
   await expect(
     page.locator(".watchlist-heading-line > .watchlist-performance"),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
+  await expect(
+    page.locator(".watchlist-buttons > .watchlist-performance-button"),
+  ).toHaveCount(5);
+  await expect(
+    page.locator(".watchlist-buttons > .watchlist-performance-button").first(),
+  ).toHaveAccessibleName("Owner Focus");
+  // Owner Focus is the landing list once it has stocks, so pick Semiconductors.
+  await page
+    .getByRole("button", { name: "Semiconductors", exact: true })
+    .click();
   const subsectorBar = page.getByRole("group", { name: "Sub-sectors" });
   await subsectorBar.getByRole("button", { name: /^Optical modules/ }).click();
   await expect(
     subsectorBar.getByRole("button", { name: /^Optical modules/ }),
   ).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
-  await expect(
-    page.locator(".watchlist-buttons > .watchlist-performance-button"),
-  ).toHaveCount(4);
   const other = page.getByRole("button", { name: "Other", exact: true });
   await expect(other).toHaveAttribute("aria-expanded", "false");
   await other.click();
@@ -208,6 +225,17 @@ test("public research authorization resists spoofed source headers", async ({
       { headers },
     );
     expect(invalidRemove.status()).toBe(400);
+    // Owner Focus checks the IP first; an invalid edit changes nothing.
+    const ownerAdd = await request.post(
+      "/api/watchlists/owner-focus/symbols",
+      { headers, data: {} },
+    );
+    expect(ownerAdd.status()).toBe(access.canRun ? 400 : 403);
+    const ownerRemove = await request.delete(
+      "/api/watchlists/owner-focus/symbols/%24BAD",
+      { headers },
+    );
+    expect(ownerRemove.status()).toBe(access.canRun ? 400 : 403);
   }
 });
 

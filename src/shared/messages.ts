@@ -277,6 +277,8 @@ export const chineseMessages: Record<string, string> = {
   "Industrials & Defense": "工业与国防",
   "Utilities & Power": "公用事业与电力",
   "close watch": "重点关注",
+  "Owner Focus": "站长关注",
+  "Stocks the site owner is watching": "站长正在观察的股票",
   "Large semiconductor designers, foundries, memory, equipment, and materials names":
     "涵盖芯片设计、代工、存储、设备及材料企业",
   "Food, beverages, household products, retail staples, and tobacco names":

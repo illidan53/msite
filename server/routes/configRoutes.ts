@@ -1,10 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import type { WatchlistEditResult } from "../../shared/types";
+import type { WatchlistEditResult, WatchlistsConfig } from "../../shared/types";
 import type { BrowserIds } from "../browser/browserId";
 import { ConfigRepository } from "../config/configRepository";
 import { ApiError } from "../http/apiError";
-import { assertSameSiteWrite } from "../http/ownerWrite";
+import { assertOwnerWrite, assertSameSiteWrite } from "../http/ownerWrite";
+import type { researchAccess } from "../research/access";
 
 /**
  * Resolves a ticker to its listed symbol, null when the provider does not
@@ -22,6 +23,8 @@ export interface ConfigRoutesOptions {
   browserIds?: BrowserIds;
   /** The client's IP (via the trusted proxy); defaults to the socket peer. */
   clientIp?: (request: Request) => string | null;
+  /** The research IP allowlist; only it may edit Owner Focus. */
+  ownerAccess?: ReturnType<typeof researchAccess>;
   /** Watchlist writes per browser per window (default 60 per 10 min). */
   editLimit?: Budget;
   /** Writes per client IP per window (default 120 per 10 min). */
@@ -30,6 +33,8 @@ export interface ConfigRoutesOptions {
   ipNewBrowserLimit?: Budget;
   /** Writes from everyone together per window (default 600 per 10 min). */
   siteEditLimit?: Budget;
+  /** Owner Focus writes per window (default 120 per 10 min). */
+  ownerEditLimit?: Budget;
 }
 
 interface Budget {
@@ -97,6 +102,7 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
     options.ipNewBrowserLimit ?? { max: 10, windowMs: 60 * 60_000 },
   );
   const site = slidingWindow(options.siteEditLimit ?? { max: 600, windowMs: 10 * 60_000 });
+  const ownerEdits = slidingWindow(options.ownerEditLimit ?? { max: 120, windowMs: 10 * 60_000 });
   const rateLimited = () =>
     new ApiError(429, "EDIT_RATE_LIMIT", "Too many watchlist edits", { source: "watchlists" });
 
@@ -139,22 +145,49 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
       throw new ApiError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist", { source: "watchlists" });
     return listId;
   };
-  // Responses depend on the browser cookie: never cache them anywhere shared.
+  const isOwner = (request: Request) => options.ownerAccess?.(request).canRun ?? false;
+  /**
+   * Owner Focus writes need the owner's IP and a same-origin request before
+   * anything else, and spend only the owner's budget: no browser cookie.
+   */
+  const ownerWrite = (request: Request, requireJson: boolean) => {
+    const access = options.ownerAccess ?? (() => ({ canRun: false, clientIp: null }));
+    assertOwnerWrite(access, request, {
+      source: "watchlists",
+      forbidden: "Only the site owner can change this list",
+      requireJson,
+    });
+  };
+  const spendOwnerBudget = () => {
+    const now = Date.now();
+    if (ownerEdits.full("owner", now)) throw rateLimited();
+    ownerEdits.take("owner", now);
+  };
+  // Responses depend on the browser cookie and, for Owner Focus, the IP:
+  // never cache them anywhere shared.
   const personal = { "Cache-Control": "private, no-store", Vary: "Cookie" };
   const browserOf = (request: Request) => browserIds?.read(request) ?? null;
+  /** Every list this visitor sees, after a write to one of them. */
+  const listsFor = (request: Request, lists?: WatchlistsConfig) =>
+    lists
+      ? repository.withOwnerFocus(lists, isOwner(request))
+      : repository.readWatchlists(browserOf(request), isOwner(request));
 
   router.get("/config", async (request, response) => {
-    response.set(personal).json(await repository.readConfig(browserOf(request)));
+    response.set(personal).json(await repository.readConfig(browserOf(request), isOwner(request)));
   });
 
   router.get("/watchlists", async (request, response) => {
-    response.set(personal).json(await repository.readWatchlists(browserOf(request)));
+    response.set(personal).json(await listsFor(request));
   });
 
   router.post("/watchlists/:watchlistId/symbols", async (request, response) => {
-    const listId = await checkedList(request, true);
+    const owner = repository.isOwnerFocus(request.params.watchlistId);
+    if (owner) ownerWrite(request, true);
+    const listId = owner ? request.params.watchlistId : await checkedList(request, true);
     const input = parse(addSchema, request.body);
-    const browserId = editingBrowser(request, response);
+    const browserId = owner ? null : editingBrowser(request, response);
+    if (owner) spendOwnerBudget();
     let found: Awaited<ReturnType<SymbolLookup>>;
     try {
       found = options.lookupSymbol
@@ -173,27 +206,44 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
         source: "watchlists",
       });
     const symbol = found.symbol.toUpperCase();
-    const watchlists = await repository.addWatchlistSymbol(browserId, listId, {
-      ...input,
-      symbol,
-    });
+    let watchlists: WatchlistsConfig;
+    if (browserId) {
+      const lists = await repository.addWatchlistSymbol(browserId, listId, { ...input, symbol });
+      watchlists = await listsFor(request, lists);
+    } else {
+      await repository.addOwnerFocusSymbol({ ...input, symbol });
+      watchlists = await listsFor(request);
+    }
     const result: WatchlistEditResult = { symbol, name: found.name, watchlists };
     response.status(201).set(personal).json(result);
   });
 
   router.delete("/watchlists/:watchlistId/symbols/:symbol", async (request, response) => {
+    if (repository.isOwnerFocus(request.params.watchlistId)) {
+      ownerWrite(request, false);
+      const symbol = parse(symbolSchema, request.params.symbol);
+      spendOwnerBudget();
+      await repository.removeOwnerFocusSymbol(symbol);
+      const result: WatchlistEditResult = { symbol, watchlists: await listsFor(request) };
+      response.set(personal).json(result);
+      return;
+    }
     const listId = await checkedList(request, false);
     const symbol = parse(symbolSchema, request.params.symbol);
     const browserId = editingBrowser(request, response);
-    const watchlists = await repository.removeWatchlistSymbol(browserId, listId, symbol);
+    const watchlists = await listsFor(
+      request,
+      await repository.removeWatchlistSymbol(browserId, listId, symbol),
+    );
     const result: WatchlistEditResult = { symbol, watchlists };
     response.set(personal).json(result);
   });
 
+  // Owner Focus has no default to go back to, so only YAML lists reset.
   router.delete("/watchlists/:watchlistId/edits", async (request, response) => {
     const listId = await checkedList(request, false);
     const browserId = editingBrowser(request, response);
-    const watchlists = await repository.resetWatchlist(browserId, listId);
+    const watchlists = await listsFor(request, await repository.resetWatchlist(browserId, listId));
     response.set(personal).json({ watchlists });
   });
 

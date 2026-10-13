@@ -159,9 +159,11 @@ describe("config routes", () => {
 
     expect(configResponse.status).toBe(200);
     expect(configResponse.body.settings.polygon.plan).toBe("free");
-    expect(configResponse.body.watchlists.watchlists[0].pinnedSymbols).toEqual(["NVDA"]);
+    // The owner's server-side list comes first, then the YAML lists.
+    expect(configResponse.body.watchlists.watchlists[0].id).toBe("owner-focus");
+    expect(configResponse.body.watchlists.watchlists[1].pinnedSymbols).toEqual(["NVDA"]);
     expect(watchlistsResponse.status).toBe(200);
-    expect(watchlistsResponse.body.watchlists[0].rows[0].symbols).toEqual(["AMD"]);
+    expect(watchlistsResponse.body.watchlists[1].rows[0].symbols).toEqual(["AMD"]);
   });
 
   it("does not expose whole-config watchlist writes", async () => {

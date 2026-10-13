@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { MarketSnapshot, PriceSeries } from "../../../shared/types";
+import type {
+  MarketSnapshot,
+  PriceSeries,
+  Watchlist,
+} from "../../../shared/types";
 import {
   ApiRequestError,
   type WorkbenchApi,
@@ -842,7 +846,140 @@ describe("Workbench", () => {
       within(table).queryByRole("button", { name: "Remove KO" }),
     ).not.toBeInTheDocument();
   });
+
+  it("shows Owner Focus first and read-only to visitors", async () => {
+    const user = userEvent.setup();
+    render(
+      <Workbench
+        api={createApi({ config: withOwnerFocus(["PLTR", "CLS"], false) })}
+      />,
+    );
+
+    const table = await screen.findByRole("table", {
+      name: "Owner Focus quotes",
+    });
+    expect(within(table).getByRole("button", { name: "PLTR" })).toBeInTheDocument();
+    expect(screen.getByText(/Stocks the site owner is watching/)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Edit list" }),
+    ).not.toBeInTheDocument();
+
+    // Other lists stay editable per browser; the editor hides on Owner Focus.
+    await user.click(screen.getByRole("button", { name: "Watchlist" }));
+    await user.click(screen.getByRole("button", { name: "Semiconductors" }));
+    await user.click(await screen.findByRole("button", { name: "Edit list" }));
+    expect(
+      screen.getByRole("region", { name: "Edit watchlist" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Owner Focus" }));
+    expect(
+      screen.queryByRole("region", { name: "Edit watchlist" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(
+        screen.getByRole("table", { name: "Owner Focus quotes" }),
+      ).queryByRole("button", { name: "Remove PLTR" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("lets the owner fill Owner Focus and empty it again", async () => {
+    const user = userEvent.setup();
+    const addWatchlistSymbol = vi.fn<WorkbenchApi["addWatchlistSymbol"]>(
+      async (_id, { symbol }) => {
+        if (symbol === "CLS")
+          throw new ApiRequestError("failed", 403, "RESEARCH_IP_FORBIDDEN");
+        return {
+          symbol,
+          name: "Palantir",
+          watchlists: withOwnerFocus(["PLTR"], true).watchlists,
+        };
+      },
+    );
+    const removeWatchlistSymbol = vi.fn<WorkbenchApi["removeWatchlistSymbol"]>(
+      async (_id, symbol) => ({
+        symbol,
+        watchlists: withOwnerFocus([], true).watchlists,
+      }),
+    );
+    render(
+      <Workbench
+        api={createApi({
+          config: withOwnerFocus([], true),
+          addWatchlistSymbol,
+          removeWatchlistSymbol,
+        })}
+      />,
+    );
+
+    // An empty list is not the landing page.
+    expect(
+      await screen.findByRole("table", { name: "Semiconductors quotes" }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Watchlist" }));
+    await user.click(screen.getByRole("button", { name: "Owner Focus" }));
+    const table = screen.getByRole("table", { name: "Owner Focus quotes" });
+    const empty =
+      "No stocks yet. Use Edit list to add the ones you want to watch.";
+    expect(screen.getByText(empty)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit list" }));
+    const editor = screen.getByRole("region", { name: "Edit watchlist" });
+    expect(within(editor).queryByLabelText("Segment")).not.toBeInTheDocument();
+    expect(
+      within(editor).queryByRole("button", { name: "Reset to default list" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(editor).getByText(/^Saved on the server: every visitor sees this list/),
+    ).toBeInTheDocument();
+
+    await user.type(within(editor).getByLabelText("Symbol"), "cls");
+    await user.click(within(editor).getByRole("button", { name: "Add stock" }));
+    expect(
+      await within(editor).findByText("Only the site owner can change this list."),
+    ).toBeInTheDocument();
+
+    await user.clear(within(editor).getByLabelText("Symbol"));
+    await user.type(within(editor).getByLabelText("Symbol"), "pltr");
+    await user.click(within(editor).getByRole("button", { name: "Add stock" }));
+    expect(addWatchlistSymbol).toHaveBeenLastCalledWith("owner-focus", {
+      symbol: "PLTR",
+      rowId: "focus",
+      description: undefined,
+    });
+    expect(
+      await within(editor).findByText("Added PLTR (Palantir) to Owner Focus."),
+    ).toBeInTheDocument();
+
+    // Unlike the YAML lists, the last stock can go.
+    const remove = within(table).getByRole("button", { name: "Remove PLTR" });
+    expect(remove).toBeEnabled();
+    await user.click(remove);
+    expect(removeWatchlistSymbol).toHaveBeenCalledWith("owner-focus", "PLTR");
+    expect(
+      await within(editor).findByText("Removed PLTR from Owner Focus."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(empty)).toBeInTheDocument();
+  });
 });
+
+function withOwnerFocus(symbols: string[], canEdit: boolean): WorkbenchConfig {
+  const ownerFocus: Watchlist = {
+    id: "owner-focus",
+    name: "Owner Focus",
+    description: "Stocks the site owner is watching",
+    navigationGroup: "primary",
+    pinnedSymbols: [],
+    symbolDescriptions: {},
+    rows: [{ id: "focus", name: "Focus", expandedByDefault: true, symbols }],
+    ownerManaged: { canEdit },
+  };
+  return {
+    ...baseConfig,
+    watchlists: {
+      watchlists: [ownerFocus, ...baseConfig.watchlists.watchlists],
+    },
+  };
+}
 
 const sectorSymbols = [
   "NVDA",

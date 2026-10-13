@@ -40,6 +40,35 @@ describe("createApp", () => {
     expect(String(dev.headers["set-cookie"])).not.toMatch(/Secure/);
   });
 
+  it("lets only the research IP allowlist edit Owner Focus, kept in RESEARCH_DATA_DIR", async () => {
+    const saved = { ...process.env };
+    process.env.RESEARCH_DATA_DIR = await mkdtemp(join(tmpdir(), "msite-research-"));
+    try {
+      delete process.env.RESEARCH_ALLOWED_IPS;
+      const visitor = createApp();
+      const lists = await request(visitor).get("/api/watchlists").expect(200);
+      expect(lists.body.watchlists[0]).toMatchObject({
+        id: "owner-focus",
+        rows: [{ symbols: [] }],
+        ownerManaged: { canEdit: false },
+      });
+      const denied = await request(visitor).post("/api/watchlists/owner-focus/symbols").send({});
+      expect(denied.status).toBe(403);
+      expect(denied.body.code).toBe("RESEARCH_IP_FORBIDDEN");
+
+      process.env.RESEARCH_ALLOWED_IPS = "127.0.0.1";
+      const owner = createApp();
+      const mine = await request(owner).get("/api/config").expect(200);
+      expect(mine.body.watchlists.watchlists[0].ownerManaged).toEqual({ canEdit: true });
+      // Past the owner gate, an invalid edit is refused before any lookup.
+      const invalid = await request(owner).post("/api/watchlists/owner-focus/symbols").send({});
+      expect(invalid.status).toBe(400);
+      expect(invalid.body.code).toBe("INVALID_WATCHLIST_EDIT");
+    } finally {
+      process.env = saved;
+    }
+  });
+
   it("serves the production frontend shell and static assets", async () => {
     const staticDir = await mkdtemp(join(tmpdir(), "msite-static-"));
     await writeFile(join(staticDir, "index.html"), "<!doctype html><title>Stock Workbench</title><div id=\"root\"></div>");

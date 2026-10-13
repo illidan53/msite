@@ -36,7 +36,7 @@ export function WatchlistEditor({
   status: WatchlistEditStatus | null;
   onAdd(addition: WatchlistAddition): Promise<boolean>;
   onUndo(addition: WatchlistAddition): void;
-  /** Drops this browser's edits to the list. */
+  /** Drops this browser's edits to the list (not offered for Owner Focus). */
   onReset(): void;
 }) {
   const { t } = useLocale();
@@ -112,20 +112,22 @@ export function WatchlistEditor({
             onChange={(event) => setSymbol(event.target.value.toUpperCase())}
           />
         </div>
-        <div className="control-field">
-          <label htmlFor="watchlist-add-row">{t("Segment", "分组")}</label>
-          <select
-            id="watchlist-add-row"
-            value={rowId}
-            onChange={(event) => setRowId(event.target.value)}
-          >
-            {watchlist.rows.map((row) => (
-              <option key={row.id} value={row.id}>
-                {t(row.name)}
-              </option>
-            ))}
-          </select>
-        </div>
+        {watchlist.rows.length > 1 && (
+          <div className="control-field">
+            <label htmlFor="watchlist-add-row">{t("Segment", "分组")}</label>
+            <select
+              id="watchlist-add-row"
+              value={rowId}
+              onChange={(event) => setRowId(event.target.value)}
+            >
+              {watchlist.rows.map((row) => (
+                <option key={row.id} value={row.id}>
+                  {t(row.name)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="control-field watchlist-editor-note-field">
           <label htmlFor="watchlist-add-description">
             {t("Business (optional)", "业务（可选）")}
@@ -188,29 +190,36 @@ export function WatchlistEditor({
       </p>
       <div className="watchlist-editor-footer">
         <p className="watchlist-editor-hint">
-          {t(
-            "Changes apply to this browser only and are kept in the server's memory, so a server restart or update clears them. Other visitors, the Quant System and Models keep using the default lists.",
-            "修改只对当前浏览器生效，暂存在服务器内存中，服务器重启或更新后会清空；其他访问者、量化系统和模型页仍使用默认列表。",
-          )}
+          {watchlist.ownerManaged
+            ? t(
+                "Saved on the server: every visitor sees this list, and it survives restarts and updates. Only the site owner can change it. The Quant System and Models do not use it.",
+                "保存在服务器上：所有访问者都能看到，服务器重启或更新后仍保留。只有站长可以修改；量化系统和模型页不使用该列表。",
+              )
+            : t(
+                "Changes apply to this browser only and are kept in the server's memory, so a server restart or update clears them. Other visitors, the Quant System and Models keep using the default lists.",
+                "修改只对当前浏览器生效，暂存在服务器内存中，服务器重启或更新后会清空；其他访问者、量化系统和模型页仍使用默认列表。",
+              )}
         </p>
-        <button
-          type="button"
-          className={`watchlist-reset ${confirmingReset ? "confirming" : ""}`}
-          disabled={busy}
-          onClick={() => {
-            if (!confirmingReset) {
-              setConfirmingReset(true);
-              return;
-            }
-            setConfirmingReset(false);
-            onReset();
-          }}
-        >
-          <RotateCcw size={13} aria-hidden="true" />
-          {confirmingReset
-            ? t("Click again to reset", "再点一次确认恢复")
-            : t("Reset to default list", "恢复默认列表")}
-        </button>
+        {!watchlist.ownerManaged && (
+          <button
+            type="button"
+            className={`watchlist-reset ${confirmingReset ? "confirming" : ""}`}
+            disabled={busy}
+            onClick={() => {
+              if (!confirmingReset) {
+                setConfirmingReset(true);
+                return;
+              }
+              setConfirmingReset(false);
+              onReset();
+            }}
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+            {confirmingReset
+              ? t("Click again to reset", "再点一次确认恢复")
+              : t("Reset to default list", "恢复默认列表")}
+          </button>
+        )}
       </div>
     </section>
   );
@@ -257,6 +266,11 @@ export function watchlistEditErrorMessage(
       return t(
         "The symbol could not be verified right now. Try again shortly.",
         "暂时无法核验该代码，请稍后重试。",
+      );
+    case "RESEARCH_IP_FORBIDDEN":
+      return t(
+        "Only the site owner can change this list.",
+        "只有站长可以修改这个列表。",
       );
     case "EDIT_RATE_LIMIT":
       return t(

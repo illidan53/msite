@@ -504,6 +504,13 @@ summary {
   width: 35%;
   text-align: left;
 }
+.quote-table-empty {
+  margin: 0;
+  padding: 28px 8px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+}
 .symbol-cell {
   display: flex;
   align-items: center;

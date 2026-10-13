@@ -47,6 +47,12 @@ export interface Watchlist {
   symbolDescriptions?: Record<string, string>;
   rows: WatchlistRow[];
   subsectors?: WatchlistSubsector[];
+  /**
+   * Set on the Owner Focus list, which is saved on the server rather than
+   * in the YAML: every visitor sees it, and only the site owner (the
+   * research IP allowlist) may edit it. `canEdit` is for this visitor.
+   */
+  ownerManaged?: { canEdit: boolean };
 }
 
 export interface WatchlistsConfig {

@@ -5,6 +5,12 @@ import type { SettingsConfig, WatchlistsConfig } from "../../shared/types";
 import { ApiError } from "../http/apiError";
 import { resolveConfigPaths } from "./configPaths";
 import {
+  OWNER_FOCUS_ID,
+  OWNER_FOCUS_ROW_ID,
+  OwnerFocusStore,
+  ownerFocusWatchlist,
+} from "./ownerFocus";
+import {
   applyWatchlistEdits,
   BrowserEditStore,
   type BrowserEditLimits,
@@ -16,6 +22,8 @@ export interface ConfigRepositoryOptions {
   browserEdits?: boolean;
   /** Memory limits for per-browser edits; defaults below. */
   limits?: Partial<BrowserEditLimits>;
+  /** JSON file holding the Owner Focus list; without it there is no such list. */
+  ownerFocusFile?: string;
 }
 
 export interface StockWorkbenchConfig {
@@ -41,30 +49,71 @@ const watchlistError = (status: number, code: string, message: string) =>
 export class ConfigRepository {
   private readonly paths: ReturnType<typeof resolveConfigPaths>;
   private readonly edits: BrowserEditStore | null;
+  private readonly ownerFocus: OwnerFocusStore | null;
 
   constructor(options: ConfigRepositoryOptions = {}) {
     this.paths = resolveConfigPaths(options.configDir);
     this.edits = options.browserEdits
       ? new BrowserEditStore({ ...DEFAULT_BROWSER_LIMITS, ...options.limits })
       : null;
+    this.ownerFocus = options.ownerFocusFile ? new OwnerFocusStore(options.ownerFocusFile) : null;
   }
 
-  async readConfig(browserId: string | null = null): Promise<StockWorkbenchConfig> {
-    const [watchlists, settings] = await Promise.all([this.readWatchlists(browserId), this.readSettings()]);
+  async readConfig(browserId: string | null = null, owner = false): Promise<StockWorkbenchConfig> {
+    const [watchlists, settings] = await Promise.all([
+      this.readWatchlists(browserId, owner),
+      this.readSettings(),
+    ]);
 
     return { watchlists, settings };
   }
 
   /**
-   * The YAML watchlists, with the browser's own additions and removals
-   * applied when one is given. Other browsers, the Quant System and Models
-   * see the YAML lists only.
+   * The Owner Focus list first, then the YAML watchlists with the browser's
+   * own additions and removals applied when one is given. Other browsers,
+   * the Quant System and Models see the YAML lists only. `owner` marks
+   * whether this visitor may edit Owner Focus.
    */
-  async readWatchlists(browserId: string | null = null): Promise<WatchlistsConfig> {
+  async readWatchlists(browserId: string | null = null, owner = false): Promise<WatchlistsConfig> {
     const base = await this.readBaseWatchlists();
-    if (!browserId || !this.edits) return base;
 
-    return applyWatchlistEdits(base, this.edits.read(browserId));
+    return this.withOwnerFocus(
+      browserId && this.edits ? applyWatchlistEdits(base, this.edits.read(browserId)) : base,
+      owner,
+    );
+  }
+
+  /** Puts the Owner Focus list (when configured) in front of `lists`. */
+  async withOwnerFocus(lists: WatchlistsConfig, owner: boolean): Promise<WatchlistsConfig> {
+    if (!this.ownerFocus) return lists;
+
+    return {
+      watchlists: [ownerFocusWatchlist(await this.ownerFocus.read(), owner), ...lists.watchlists],
+    };
+  }
+
+  isOwnerFocus(listId: string): boolean {
+    return listId === OWNER_FOCUS_ID && this.ownerFocus !== null;
+  }
+
+  /** Appends a symbol to Owner Focus; the caller has checked it is the owner. */
+  async addOwnerFocusSymbol(input: {
+    symbol: string;
+    rowId: string;
+    description?: string;
+    subsectors?: string[];
+  }): Promise<void> {
+    if (!this.ownerFocus) throw watchlistError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist");
+    if (input.rowId !== OWNER_FOCUS_ROW_ID)
+      throw watchlistError(400, "WATCHLIST_ROW_NOT_FOUND", "Unknown watchlist row");
+    if (input.subsectors?.length)
+      throw watchlistError(400, "WATCHLIST_SUBSECTOR_NOT_FOUND", "Unknown watchlist subsector");
+    await this.ownerFocus.add(input.symbol, input.description);
+  }
+
+  async removeOwnerFocusSymbol(symbol: string): Promise<void> {
+    if (!this.ownerFocus) throw watchlistError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist");
+    await this.ownerFocus.remove(symbol);
   }
 
   async readBaseWatchlists(): Promise<WatchlistsConfig> {

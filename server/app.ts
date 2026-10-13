@@ -43,14 +43,17 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const indexHtml = resolve(staticDir, "index.html");
   const researchDir =
     process.env.RESEARCH_DATA_DIR ?? resolve(process.cwd(), "data/research");
-  // Each browser's watchlist edits live in memory until the next restart.
+  // Each browser's watchlist edits live in memory until the next restart;
+  // the owner's list is a file next to the research reports, kept across deploys.
   const configRepository = new ConfigRepository({
     configDir,
     browserEdits: true,
+    ownerFocusFile: resolve(researchDir, "owner-focus.json"),
   });
 
-  const proxyAccess = researchAccess({
-    allowedIps: [],
+  // The research IP allowlist is the site owner.
+  const ownerAccess = researchAccess({
+    allowedIps: parseIps(process.env.RESEARCH_ALLOWED_IPS),
     trustedProxyIps: parseIps(process.env.RESEARCH_TRUSTED_PROXY_IPS),
   });
 
@@ -82,7 +85,8 @@ export function createApp(options: CreateAppOptions = {}): Express {
       }),
       // Behind Caddy the peer is the proxy: trust its X-Forwarded-For only.
       clientIp: (request) =>
-        proxyAccess(request).clientIp ?? request.socket.remoteAddress ?? null,
+        ownerAccess(request).clientIp ?? request.socket.remoteAddress ?? null,
+      ownerAccess,
       lookupSymbol: async (symbol) => {
         try {
           const details = await marketDataProvider.getTickerDetails(symbol);

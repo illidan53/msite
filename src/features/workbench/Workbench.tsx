@@ -161,6 +161,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     (item) => item.navigationGroup === "other",
   );
   const symbolDescriptions = watchlist?.symbolDescriptions ?? {};
+  // Owner Focus is read-only except for the site owner; any browser may
+  // edit its own copy of the other lists.
+  const canEditList = watchlist?.ownerManaged?.canEdit ?? true;
 
   const activeSymbols = useMemo(
     () => (watchlist ? flattenWatchlistSymbols(watchlist) : []),
@@ -309,8 +312,13 @@ function WorkbenchContent({ api }: WorkbenchProps) {
         setConfig(loadedConfig);
         configRef.current = loadedConfig;
         setErrorMessage(null);
+        // An empty list (Owner Focus before anything is added) is not a landing page.
+        const lists = loadedConfig.watchlists.watchlists;
         setSelectedWatchlistId(
-          loadedConfig.watchlists.watchlists[0]?.id ?? null,
+          (
+            lists.find((item) => item.rows.some((row) => row.symbols.length)) ??
+            lists[0]
+          )?.id ?? null,
         );
       })
       .catch((error: unknown) => {
@@ -621,7 +629,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
       const result = await api.addWatchlistSymbol(target.id, addition);
       applyWatchlists(result.watchlists);
       const rowName = t(
-        target.rows.find((row) => row.id === addition.rowId)?.name ?? "",
+        target.ownerManaged
+          ? target.name
+          : (target.rows.find((row) => row.id === addition.rowId)?.name ?? ""),
       );
       setEditStatus({
         kind: "success",
@@ -966,18 +976,20 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           >
             {t(expandedColumns ? "Essential columns" : "All columns")}
           </button>
-          <button
-            className="edit-toggle"
-            type="button"
-            aria-pressed={editing}
-            onClick={() => {
-              setEditing(!editing);
-              setEditStatus(null);
-            }}
-          >
-            <PencilLine size={14} aria-hidden="true" />
-            {t("Edit list", "编辑列表")}
-          </button>
+          {canEditList ? (
+            <button
+              className="edit-toggle"
+              type="button"
+              aria-pressed={editing}
+              onClick={() => {
+                setEditing(!editing);
+                setEditStatus(null);
+              }}
+            >
+              <PencilLine size={14} aria-hidden="true" />
+              {t("Edit list", "编辑列表")}
+            </button>
+          ) : null}
         </header>
       )}
       {activePage === "watchlist" && subsectors.length > 0 && (
@@ -1221,7 +1233,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             aria-label={`${t(watchlist.name)} dashboard`}
           >
             {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
-            {editing ? (
+            {editing && canEditList ? (
               <WatchlistEditor
                 watchlist={watchlist}
                 defaultSubsectorId={selectedSubsector?.id ?? null}
@@ -1300,7 +1312,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                                 </small>
                               ) : null}
                             </button>
-                            {editing ? (
+                            {editing && canEditList ? (
                               <button
                                 type="button"
                                 className="symbol-remove-button"
@@ -1309,7 +1321,12 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                                   `移除 ${symbol}`,
                                 )}
                                 title={t(`Remove ${symbol}`, `移除 ${symbol}`)}
-                                disabled={editBusy || activeSymbols.length <= 1}
+                                disabled={
+                                  editBusy ||
+                                  // Owner Focus may be emptied.
+                                  (!watchlist.ownerManaged &&
+                                    activeSymbols.length <= 1)
+                                }
                                 onClick={() => void handleRemoveSymbol(symbol)}
                               >
                                 <X size={14} aria-hidden="true" />
@@ -1352,6 +1369,20 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                   })}
                 </tbody>
               </table>
+              {/* Outside the table: hidden columns would skew a colSpan row. */}
+              {pageSymbols.length === 0 ? (
+                <p className="quote-table-empty">
+                  {canEditList
+                    ? t(
+                        "No stocks yet. Use Edit list to add the ones you want to watch.",
+                        "还没有股票。点「编辑列表」添加想观察的股票。",
+                      )
+                    : t(
+                        "The site owner has not added any stocks yet.",
+                        "站长还没有添加股票。",
+                      )}
+                </p>
+              ) : null}
             </section>
 
             <nav
