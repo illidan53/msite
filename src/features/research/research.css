@@ -1,6 +1,6 @@
 .research-page {
   grid-column: 2 / -1;
-  grid-row: 3 / 5;
+  grid-row: 3 / -1;
   min-width: 0;
   padding-bottom: 32px;
 }

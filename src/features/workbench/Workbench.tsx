@@ -976,6 +976,47 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           )}
         </header>
       )}
+      {activePage === "watchlist" && subsectors.length > 0 && (
+        // Full width like the table controls, so the focus panel starts below it.
+        <div className="subsector-strip">
+          <SubsectorBar
+            options={[
+              {
+                id: null,
+                label: t("All", "全部"),
+                changePercent:
+                  performanceByWatchlist[watchlist.id]?.changePercent ??
+                  null,
+              },
+              ...subsectors.map((subsector) => ({
+                id: subsector.id,
+                label: t(subsector.name),
+                changePercent:
+                  performanceBySubsector[subsector.id]?.changePercent ??
+                  null,
+              })),
+            ]}
+            selectedId={selectedSubsector?.id ?? null}
+            onSelect={setSelectedSubsectorId}
+          />
+          {selectedSubsector ? (
+            <p className="subsector-caption">
+              {t(
+                `${visibleSymbols.length} symbols`,
+                `${visibleSymbols.length} 只`,
+              )}
+              {selectedSubsector.description
+                ? ` · ${t(selectedSubsector.description)}`
+                : ""}
+              {" · "}
+              {t(
+                "Sub-sectors can overlap; the daily change is equal-weight.",
+                "子板块之间可以重叠；日涨跌为等权平均。",
+              )}
+            </p>
+          ) : null}
+        </div>
+      )}
 
       <aside
         className="watchlist-rail"
@@ -1176,46 +1217,6 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             aria-label={`${t(watchlist.name)} dashboard`}
           >
             {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
-            {subsectors.length > 0 ? (
-              <>
-                <SubsectorBar
-                  options={[
-                    {
-                      id: null,
-                      label: t("All", "全部"),
-                      changePercent:
-                        performanceByWatchlist[watchlist.id]?.changePercent ??
-                        null,
-                    },
-                    ...subsectors.map((subsector) => ({
-                      id: subsector.id,
-                      label: t(subsector.name),
-                      changePercent:
-                        performanceBySubsector[subsector.id]?.changePercent ??
-                        null,
-                    })),
-                  ]}
-                  selectedId={selectedSubsector?.id ?? null}
-                  onSelect={setSelectedSubsectorId}
-                />
-                {selectedSubsector ? (
-                  <p className="subsector-caption">
-                    {t(
-                      `${visibleSymbols.length} symbols`,
-                      `${visibleSymbols.length} 只`,
-                    )}
-                    {selectedSubsector.description
-                      ? ` · ${t(selectedSubsector.description)}`
-                      : ""}
-                    {" · "}
-                    {t(
-                      "Sub-sectors can overlap; the daily change is equal-weight.",
-                      "子板块之间可以重叠；日涨跌为等权平均。",
-                    )}
-                  </p>
-                ) : null}
-              </>
-            ) : null}
             {canEdit && editing ? (
               <WatchlistEditor
                 watchlist={watchlist}

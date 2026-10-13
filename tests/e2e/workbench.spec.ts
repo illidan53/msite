@@ -807,6 +807,15 @@ for (const width of [1440, 390]) {
     ]);
     expect(barBox!.y).toBeGreaterThanOrEqual(toolbarBox!.y + toolbarBox!.height);
     expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(tableBox!.y);
+    // The bar spans the table and the focus panel, which starts below it.
+    const focusBox = await page
+      .getByRole("complementary", { name: "Stock analysis" })
+      .boundingBox();
+    expect(focusBox!.y).toBeGreaterThanOrEqual(barBox!.y + barBox!.height);
+    if (width > 1100) {
+      expect(barBox!.x + barBox!.width).toBeGreaterThan(focusBox!.x + focusBox!.width - 2);
+      expect(barBox!.width).toBeGreaterThan(tableBox!.width + focusBox!.width);
+    }
 
     const aiChips = bar.getByRole("button", { name: /^AI chips/ });
     await aiChips.click();

@@ -80,7 +80,8 @@ p {
 .workbench {
   display: grid;
   grid-template-columns: 204px minmax(330px, 1fr) minmax(360px, 0.85fr);
-  grid-template-rows: auto auto auto 1fr;
+  /* brand, heading, table controls, sub-sector bar, content */
+  grid-template-rows: auto auto auto auto 1fr;
   column-gap: 24px;
   min-height: 100vh;
   align-items: start;
@@ -156,7 +157,7 @@ p {
 }
 .watchlist-rail {
   grid-column: 1;
-  grid-row: 2 / 5;
+  grid-row: 2 / -1;
   align-self: stretch;
   border-right: 1px solid var(--border);
   background: var(--surface);
@@ -383,7 +384,9 @@ summary {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
+}
+.subsector-bar + .subsector-caption {
+  margin-top: 8px;
 }
 .subsector-step {
   flex: none;
@@ -457,13 +460,20 @@ summary {
   font-variant-numeric: tabular-nums;
 }
 .subsector-caption {
-  margin: 0 0 12px;
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
 }
+.subsector-strip {
+  grid-column: 2 / -1;
+  grid-row: 4;
+  min-width: 0;
+  margin-bottom: 14px;
+}
 .watchlist-main {
   grid-column: 2;
+  grid-row: 5;
   min-width: 0;
 }
 .sector-table-panel {
@@ -596,7 +606,7 @@ summary {
 }
 .symbol-detail-drawer {
   grid-column: 3;
-  grid-row: 4;
+  grid-row: 5;
   position: sticky;
   top: 20px;
   background: var(--surface);
@@ -780,14 +790,14 @@ summary {
     margin-right: -20px;
   }
   .watchlist-rail {
-    grid-row: 2 / 6;
+    grid-row: 2 / 7;
   }
   .watchlist-main {
-    grid-row: 4;
+    grid-row: 5;
   }
   .symbol-detail-drawer {
     grid-column: 2;
-    grid-row: 5;
+    grid-row: 6;
     position: static;
     margin-top: 8px;
   }
@@ -849,6 +859,9 @@ summary {
   .workbench-topbar {
     order: 3;
     gap: 10px;
+  }
+  .subsector-strip {
+    order: 3;
   }
   .control-field {
     flex: 1 1 42%;
@@ -949,12 +962,12 @@ summary {
 }
 @media (max-width: 1100px) {
   .has-selection .symbol-detail-drawer {
-    grid-row: 4;
+    grid-row: 5;
     margin: 0 0 20px;
     scroll-margin-top: 16px;
   }
   .has-selection .watchlist-main {
-    grid-row: 5;
+    grid-row: 6;
   }
 }
 @media (max-width: 600px) {
@@ -1097,7 +1110,7 @@ body:has(.metric-help-dialog[open]) {
 }
 .sector-analytics {
   grid-column: 2 / -1;
-  grid-row: 3 / 5;
+  grid-row: 3 / -1;
   min-width: 0;
   padding-bottom: 24px;
 }
