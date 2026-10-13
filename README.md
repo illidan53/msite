@@ -46,7 +46,13 @@ Anyone can sign in with a Google account (Gmail) or a Microsoft account (Outlook
 
 ### Setting up the providers (one-time, by the owner)
 
-Sign-in stays hidden until a provider's client id and secret are set. Add them to `/etc/msite/msite.env` on the instance (no quotes) and restart: `sudo systemctl restart msite.service`. Never commit them; the repository is public.
+Sign-in stays hidden until a provider's client id and secret are set. After registering the apps below, run this from your own machine (it needs the `nphunter-sso` AWS profile; run `aws sso login --profile nphunter-sso` first if the session has expired):
+
+```bash
+scripts/configure-sign-in.sh
+```
+
+It asks for each provider's client id and secret (the secret prompt is hidden; leave an id blank to skip that provider). It stores them as SSM SecureString parameters `/msite/finance/{google,microsoft}-client-{id,secret}`, next to the existing Polygon and OpenAI keys. The instance then reads them with its own role (`AmazonSSMManagedInstanceCore`), updates `/etc/msite/msite.env` (mode 0600, with a timestamped 0600 backup) and restarts `msite.service`. Finally the script waits until `/api/auth/session` lists the providers. Secrets are never on a command line, in shell history or in SSM command logs. `DRY_RUN=1` prints the steps without calling AWS. To rotate a secret, run the script again. To edit by hand instead, set the variables below in `/etc/msite/msite.env` (no quotes) and run `sudo systemctl restart msite.service`. Never commit them; the repository is public.
 
 | Variable | Meaning |
 |---|---|
