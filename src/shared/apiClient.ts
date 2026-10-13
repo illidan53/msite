@@ -3,6 +3,7 @@ import type {
   PriceSeries,
   RatePlanEvaluation,
   SettingsConfig,
+  WatchlistEditResult,
   WatchlistsConfig,
 } from "../../shared/types";
 
@@ -16,6 +17,28 @@ export interface WorkbenchApi {
   fetchSnapshots(symbols: string[]): Promise<MarketSnapshot[]>;
   getHistory(symbol: string, range: PriceSeries["range"]): Promise<PriceSeries>;
   evaluateRatePlan(input: unknown): Promise<RatePlanEvaluation>;
+  /** Whether this visitor may edit watchlists (the research IP allowlist). */
+  getEditAccess(): Promise<{ canEdit: boolean; clientIp: string | null }>;
+  addWatchlistSymbol(
+    watchlistId: string,
+    input: { symbol: string; rowId: string; description?: string },
+  ): Promise<WatchlistEditResult>;
+  removeWatchlistSymbol(
+    watchlistId: string,
+    symbol: string,
+  ): Promise<WatchlistEditResult>;
+}
+
+/** A failed API request; `code` is the server's error code when it sent one. */
+export class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "ApiRequestError";
+  }
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -28,7 +51,14 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, cache: init?.cache ?? "no-store", headers });
 
   if (!response.ok) {
-    throw new Error(formatRequestError(url, init?.method ?? "GET", response));
+    const body = (await response.json().catch(() => null)) as {
+      code?: unknown;
+    } | null;
+    throw new ApiRequestError(
+      formatRequestError(url, init?.method ?? "GET", response),
+      response.status,
+      typeof body?.code === "string" ? body.code : undefined,
+    );
   }
 
   return (await response.json()) as T;
@@ -65,4 +95,18 @@ export const apiClient: WorkbenchApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
+  getEditAccess: () =>
+    requestJson<{ canRun: boolean; clientIp: string | null }>(
+      "/api/research/access",
+    ).then(({ canRun, clientIp }) => ({ canEdit: canRun, clientIp })),
+  addWatchlistSymbol: (watchlistId, input) =>
+    requestJson<WatchlistEditResult>(
+      `/api/watchlists/${encodeURIComponent(watchlistId)}/symbols`,
+      { method: "POST", body: JSON.stringify(input) },
+    ),
+  removeWatchlistSymbol: (watchlistId, symbol) =>
+    requestJson<WatchlistEditResult>(
+      `/api/watchlists/${encodeURIComponent(watchlistId)}/symbols/${encodeURIComponent(symbol)}`,
+      { method: "DELETE" },
+    ),
 };

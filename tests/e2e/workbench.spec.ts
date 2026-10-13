@@ -786,7 +786,117 @@ for (const width of [1440, 390]) {
   });
 }
 
-async function mockWorkbenchApis(page: Page) {
+for (const width of [1440, 390]) {
+  test(`adds and removes watchlist stocks from an allowed IP at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const mocks = await mockWorkbenchApis(page, { canEdit: true });
+    const lists = structuredClone(workbenchConfig.watchlists);
+    const staples = lists.watchlists[1];
+    const edits: string[] = [];
+    await page.route("**/api/watchlists/consumer-staples/symbols**", async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      edits.push(`${request.method()} ${path}`);
+      if (request.method() === "POST") {
+        const body = request.postDataJSON() as {
+          symbol: string;
+          rowId: string;
+          description?: string;
+        };
+        expect(request.headers()["content-type"]).toBe("application/json");
+        if (body.symbol === "ZZZZ") {
+          await route.fulfill({ status: 404, json: { code: "UNKNOWN_SYMBOL" } });
+          return;
+        }
+        staples.rows[0].symbols.push(body.symbol);
+        staples.symbolDescriptions = {
+          ...staples.symbolDescriptions,
+          ...(body.description ? { [body.symbol]: body.description } : {}),
+        };
+        await route.fulfill({
+          status: 201,
+          json: { symbol: body.symbol, name: `${body.symbol} Inc.`, watchlists: lists },
+        });
+        return;
+      }
+      const symbol = decodeURIComponent(path.split("/").at(-1) ?? "");
+      staples.rows[0].symbols = staples.rows[0].symbols.filter((s) => s !== symbol);
+      await route.fulfill({ json: { symbol, watchlists: lists } });
+    });
+
+    await page.goto("/");
+    await page.getByRole("button", { name: "Watchlist", exact: true }).click();
+    if (width < 600)
+      await page.getByLabel("Watchlist", { exact: true }).selectOption("consumer-staples");
+    else
+      await page.getByRole("button", { name: "Consumer Staples", exact: true }).click();
+    const quotes = page.getByRole("table", { name: "Consumer Staples quotes" });
+    await expect(quotes.getByRole("button", { name: "KO", exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: "Edit list", exact: true }).click();
+    const editor = page.getByRole("region", { name: "Edit watchlist" });
+    await editor.getByLabel("Symbol").fill("zzzz");
+    await editor.getByRole("button", { name: "Add stock" }).click();
+    await expect(editor.getByRole("status")).toHaveText("No listed security matches ZZZZ.");
+
+    await editor.getByLabel("Symbol").fill("pltr");
+    await editor.getByLabel("Business (optional)").fill("Data analytics software");
+    await editor.getByRole("button", { name: "Add stock" }).click();
+    await expect(editor.getByRole("status")).toHaveText(
+      "Added PLTR (PLTR Inc.) to Staples.",
+    );
+    await expect(quotes.getByRole("button", { name: "PLTR", exact: true })).toBeVisible();
+    await expect(page.getByText("5 symbols · USD", { exact: false })).toBeVisible();
+    await expect
+      .poll(() => mocks.snapshotRequests.some((symbols) => symbols.includes("PLTR")))
+      .toBe(true);
+
+    await quotes.getByRole("button", { name: "Remove KO", exact: true }).click();
+    await expect(editor.getByRole("status")).toContainText(
+      "Removed KO from Consumer Staples.",
+    );
+    await expect(quotes.getByRole("button", { name: "KO", exact: true })).toHaveCount(0);
+    await editor.getByRole("button", { name: "Undo" }).click();
+    await expect(editor.getByRole("status")).toHaveText("Restored KO.");
+    await expect(quotes.getByRole("button", { name: "KO", exact: true })).toBeVisible();
+
+    expect(edits).toEqual([
+      "POST /api/watchlists/consumer-staples/symbols",
+      "POST /api/watchlists/consumer-staples/symbols",
+      "DELETE /api/watchlists/consumer-staples/symbols/KO",
+      "POST /api/watchlists/consumer-staples/symbols",
+    ]);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+
+    await page.getByRole("button", { name: "Edit list", exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    await expect(quotes.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+  });
+}
+
+test("shows no watchlist editing to visitors outside the IP allowlist", async ({
+  page,
+}) => {
+  await mockWorkbenchApis(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Watchlist", exact: true }).click();
+  const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
+  await expect(quotes.getByRole("button", { name: "NVDA", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Edit list" })).toHaveCount(0);
+  await expect(quotes.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+});
+
+async function mockWorkbenchApis(
+  page: Page,
+  { canEdit = false }: { canEdit?: boolean } = {},
+) {
   const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];
   const historyRequests: Array<{
@@ -867,6 +977,15 @@ async function mockWorkbenchApis(page: Page) {
     });
   });
 
+  await page.route("**/api/research/access", async (route) => {
+    await route.fulfill({
+      json: {
+        canRun: canEdit,
+        clientIp: canEdit ? "70.111.76.119" : "198.51.100.7",
+      },
+    });
+  });
+
   await page.route("**/api/rate-plan/evaluate", async (route) => {
     if (route.request().method() !== "POST") {
       await route.fallback();
@@ -894,7 +1013,8 @@ function isMockedApiRequest(method: string, url: URL) {
     (method === "POST" && url.pathname === "/api/market/snapshots") ||
     (method === "GET" && url.pathname === "/api/market/history") ||
     (method === "POST" && url.pathname === "/api/rate-plan/evaluate") ||
-    (method === "GET" && url.pathname === "/api/config")
+    (method === "GET" && url.pathname === "/api/config") ||
+    (method === "GET" && url.pathname === "/api/research/access")
   );
 }
 

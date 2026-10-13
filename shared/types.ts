@@ -40,6 +40,13 @@ export interface WatchlistsConfig {
   watchlists: Watchlist[];
 }
 
+/** Response of adding or removing a watchlist symbol: the updated lists. */
+export interface WatchlistEditResult {
+  symbol: string;
+  name?: string;
+  watchlists: WatchlistsConfig;
+}
+
 export interface MarketSnapshot {
   symbol: string;
   name?: string;

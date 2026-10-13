@@ -24,10 +24,11 @@ test("public deployment serves the workbench shell and health endpoint", async (
   const cloud = config.watchlists.find(
     (list) => list.id === "ai-cloud-infrastructure",
   );
+  // Members can be edited at runtime, so check the structure, not the symbols.
   expect(
-    cloud?.rows.find((row) => row.name === "GPU cloud operators")?.symbols,
-  ).toEqual(["CRWV", "NBIS", "IREN"]);
-  expect(cloud?.rows.flatMap((row) => row.symbols)).toContain("P");
+    cloud?.rows.find((row) => row.name === "GPU cloud operators")?.symbols
+      .length,
+  ).toBeGreaterThan(0);
   expect(
     cloud?.selectionSources?.some(
       (source) => source.kind === "discussion" && source.publishedAt,
@@ -183,6 +184,17 @@ test("public research authorization resists spoofed source headers", async ({
       data: { job: "invalid" },
     });
     expect(strategyDenied.status()).toBe(access.canRun ? 400 : 403);
+    // Invalid edits check authorization without changing a watchlist.
+    const addDenied = await request.post(
+      "/api/watchlists/semiconductors/symbols",
+      { headers, data: {} },
+    );
+    expect(addDenied.status()).toBe(access.canRun ? 400 : 403);
+    const removeDenied = await request.delete(
+      "/api/watchlists/semiconductors/symbols/%24BAD",
+      { headers },
+    );
+    expect(removeDenied.status()).toBe(access.canRun ? 400 : 403);
   }
 });
 

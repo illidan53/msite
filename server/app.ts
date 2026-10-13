@@ -11,7 +11,7 @@ import type { Express } from "express";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { defaultConfigDir } from "./config/configPaths";
-import { apiErrorHandler } from "./http/apiError";
+import { ApiError, apiErrorHandler } from "./http/apiError";
 import { MarketDataProvider } from "./market/marketDataProvider";
 import { PolygonClient } from "./market/polygonClient";
 import { createConfigRoutes } from "./routes/configRoutes";
@@ -41,7 +41,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const indexHtml = resolve(staticDir, "index.html");
   const researchDir =
     process.env.RESEARCH_DATA_DIR ?? resolve(process.cwd(), "data/research");
-  const configRepository = new ConfigRepository({ configDir });
+  // Runtime watchlist edits live beside research data, which survives deploys.
+  const configRepository = new ConfigRepository({
+    configDir,
+    dataDir: researchDir,
+  });
 
   app.use(express.json());
 
@@ -55,7 +59,18 @@ export function createApp(options: CreateAppOptions = {}): Express {
   app.use(
     "/api",
     createConfigRoutes({
-      configDir,
+      repository: configRepository,
+      lookupSymbol: async (symbol) => {
+        try {
+          const details = await marketDataProvider.getTickerDetails(symbol);
+          return details.name
+            ? { symbol: details.symbol, name: details.name }
+            : null;
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 404) return null;
+          throw error;
+        }
+      },
     }),
   );
   app.use("/api", createRateRoutes());

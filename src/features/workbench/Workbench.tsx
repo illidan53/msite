@@ -11,6 +11,8 @@ import {
   ChartNoAxesCombined,
   ChevronDown,
   Layers,
+  PencilLine,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
@@ -18,6 +20,7 @@ import type {
   PriceSeries,
   RatePlanEvaluation,
   Watchlist,
+  WatchlistsConfig,
 } from "../../../shared/types";
 import { SymbolChart } from "../charts/SymbolChart";
 import { RefreshControls } from "../settings/RefreshControls";
@@ -30,6 +33,12 @@ import {
   type WatchlistPerformance,
 } from "./watchlistPerformance";
 import { activityExplanations } from "../analytics/metrics";
+import {
+  WatchlistEditor,
+  watchlistEditErrorMessage,
+  type WatchlistAddition,
+  type WatchlistEditStatus,
+} from "./WatchlistEditor";
 
 interface WorkbenchProps {
   api: WorkbenchApi;
@@ -129,6 +138,12 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     message: "Refresh interval is within the configured budget.",
     disabledIntervals: [] as number[],
   });
+  const [canEdit, setCanEdit] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editStatus, setEditStatus] = useState<WatchlistEditStatus | null>(
+    null,
+  );
   const detailRef = useRef<HTMLElement | null>(null);
   const configRef = useRef<WorkbenchConfig | null>(null);
 
@@ -276,6 +291,25 @@ function WorkbenchContent({ api }: WorkbenchProps) {
       isStale = true;
     };
   }, [api]);
+
+  useEffect(() => {
+    let isStale = false;
+    setCanEdit(false);
+    void api
+      .getEditAccess()
+      .then((access) => {
+        if (!isStale) setCanEdit(access.canEdit);
+      })
+      // Editing stays hidden when access cannot be checked.
+      .catch(() => undefined);
+    return () => {
+      isStale = true;
+    };
+  }, [api]);
+
+  useEffect(() => {
+    setEditStatus(null);
+  }, [selectedWatchlistId]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -517,6 +551,72 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     setSelectedSymbol(null);
     setHistorySeries(null);
     setHistoryErrorMessage(null);
+  }
+
+  function applyWatchlists(next: WatchlistsConfig) {
+    setConfig((current) => (current ? { ...current, watchlists: next } : current));
+  }
+
+  async function handleAddSymbol(
+    addition: WatchlistAddition,
+    restoring = false,
+  ): Promise<boolean> {
+    if (!watchlist || editBusy) return false;
+    const target = watchlist;
+    setEditBusy(true);
+    try {
+      const result = await api.addWatchlistSymbol(target.id, addition);
+      applyWatchlists(result.watchlists);
+      const rowName = t(
+        target.rows.find((row) => row.id === addition.rowId)?.name ?? "",
+      );
+      setEditStatus({
+        kind: "success",
+        message: restoring
+          ? t(`Restored ${result.symbol}.`, `已恢复 ${result.symbol}。`)
+          : t(
+              `Added ${result.symbol}${result.name ? ` (${result.name})` : ""} to ${rowName}.`,
+              `已将 ${result.symbol}${result.name ? `（${result.name}）` : ""}添加到「${rowName}」。`,
+            ),
+      });
+      return true;
+    } catch (error) {
+      setEditStatus({
+        kind: "error",
+        message: watchlistEditErrorMessage(error, addition.symbol, t),
+      });
+      return false;
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
+  async function handleRemoveSymbol(symbol: string) {
+    if (!watchlist || editBusy) return;
+    const target = watchlist;
+    const rowId = target.rows.find((row) => row.symbols.includes(symbol))?.id;
+    const description = target.symbolDescriptions?.[symbol];
+    setEditBusy(true);
+    try {
+      const result = await api.removeWatchlistSymbol(target.id, symbol);
+      applyWatchlists(result.watchlists);
+      if (selectedSymbol === symbol) handleCloseDetails();
+      setEditStatus({
+        kind: "success",
+        message: t(
+          `Removed ${symbol} from ${t(target.name)}.`,
+          `已从「${t(target.name)}」移除 ${symbol}。`,
+        ),
+        undo: rowId ? { symbol, rowId, description } : undefined,
+      });
+    } catch (error) {
+      setEditStatus({
+        kind: "error",
+        message: watchlistEditErrorMessage(error, symbol, t),
+      });
+    } finally {
+      setEditBusy(false);
+    }
   }
 
   function renderWatchlistButton(watchlistOption: Watchlist) {
@@ -809,6 +909,20 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           >
             {t(expandedColumns ? "Essential columns" : "All columns")}
           </button>
+          {canEdit && (
+            <button
+              className="edit-toggle"
+              type="button"
+              aria-pressed={editing}
+              onClick={() => {
+                setEditing(!editing);
+                setEditStatus(null);
+              }}
+            >
+              <PencilLine size={14} aria-hidden="true" />
+              {t("Edit list", "编辑列表")}
+            </button>
+          )}
         </header>
       )}
 
@@ -1011,6 +1125,15 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             aria-label={`${t(watchlist.name)} dashboard`}
           >
             {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
+            {canEdit && editing ? (
+              <WatchlistEditor
+                watchlist={watchlist}
+                busy={editBusy}
+                status={editStatus}
+                onAdd={(addition) => handleAddSymbol(addition)}
+                onUndo={(addition) => void handleAddSymbol(addition, true)}
+              />
+            ) : null}
             <section
               className={`watchlist-row sector-table-panel ${expandedColumns ? "expanded-columns" : "essential-columns"}`}
             >
@@ -1064,20 +1187,37 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                         }
                       >
                         <td>
-                          <button
-                            type="button"
-                            className="symbol-button"
-                            aria-label={symbol}
-                            aria-pressed={selectedSymbol === symbol}
-                            onClick={() => handleSymbolSelect(symbol)}
-                          >
-                            <span>{symbol}</span>
-                            {!expandedColumns ? (
-                              <small>
-                                {snapshot?.name ?? t("Quote unavailable")}
-                              </small>
+                          <div className="symbol-cell">
+                            <button
+                              type="button"
+                              className="symbol-button"
+                              aria-label={symbol}
+                              aria-pressed={selectedSymbol === symbol}
+                              onClick={() => handleSymbolSelect(symbol)}
+                            >
+                              <span>{symbol}</span>
+                              {!expandedColumns ? (
+                                <small>
+                                  {snapshot?.name ?? t("Quote unavailable")}
+                                </small>
+                              ) : null}
+                            </button>
+                            {canEdit && editing ? (
+                              <button
+                                type="button"
+                                className="symbol-remove-button"
+                                aria-label={t(
+                                  `Remove ${symbol}`,
+                                  `移除 ${symbol}`,
+                                )}
+                                title={t(`Remove ${symbol}`, `移除 ${symbol}`)}
+                                disabled={editBusy || activeSymbols.length <= 1}
+                                onClick={() => void handleRemoveSymbol(symbol)}
+                              >
+                                <X size={14} aria-hidden="true" />
+                              </button>
                             ) : null}
-                          </button>
+                          </div>
                         </td>
                         <td>{snapshot?.name ?? "--"}</td>
                         <td>{t(symbolDescriptions[symbol] ?? "--")}</td>

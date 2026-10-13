@@ -150,7 +150,7 @@ describe("config routes", () => {
     expect(watchlistsResponse.body.watchlists[0].rows[0].symbols).toEqual(["AMD"]);
   });
 
-  it("does not expose watchlist writes because watchlists are file-backed", async () => {
+  it("does not expose whole-config watchlist writes", async () => {
     const app = createApp({ configDir, nodeEnv: "development" });
 
     const response = await request(app)

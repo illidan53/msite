@@ -9,7 +9,11 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { MarketSnapshot, PriceSeries } from "../../../shared/types";
-import type { WorkbenchApi, WorkbenchConfig } from "../../shared/apiClient";
+import {
+  ApiRequestError,
+  type WorkbenchApi,
+  type WorkbenchConfig,
+} from "../../shared/apiClient";
 import {
   latestFixture,
   paperFixture,
@@ -596,6 +600,139 @@ describe("Workbench", () => {
       }),
     );
   });
+
+  it("hides watchlist editing from visitors outside the IP allowlist", async () => {
+    const getEditAccess = vi.fn(async () => ({
+      canEdit: false,
+      clientIp: "203.0.113.9",
+    }));
+    render(<Workbench api={createApi({ getEditAccess })} />);
+
+    await screen.findByRole("table", { name: "Semiconductors quotes" });
+    await waitFor(() => expect(getEditAccess).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByRole("button", { name: "Edit list" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Remove / }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("adds, removes and restores stocks in the selected watchlist", async () => {
+    const user = userEvent.setup();
+    const staples = baseConfig.watchlists.watchlists[1];
+    const withStaples = (symbols: string[]): WorkbenchConfig["watchlists"] => ({
+      watchlists: [
+        baseConfig.watchlists.watchlists[0],
+        { ...staples, rows: [{ ...staples.rows[0], symbols }] },
+      ],
+    });
+    const addWatchlistSymbol = vi.fn<WorkbenchApi["addWatchlistSymbol"]>(
+      async (_id, { symbol }) => {
+        if (symbol === "ZZZZ")
+          throw new ApiRequestError("failed", 404, "UNKNOWN_SYMBOL");
+        return symbol === "PLTR"
+          ? {
+              symbol,
+              name: "Palantir",
+              watchlists: withStaples(["COST", "WMT", "PG", "KO", "PLTR"]),
+            }
+          : { symbol, watchlists: withStaples(["COST", "WMT", "PG", "KO", "PLTR"]) };
+      },
+    );
+    const removeWatchlistSymbol = vi.fn<WorkbenchApi["removeWatchlistSymbol"]>(
+      async (_id, symbol) => ({
+        symbol,
+        watchlists: withStaples(["COST", "WMT", "PG", "PLTR"]),
+      }),
+    );
+    const fetchSnapshots = vi.fn(async (symbols: string[]) =>
+      symbols.map(snapshotFor),
+    );
+    render(
+      <Workbench
+        api={createApi({
+          fetchSnapshots,
+          getEditAccess: async () => ({ canEdit: true, clientIp: "127.0.0.1" }),
+          addWatchlistSymbol,
+          removeWatchlistSymbol,
+        })}
+      />,
+    );
+
+    await user.click(await screen.findByRole("button", { name: "Watchlist" }));
+    await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
+    const toggle = await screen.findByRole("button", { name: "Edit list" });
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const editor = screen.getByRole("region", { name: "Edit watchlist" });
+
+    await user.type(within(editor).getByLabelText("Symbol"), "1abc");
+    await user.click(within(editor).getByRole("button", { name: "Add stock" }));
+    expect(
+      within(editor).getByText("Enter a ticker such as PLTR or BRK.B."),
+    ).toBeInTheDocument();
+    expect(addWatchlistSymbol).not.toHaveBeenCalled();
+
+    await user.clear(within(editor).getByLabelText("Symbol"));
+    await user.type(within(editor).getByLabelText("Symbol"), "zzzz");
+    await user.click(within(editor).getByRole("button", { name: "Add stock" }));
+    expect(
+      await within(editor).findByText("No listed security matches ZZZZ."),
+    ).toBeInTheDocument();
+
+    await user.clear(within(editor).getByLabelText("Symbol"));
+    await user.type(within(editor).getByLabelText("Symbol"), "pltr");
+    await user.type(
+      within(editor).getByLabelText("Business (optional)"),
+      "Data analytics software",
+    );
+    await user.click(within(editor).getByRole("button", { name: "Add stock" }));
+    expect(addWatchlistSymbol).toHaveBeenLastCalledWith("consumer-staples", {
+      symbol: "PLTR",
+      rowId: "staples",
+      description: "Data analytics software",
+    });
+    expect(
+      await within(editor).findByText("Added PLTR (Palantir) to Staples."),
+    ).toBeInTheDocument();
+    const table = screen.getByRole("table", { name: "Consumer Staples quotes" });
+    expect(within(table).getByRole("button", { name: "PLTR" })).toBeInTheDocument();
+    expect(within(editor).getByLabelText("Symbol")).toHaveValue("");
+    await waitFor(() =>
+      expect(fetchSnapshots).toHaveBeenLastCalledWith(
+        expect.arrayContaining(["PLTR"]),
+      ),
+    );
+
+    await user.click(within(table).getByRole("button", { name: "KO" }));
+    await user.click(within(table).getByRole("button", { name: "Remove KO" }));
+    expect(removeWatchlistSymbol).toHaveBeenCalledWith("consumer-staples", "KO");
+    expect(
+      await within(editor).findByText("Removed KO from Consumer Staples."),
+    ).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "KO" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("complementary", { name: "KO details" }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(editor).getByRole("button", { name: "Undo" }));
+    expect(addWatchlistSymbol).toHaveBeenLastCalledWith("consumer-staples", {
+      symbol: "KO",
+      rowId: "staples",
+      description: undefined,
+    });
+    expect(await within(editor).findByText("Restored KO.")).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "KO" })).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(
+      screen.queryByRole("region", { name: "Edit watchlist" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(table).queryByRole("button", { name: "Remove KO" }),
+    ).not.toBeInTheDocument();
+  });
 });
 
 const sectorSymbols = [
@@ -693,6 +830,13 @@ function createApi({
   fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor)),
   getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range)),
   evaluateRatePlan = vi.fn(async () => ratePlanEvaluation),
+  getEditAccess = vi.fn(async () => ({ canEdit: false, clientIp: null })),
+  addWatchlistSymbol = vi.fn(async () => {
+    throw new Error("Unexpected watchlist edit");
+  }),
+  removeWatchlistSymbol = vi.fn(async () => {
+    throw new Error("Unexpected watchlist edit");
+  }),
 }: {
   config?: WorkbenchConfig;
   configError?: Error;
@@ -700,6 +844,9 @@ function createApi({
   fetchSnapshots?: WorkbenchApi["fetchSnapshots"];
   getHistory?: WorkbenchApi["getHistory"];
   evaluateRatePlan?: WorkbenchApi["evaluateRatePlan"];
+  getEditAccess?: WorkbenchApi["getEditAccess"];
+  addWatchlistSymbol?: WorkbenchApi["addWatchlistSymbol"];
+  removeWatchlistSymbol?: WorkbenchApi["removeWatchlistSymbol"];
 } = {}): WorkbenchApi {
   return {
     getConfig: vi.fn(async () => {
@@ -712,6 +859,9 @@ function createApi({
     fetchSnapshots,
     getHistory,
     evaluateRatePlan,
+    getEditAccess,
+    addWatchlistSymbol,
+    removeWatchlistSymbol,
   };
 }
 

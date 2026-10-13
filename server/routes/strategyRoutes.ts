@@ -1,6 +1,7 @@
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { ApiError } from "../http/apiError";
+import { assertOwnerWrite } from "../http/ownerWrite";
 import {
   parseIps,
   researchAccess,
@@ -17,14 +18,6 @@ const symbol = z
   .regex(/^(?=.*[A-Z0-9])[A-Z0-9.-]+$/);
 const book = z.string().regex(/^[a-z][a-z0-9-]{0,31}$/);
 const runSchema = z.object({ job: z.enum(["daily", "backtest"]) }).strict();
-/** host[:port] of an Origin header; null for "null" or anything unparsable. */
-const hostOf = (origin: string) => {
-  try {
-    return new URL(origin).host;
-  } catch {
-    return null;
-  }
-};
 
 /**
  * Results are public; anything that fetches market data, spends compute or
@@ -51,30 +44,11 @@ export function createStrategyRoutes(
       });
     return result.data;
   };
-  const allowed = (req: Request) => {
-    if (!access(req).canRun)
-      throw new ApiError(
-        403,
-        "RESEARCH_IP_FORBIDDEN",
-        "This IP address is not allowed to run the quant system",
-        { source: "strategy" },
-      );
-    // The IP gate alone lets any page the owner visits post through their
-    // browser (CSRF): refuse cross-site requests, and require JSON so a
-    // cross-site form or no-cors fetch cannot be sent without a preflight.
-    const origin = req.get("origin");
-    if (
-      req.get("sec-fetch-site") === "cross-site" ||
-      (origin !== undefined && hostOf(origin) !== req.get("host"))
-    )
-      throw new ApiError(403, "CROSS_SITE_REQUEST", "Cross-site requests are not allowed", {
-        source: "strategy",
-      });
-    if (!req.is("application/json"))
-      throw new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", "Send a JSON body", {
-        source: "strategy",
-      });
-  };
+  const allowed = (req: Request) =>
+    assertOwnerWrite(access, req, {
+      source: "strategy",
+      forbidden: "This IP address is not allowed to run the quant system",
+    });
   router.use("/strategy", (_req, res, next) => {
     res.set("Cache-Control", "no-store");
     next();
