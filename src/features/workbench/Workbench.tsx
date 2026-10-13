@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
+  AuthSession,
   MarketSnapshot,
   PriceSeries,
   RatePlanEvaluation,
@@ -40,6 +41,13 @@ import {
   type WatchlistEditStatus,
 } from "./WatchlistEditor";
 import { SubsectorBar } from "./SubsectorBar";
+import {
+  AccountMenu,
+  PrivacyLink,
+  SignInOptions,
+  type AccountNotice,
+} from "../../shared/AccountMenu";
+import { ApiRequestError } from "../../shared/apiClient";
 
 interface WorkbenchProps {
   api: WorkbenchApi;
@@ -142,7 +150,18 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     message: "Refresh interval is within the configured budget.",
     disabledIntervals: [] as number[],
   });
-  const [canEdit, setCanEdit] = useState(false);
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [accountNotice, setAccountNotice] = useState<AccountNotice | null>(
+    null,
+  );
+  const [loginResult, setLoginResult] = useState<
+    "failed" | "cancelled" | "unavailable" | null
+  >(null);
+  const signedIn = Boolean(session?.user);
+  const authAvailable = Boolean(
+    session && (session.user || session.providers.length > 0),
+  );
   const [editing, setEditing] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
   const [editStatus, setEditStatus] = useState<WatchlistEditStatus | null>(
@@ -150,6 +169,12 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   );
   const detailRef = useRef<HTMLElement | null>(null);
   const configRef = useRef<WorkbenchConfig | null>(null);
+  /** Bumped on sign-out; an edit that started earlier is then ignored. */
+  const sessionGeneration = useRef(0);
+  /** ?signin=<nonce> from a sign-in round trip, read once at first render. */
+  const signInNonce = useRef<string | null | undefined>(undefined);
+  if (signInNonce.current === undefined)
+    signInNonce.current = new URL(window.location.href).searchParams.get("signin");
 
   const watchlists = config?.watchlists.watchlists ?? [];
   const watchlist: Watchlist | undefined =
@@ -310,9 +335,18 @@ function WorkbenchContent({ api }: WorkbenchProps) {
         setConfig(loadedConfig);
         configRef.current = loadedConfig;
         setErrorMessage(null);
-        setSelectedWatchlistId(
-          loadedConfig.watchlists.watchlists[0]?.id ?? null,
+        const restored = takeSignInContext(signInNonce.current ?? null);
+        const restoredList = loadedConfig.watchlists.watchlists.find(
+          (item) => item.id === restored?.watchlistId,
         );
+        setSelectedWatchlistId(
+          restoredList?.id ?? loadedConfig.watchlists.watchlists[0]?.id ?? null,
+        );
+        if (restoredList?.navigationGroup === "other") setOtherWatchlistsOpen(true);
+        if (restored) {
+          setActivePage(restored.page);
+          setEditing(restored.editing);
+        }
       })
       .catch((error: unknown) => {
         if (isStale) {
@@ -333,15 +367,43 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   }, [api]);
 
   useEffect(() => {
+    // The sign-in callback returns with ?login=<result> on failure: show it
+    // once and drop it from the address bar.
+    const url = new URL(window.location.href);
+    const result = url.searchParams.get("login");
+    if (result === "failed" || result === "cancelled" || result === "unavailable")
+      setLoginResult(result);
+    if (url.searchParams.has("login") || url.searchParams.has("signin")) {
+      url.searchParams.delete("login");
+      url.searchParams.delete("signin");
+      window.history.replaceState(window.history.state, "", url);
+    }
+    // Back from the provider without signing in (bfcache): forget the page.
+    const forget = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        try {
+          window.sessionStorage.removeItem(SIGN_IN_CONTEXT_KEY);
+        } catch {
+          /* Optional. */
+        }
+      }
+    };
+    window.addEventListener("pageshow", forget);
+    return () => window.removeEventListener("pageshow", forget);
+  }, []);
+
+  useEffect(() => {
     let isStale = false;
-    setCanEdit(false);
+    setSession(null);
     void api
-      .getEditAccess()
-      .then((access) => {
-        if (!isStale) setCanEdit(access.canEdit);
+      .getSession()
+      .then((loaded) => {
+        if (!isStale) setSession(loaded);
       })
-      // Editing stays hidden when access cannot be checked.
-      .catch(() => undefined);
+      // Sign-in and editing stay hidden when the session cannot be checked.
+      .catch(() => {
+        if (!isStale) setSession({ user: null, providers: [] });
+      });
     return () => {
       isStale = true;
     };
@@ -598,16 +660,145 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     setConfig((current) => (current ? { ...current, watchlists: next } : current));
   }
 
+  /**
+   * Applies an edit's result only if no sign-out happened while it was in
+   * flight, so a late response cannot show personal lists to a signed-out
+   * visitor.
+   */
+  function applyEditResult(generation: number, next: WatchlistsConfig) {
+    if (generation !== sessionGeneration.current) return false;
+    applyWatchlists(next);
+    return true;
+  }
+
+  /**
+   * Signed out: show the default lists that every visitor sees. If they
+   * cannot be loaded, drop the personal lists anyway and ask for a refresh.
+   */
+  async function reloadDefaultLists(generation: number) {
+    try {
+      const loaded = await api.getConfig();
+      if (generation === sessionGeneration.current) applyWatchlists(loaded.watchlists);
+    } catch {
+      if (generation !== sessionGeneration.current) return;
+      setConfig(null);
+      configRef.current = null;
+      setErrorMessage("Signed out. Refresh the page to load the default lists.");
+    }
+  }
+
+  function markSignedOut() {
+    sessionGeneration.current += 1;
+    setSession((current) => (current ? { ...current, user: null } : current));
+    void reloadDefaultLists(sessionGeneration.current);
+  }
+
+  /** An expired session turns the editor back into the sign-in prompt. */
+  function handleEditError(error: unknown, symbol: string) {
+    if (error instanceof ApiRequestError && error.code === "AUTH_REQUIRED") {
+      setAccountNotice(null);
+      markSignedOut();
+    }
+    setEditStatus({
+      kind: "error",
+      message: watchlistEditErrorMessage(error, symbol, t),
+    });
+  }
+
+  /**
+   * Remembers the page across the sign-in redirect and returns a one-time
+   * nonce for the return URL; see takeSignInContext.
+   */
+  function rememberSignInContext(): string | undefined {
+    const nonce = Math.random().toString(36).slice(2, 12);
+    try {
+      window.sessionStorage.setItem(
+        SIGN_IN_CONTEXT_KEY,
+        JSON.stringify({
+          page: activePage,
+          watchlistId: watchlist?.id ?? null,
+          editing,
+          nonce,
+          savedAt: Date.now(),
+        }),
+      );
+      return nonce;
+    } catch {
+      /* Storage can be disabled; sign-in still works. */
+      return undefined;
+    }
+  }
+
+  async function handleSignOut(deleteData = false) {
+    setSigningOut(true);
+    setAccountNotice(null);
+    try {
+      await (deleteData ? api.deleteAccount() : api.logout());
+    } catch (error) {
+      const expired =
+        error instanceof ApiRequestError && error.code === "AUTH_REQUIRED";
+      setAccountNotice({
+        kind: "error",
+        text: expired
+          ? t(
+              "Your session had already ended. Sign in again to delete your data.",
+              "登录已失效，请重新登录后再删除数据。",
+            )
+          : deleteData
+            ? t("Your data could not be deleted. Try again.", "删除数据失败，请重试。")
+            : t("Could not sign out. Try again.", "退出登录失败，请重试。"),
+      });
+      if (expired) markSignedOut();
+      setSigningOut(false);
+      return;
+    }
+    setEditing(false);
+    setEditStatus(null);
+    if (deleteData)
+      setAccountNotice({
+        kind: "success",
+        text: t(
+          "Your data was deleted and you are signed out on every device.",
+          "已删除你的数据，并在所有设备上退出登录。",
+        ),
+      });
+    markSignedOut();
+    setSigningOut(false);
+  }
+
+  async function handleResetList() {
+    if (!watchlist || editBusy) return;
+    const target = watchlist;
+    const generation = sessionGeneration.current;
+    setEditBusy(true);
+    try {
+      const result = await api.resetWatchlist(target.id);
+      if (!applyEditResult(generation, result.watchlists)) return;
+      setEditStatus({
+        kind: "success",
+        message: t(
+          `${t(target.name)} is back to the default list.`,
+          `「${t(target.name)}」已恢复为默认列表。`,
+        ),
+      });
+    } catch (error) {
+      handleEditError(error, "");
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
   async function handleAddSymbol(
     addition: WatchlistAddition,
     restoring = false,
   ): Promise<boolean> {
     if (!watchlist || editBusy) return false;
     const target = watchlist;
+    const generation = sessionGeneration.current;
     setEditBusy(true);
     try {
       const result = await api.addWatchlistSymbol(target.id, addition);
-      applyWatchlists(result.watchlists);
+      if (!applyEditResult(generation, result.watchlists)) return false;
       const rowName = t(
         target.rows.find((row) => row.id === addition.rowId)?.name ?? "",
       );
@@ -622,10 +813,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
       });
       return true;
     } catch (error) {
-      setEditStatus({
-        kind: "error",
-        message: watchlistEditErrorMessage(error, addition.symbol, t),
-      });
+      handleEditError(error, addition.symbol);
       return false;
     } finally {
       setEditBusy(false);
@@ -640,10 +828,11 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     const tags = (target.subsectors ?? [])
       .filter((subsector) => subsector.symbols.includes(symbol))
       .map((subsector) => subsector.id);
+    const generation = sessionGeneration.current;
     setEditBusy(true);
     try {
       const result = await api.removeWatchlistSymbol(target.id, symbol);
-      applyWatchlists(result.watchlists);
+      if (!applyEditResult(generation, result.watchlists)) return;
       if (selectedSymbol === symbol) handleCloseDetails();
       setEditStatus({
         kind: "success",
@@ -661,10 +850,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           : undefined,
       });
     } catch (error) {
-      setEditStatus({
-        kind: "error",
-        message: watchlistEditErrorMessage(error, symbol, t),
-      });
+      handleEditError(error, symbol);
     } finally {
       setEditBusy(false);
     }
@@ -699,7 +885,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   if (errorMessage && !config) {
     return (
       <main className="workbench">
-        <BrandBar />
+        <BrandBar session={session} />
         <ErrorAlert message={errorMessage} />
       </main>
     );
@@ -708,7 +894,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
   if (!config || !watchlist) {
     return (
       <main className="workbench" aria-busy="true">
-        <BrandBar />
+        <BrandBar session={session} />
         <p className="loading-copy">{t("Loading watchlists...")}</p>
       </main>
     );
@@ -718,9 +904,39 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     <main
       className={`workbench ${activePage !== "watchlist" ? "analytics-workbench" : selectedSymbol ? "has-selection" : ""}`}
     >
-      <BrandBar />
+      <BrandBar
+        session={session}
+        signingOut={signingOut}
+        notice={accountNotice}
+        onSignOut={() => void handleSignOut()}
+        onDeleteData={() => void handleSignOut(true)}
+        onBeforeSignIn={rememberSignInContext}
+        onNoticeDismiss={() => setAccountNotice(null)}
+      />
       <div className="workspace-heading">
         <div>
+          {loginResult ? (
+            <p className="login-notice" role="status">
+              {loginResult === "cancelled"
+                ? t("Sign-in was cancelled.", "已取消登录。")
+                : loginResult === "unavailable"
+                  ? t(
+                      "Sign-in is temporarily unavailable. Try again later.",
+                      "登录服务暂时不可用，请稍后再试。",
+                    )
+                  : t(
+                      "Sign-in did not complete. Try again. Work or school Microsoft accounts may need an administrator's approval; a personal Gmail or Outlook account always works.",
+                      "登录未完成，请重试。工作或学校的微软账户可能需要管理员批准；个人 Gmail 或 Outlook 账户都可以直接使用。",
+                    )}
+              <button
+                type="button"
+                aria-label={t("Dismiss", "关闭")}
+                onClick={() => setLoginResult(null)}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </p>
+          ) : null}
           <p className="eyebrow">
             {activePage === "research"
               ? t("ANALYTICS / DIG DEEP", "分析 / 深度研究")
@@ -960,7 +1176,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           >
             {t(expandedColumns ? "Essential columns" : "All columns")}
           </button>
-          {canEdit && (
+          {authAvailable && (
             <button
               className="edit-toggle"
               type="button"
@@ -1217,15 +1433,39 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             aria-label={`${t(watchlist.name)} dashboard`}
           >
             {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
-            {canEdit && editing ? (
+            {editing && signedIn ? (
               <WatchlistEditor
                 watchlist={watchlist}
+                account={session?.user?.email ?? session?.user?.name ?? null}
                 defaultSubsectorId={selectedSubsector?.id ?? null}
                 busy={editBusy}
                 status={editStatus}
                 onAdd={(addition) => handleAddSymbol(addition)}
                 onUndo={(addition) => void handleAddSymbol(addition, true)}
+                onReset={() => void handleResetList()}
               />
+            ) : editing && authAvailable ? (
+              <section
+                className="watchlist-editor watchlist-sign-in"
+                aria-label={t("Edit watchlist", "编辑列表")}
+              >
+                {editStatus?.kind === "error" ? (
+                  <p className="watchlist-editor-status error" role="status">
+                    {editStatus.message}
+                  </p>
+                ) : null}
+                <p>
+                  {t(
+                    "Sign in to keep your own version of the watchlists. Your changes are saved to your account and only you see them; everyone else, the Quant System and Models keep using the default lists.",
+                    "登录后可以保存属于你自己的板块列表。修改保存在你的账户中，只有你能看到；其他访问者、量化系统和模型页仍使用默认列表。",
+                  )}
+                </p>
+                <SignInOptions
+                  providers={session?.providers ?? []}
+                  onBeforeSignIn={rememberSignInContext}
+                />
+                <PrivacyLink />
+              </section>
             ) : null}
             <section
               className={`watchlist-row sector-table-panel ${expandedColumns ? "expanded-columns" : "essential-columns"}`}
@@ -1295,7 +1535,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
                                 </small>
                               ) : null}
                             </button>
-                            {canEdit && editing ? (
+                            {signedIn && editing ? (
                               <button
                                 type="button"
                                 className="symbol-remove-button"
@@ -1490,6 +1730,40 @@ function WorkbenchContent({ api }: WorkbenchProps) {
       )}
     </main>
   );
+}
+
+const SIGN_IN_CONTEXT_KEY = "msite-sign-in-context";
+type WorkbenchPage = "watchlist" | "analytics" | "research" | "quant" | "models";
+const PAGES: WorkbenchPage[] = ["watchlist", "analytics", "research", "quant", "models"];
+
+/**
+ * Reads (once) what the page showed when sign-in started, so the full-page
+ * round trip to Google or Microsoft lands back on the same list and mode.
+ * Only a return carrying the matching ?signin nonce restores it, so an
+ * abandoned sign-in cannot reshape a later reload.
+ */
+function takeSignInContext(nonce: string | null): {
+  page: WorkbenchPage;
+  watchlistId: string | null;
+  editing: boolean;
+} | null {
+  try {
+    const raw = window.sessionStorage.getItem(SIGN_IN_CONTEXT_KEY);
+    if (!nonce || !raw) return null;
+    window.sessionStorage.removeItem(SIGN_IN_CONTEXT_KEY);
+    const value = JSON.parse(raw) as Record<string, unknown>;
+    const age = typeof value.savedAt === "number" ? Date.now() - value.savedAt : -1;
+    if (value.nonce !== nonce || age < 0 || age > 15 * 60_000) return null;
+    return {
+      page: PAGES.includes(value.page as WorkbenchPage)
+        ? (value.page as WorkbenchPage)
+        : "watchlist",
+      watchlistId: typeof value.watchlistId === "string" ? value.watchlistId : null,
+      editing: value.editing === true,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function flattenWatchlistSymbols(watchlist: Watchlist): string[] {
@@ -1843,7 +2117,23 @@ function formatChangeClass(
   return value > 0 ? "positive-change" : "negative-change";
 }
 
-function BrandBar() {
+function BrandBar({
+  session,
+  signingOut = false,
+  notice = null,
+  onSignOut = () => undefined,
+  onDeleteData = () => undefined,
+  onBeforeSignIn,
+  onNoticeDismiss,
+}: {
+  session: AuthSession | null;
+  signingOut?: boolean;
+  notice?: AccountNotice | null;
+  onSignOut?: () => void;
+  onDeleteData?: () => void;
+  onBeforeSignIn?: () => string | undefined;
+  onNoticeDismiss?: () => void;
+}) {
   const { t } = useLocale();
   return (
     <header className="brand-bar">
@@ -1858,6 +2148,15 @@ function BrandBar() {
           {t("MARKET OBSERVATORY / US EQUITIES")}
         </span>
         <LanguageSwitcher />
+        <AccountMenu
+          session={session}
+          signingOut={signingOut}
+          notice={notice}
+          onSignOut={onSignOut}
+          onDeleteData={onDeleteData}
+          onBeforeSignIn={onBeforeSignIn}
+          onNoticeDismiss={onNoticeDismiss}
+        />
       </div>
     </header>
   );

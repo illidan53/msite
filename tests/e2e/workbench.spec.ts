@@ -18,6 +18,7 @@ import {
   stateFixture,
 } from "../../src/features/strategy/fixtures";
 import type {
+  AuthSession,
   MarketSnapshot,
   PriceSeries,
   RatePlanEvaluation,
@@ -873,7 +874,16 @@ for (const width of [1440, 390]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 900 });
-    const mocks = await mockWorkbenchApis(page, { canEdit: true });
+    const mocks = await mockWorkbenchApis(page, {
+      session: {
+        // A long work address must not push the layout off a phone screen.
+        user: {
+          provider: "microsoft",
+          email: "firstname.lastname@contoso.onmicrosoft.com",
+        },
+        providers: ["google", "microsoft"],
+      },
+    });
     const lists = structuredClone(workbenchConfig.watchlists);
     const staples = lists.watchlists[1];
     const edits: string[] = [];
@@ -963,21 +973,68 @@ for (const width of [1440, 390]) {
   });
 }
 
-test("shows no watchlist editing to visitors outside the IP allowlist", async ({
+test("shows no editing or sign-in when sign-in is not configured", async ({
   page,
 }) => {
-  await mockWorkbenchApis(page);
+  const mocks = await mockWorkbenchApis(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Watchlist", exact: true }).click();
   const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
   await expect(quotes.getByRole("button", { name: "NVDA", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit list" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Sign in" })).toHaveCount(0);
   await expect(quotes.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+  expect(mocks.unexpectedApiRequests).toEqual([]);
 });
+
+for (const width of [1440, 390]) {
+  test(`asks visitors to sign in with Gmail or Outlook before editing at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const mocks = await mockWorkbenchApis(page, {
+      session: { user: null, providers: ["google", "microsoft"] },
+    });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Edit list", exact: true }).click();
+    const prompt = page.getByRole("region", { name: "Edit watchlist" });
+    await expect(
+      prompt.getByRole("link", { name: "Continue with Google (Gmail)" }),
+    ).toHaveAttribute("href", "/api/auth/login/google?returnTo=%2F");
+    await expect(
+      prompt.getByRole("link", { name: "Continue with Microsoft (Outlook)" }),
+    ).toHaveAttribute("href", "/api/auth/login/microsoft?returnTo=%2F");
+    await expect(prompt.getByLabel("Symbol")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    const panel = page.getByRole("group", { name: "Account" });
+    await expect(panel.getByRole("link", { name: /^Continue with/ })).toHaveCount(2);
+    await expect(panel.getByRole("link", { name: "Privacy" })).toHaveAttribute(
+      "href",
+      "/privacy.html",
+    );
+    const panelBox = await panel.boundingBox();
+    expect(panelBox!.x).toBeGreaterThanOrEqual(0);
+    expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(width);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    await expect(
+      page.getByRole("link", { name: "使用 Google（Gmail） 登录" }).first(),
+    ).toBeVisible();
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+  });
+}
 
 async function mockWorkbenchApis(
   page: Page,
-  { canEdit = false }: { canEdit?: boolean } = {},
+  {
+    session = { user: null, providers: [] },
+  }: { session?: AuthSession } = {},
 ) {
   const configRequests: string[] = [];
   const snapshotRequests: string[][] = [];
@@ -1059,13 +1116,8 @@ async function mockWorkbenchApis(
     });
   });
 
-  await page.route("**/api/research/access", async (route) => {
-    await route.fulfill({
-      json: {
-        canRun: canEdit,
-        clientIp: canEdit ? "70.111.76.119" : "198.51.100.7",
-      },
-    });
+  await page.route("**/api/auth/session", async (route) => {
+    await route.fulfill({ json: session });
   });
 
   await page.route("**/api/rate-plan/evaluate", async (route) => {
@@ -1096,7 +1148,7 @@ function isMockedApiRequest(method: string, url: URL) {
     (method === "GET" && url.pathname === "/api/market/history") ||
     (method === "POST" && url.pathname === "/api/rate-plan/evaluate") ||
     (method === "GET" && url.pathname === "/api/config") ||
-    (method === "GET" && url.pathname === "/api/research/access")
+    (method === "GET" && url.pathname === "/api/auth/session")
   );
 }
 

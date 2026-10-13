@@ -1,10 +1,13 @@
+import { existsSync } from "node:fs";
+import { mkdir, readdir, rm, statfs } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import type { WatchlistsConfig } from "../../shared/types";
+import { ApiError } from "../http/apiError";
 import { readJson, SerialQueue, writeJsonAtomic } from "../strategy/store";
 
 /**
- * Runtime additions and removals layered over `config/watchlists.yaml`.
+ * One account's additions and removals layered over `config/watchlists.yaml`.
  * The YAML ships inside the image, so edits live in the persistent data
  * directory and survive deploys; a later YAML change still shows through.
  */
@@ -23,6 +26,10 @@ const listEditsSchema = z.object({
 const editsSchema = z.object({
   version: z.literal(1),
   updatedAt: z.string().nullable(),
+  /** Who owns the file, for operators reading it; never used for access. */
+  account: z
+    .object({ provider: z.string(), email: z.string().optional() })
+    .optional(),
   lists: z.record(listEditsSchema),
 });
 
@@ -92,15 +99,17 @@ export function applyWatchlistEdits(
 }
 
 export class WatchlistEditStore {
-  private readonly file: string;
   private readonly queue = new SerialQueue();
 
-  constructor(dataDir: string) {
-    this.file = join(dataDir, "watchlist-edits.json");
-  }
+  constructor(readonly file: string) {}
 
   async read(): Promise<WatchlistEdits> {
     return (await readJson(this.file, isEdits)) ?? emptyEdits();
+  }
+
+  /** Runs `task` after every queued edit, so none can land after it. */
+  exclusive<T>(task: () => Promise<T>): Promise<T> {
+    return this.queue.run(task);
   }
 
   /**
@@ -110,22 +119,129 @@ export class WatchlistEditStore {
   update(
     listId: string,
     change: (edits: ListEdits, current: WatchlistEdits) => void,
+    options: {
+      account?: WatchlistEdits["account"];
+      /**
+       * Runs first inside the queue; throwing aborts the edit. Re-checks
+       * that the request's session still exists, so an edit authorised
+       * before "Delete my data" cannot recreate the deleted file.
+       */
+      guard?: () => Promise<void>;
+      /** Runs inside the queue before writing; `isNew` for a first write. */
+      beforeWrite?: (isNew: boolean) => Promise<void>;
+    } = {},
   ): Promise<WatchlistEdits> {
     return this.queue.run(async () => {
+      await options.guard?.();
       const current = await this.read();
       const listEdits: ListEdits = structuredClone(
         current.lists[listId] ?? { added: [], removed: [] },
       );
       change(listEdits, current);
+      const isNew = current.updatedAt === null;
+      // A no-op (e.g. resetting an untouched list) never creates a file.
+      if (isNew && !listEdits.added.length && !listEdits.removed.length) return current;
+      await options.beforeWrite?.(isNew);
       const next: WatchlistEdits = {
         version: 1,
         updatedAt: new Date().toISOString(),
+        ...(options.account ?? current.account
+          ? { account: options.account ?? current.account }
+          : {}),
         lists: { ...current.lists, [listId]: listEdits },
       };
       if (!listEdits.added.length && !listEdits.removed.length)
         delete next.lists[listId];
       await writeJsonAtomic(this.file, next);
       return next;
+    });
+  }
+}
+
+/** Account ids are server-made hashes; anything else never becomes a path. */
+const ACCOUNT_ID = /^[A-Za-z0-9_-]{16,64}$/;
+
+export interface AccountStorageLimits {
+  /** Backstop on the number of accounts with stored edits. */
+  maxAccounts: number;
+  /** Free space a new account needs before its first write. */
+  newAccountFreeBytes: number;
+  /** Free space any write needs. */
+  writeFreeBytes: number;
+  /** Tests inject this; production asks the file system. */
+  freeBytes?: (path: string) => Promise<number>;
+}
+
+const storageError = (code: string, message: string) =>
+  new ApiError(503, code, message, { source: "watchlists" });
+
+/**
+ * Per-account edit files at `<dataDir>/accounts/<accountId>/watchlist-edits.json`.
+ * Disk is the real limit on the small production volume: new accounts need
+ * `newAccountFreeBytes` free and every write `writeFreeBytes`, with
+ * `maxAccounts` as a backstop. Existing accounts keep working until space
+ * itself runs low.
+ */
+export class AccountEditStores {
+  private readonly stores = new Map<string, WatchlistEditStore>();
+  private readonly root: string;
+  private readonly creating = new SerialQueue();
+
+  constructor(
+    dataDir: string,
+    private readonly limits: AccountStorageLimits,
+  ) {
+    this.root = join(dataDir, "accounts");
+  }
+
+  private async freeBytes() {
+    await mkdir(this.root, { recursive: true, mode: 0o700 });
+    if (this.limits.freeBytes) return this.limits.freeBytes(this.root);
+    const stats = await statfs(this.root);
+    return Number(stats.bavail) * Number(stats.bsize);
+  }
+
+  /** Throws 503 STORAGE_LOW when the volume is nearly full. */
+  async ensureWriteSpace(): Promise<void> {
+    if ((await this.freeBytes()) < this.limits.writeFreeBytes)
+      throw storageError("STORAGE_LOW", "Saving is paused while the server is low on storage");
+  }
+
+  for(accountId: string): WatchlistEditStore {
+    if (!ACCOUNT_ID.test(accountId)) throw new Error("Invalid account id");
+    let store = this.stores.get(accountId);
+    if (!store) {
+      store = new WatchlistEditStore(
+        join(this.root, accountId, "watchlist-edits.json"),
+      );
+      this.stores.set(accountId, store);
+    }
+    return store;
+  }
+
+  /** Permanently removes an account's edits directory. */
+  async delete(accountId: string): Promise<void> {
+    const store = this.for(accountId);
+    await store.exclusive(() =>
+      rm(join(this.root, accountId), { recursive: true, force: true }),
+    );
+  }
+
+  /**
+   * Claims a directory for a new account, or throws 503 ACCOUNT_LIMIT when
+   * space or the backstop count would be exceeded. Serialised, so concurrent
+   * sign-ups cannot overshoot it.
+   */
+  ensureCapacity(accountId: string): Promise<void> {
+    return this.creating.run(async () => {
+      if (existsSync(join(this.root, accountId))) return;
+      const free = await this.freeBytes();
+      const count = (await readdir(this.root, { withFileTypes: true })).filter(
+        (entry) => entry.isDirectory(),
+      ).length;
+      if (count >= this.limits.maxAccounts || free < this.limits.newAccountFreeBytes)
+        throw storageError("ACCOUNT_LIMIT", "New accounts cannot save watchlist edits right now");
+      await mkdir(join(this.root, accountId), { recursive: true, mode: 0o700 });
     });
   }
 }

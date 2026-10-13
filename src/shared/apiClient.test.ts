@@ -1,20 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiClient } from "./apiClient";
+import { apiClient, loginHref } from "./apiClient";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
 describe("apiClient", () => {
-  it("exposes workbench reads and per-symbol watchlist edits only", () => {
+  it("exposes workbench reads, the session and per-account watchlist edits only", () => {
     expect(Object.keys(apiClient).sort()).toEqual([
       "addWatchlistSymbol",
+      "deleteAccount",
       "evaluateRatePlan",
       "fetchSnapshots",
       "getConfig",
-      "getEditAccess",
       "getHistory",
+      "getSession",
+      "logout",
       "removeWatchlistSymbol",
+      "resetWatchlist",
     ]);
   });
 
@@ -46,6 +49,23 @@ describe("apiClient", () => {
     await apiClient.removeWatchlistSymbol("chips", "BRK.B");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/watchlists/chips/symbols/BRK.B");
     expect(fetchMock.mock.calls[1][1]?.method).toBe("DELETE");
+  });
+
+  it("signs out with a same-origin JSON POST and builds safe sign-in links", async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(JSON.stringify({ ok: true })),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await apiClient.logout();
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/auth/logout");
+    expect(init?.method).toBe("POST");
+    expect(new Headers(init?.headers).get("content-type")).toBe("application/json");
+    expect(loginHref("microsoft", "/?a=1&b=2")).toBe(
+      "/api/auth/login/microsoft?returnTo=%2F%3Fa%3D1%26b%3D2",
+    );
   });
 
   it("requests API data without using the browser cache", async () => {

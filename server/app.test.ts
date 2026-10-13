@@ -17,6 +17,20 @@ describe("createApp", () => {
     expect(JSON.stringify(response.body)).not.toContain("POLYGON_API_KEY");
   });
 
+  it("offers no sign-in without provider credentials and hardens production responses", async () => {
+    const app = createApp({ nodeEnv: "production", staticDir: await mkdtemp(join(tmpdir(), "msite-static-")) });
+    const session = await request(app).get("/api/auth/session").expect(200);
+
+    expect(session.body).toEqual({ user: null, providers: [] });
+    expect(session.headers["x-powered-by"]).toBeUndefined();
+    expect(session.headers["strict-transport-security"]).toBe("max-age=31536000");
+    await request(app).get("/api/auth/login/google").expect(404);
+    // Edits need an account, whatever the client IP.
+    const edit = await request(app).post("/api/watchlists/semiconductors/symbols").send({});
+    expect(edit.status).toBe(401);
+    expect(edit.body.code).toBe("AUTH_REQUIRED");
+  });
+
   it("serves the production frontend shell and static assets", async () => {
     const staticDir = await mkdtemp(join(tmpdir(), "msite-static-"));
     await writeFile(join(staticDir, "index.html"), "<!doctype html><title>Stock Workbench</title><div id=\"root\"></div>");

@@ -174,9 +174,8 @@ export function resolveBooks(
           throw new Error(`Unknown class override ${key} → ${cls}`);
         if (all.includes(key)) classOf[key] = cls;
       }
-      // A symbol only on excluded lists (for example one added to close-watch
-      // at runtime) has no class and stays out of the book until a sector list
-      // or classOverrides gives it one.
+      // A symbol only on excluded lists has no class and stays out of the
+      // book until a sector list or classOverrides gives it one.
       const classes: BookClass[] = [];
       for (const list of watchlists.watchlists) {
         if (excluded.has(list.id)) continue;

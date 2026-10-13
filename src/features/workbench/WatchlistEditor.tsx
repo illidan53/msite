@@ -1,4 +1,4 @@
-import { Plus, Undo2 } from "lucide-react";
+import { Plus, RotateCcw, Undo2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import type { Watchlist } from "../../../shared/types";
 import { ApiRequestError } from "../../shared/apiClient";
@@ -22,19 +22,25 @@ const SYMBOL_PATTERN = /^[A-Z][A-Z0-9.-]{0,11}$/;
 
 export function WatchlistEditor({
   watchlist,
+  account,
   defaultSubsectorId,
   busy,
   status,
   onAdd,
   onUndo,
+  onReset,
 }: {
   watchlist: Watchlist;
+  /** Email or name of the signed-in account the edits are saved to. */
+  account: string | null;
   /** The subsector being viewed; a new stock is tagged with it by default. */
   defaultSubsectorId: string | null;
   busy: boolean;
   status: WatchlistEditStatus | null;
   onAdd(addition: WatchlistAddition): Promise<boolean>;
   onUndo(addition: WatchlistAddition): void;
+  /** Drops this account's edits to the list. */
+  onReset(): void;
 }) {
   const { t } = useLocale();
   const [symbol, setSymbol] = useState("");
@@ -42,13 +48,21 @@ export function WatchlistEditor({
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const subsectors = watchlist.subsectors ?? [];
+
+  useEffect(() => {
+    if (!confirmingReset) return;
+    const timer = window.setTimeout(() => setConfirmingReset(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [confirmingReset]);
 
   useEffect(() => {
     setRowId(watchlist.rows[0]?.id ?? "");
     setSymbol("");
     setDescription("");
     setInputError(null);
+    setConfirmingReset(false);
   }, [watchlist.id]);
 
   useEffect(() => {
@@ -175,12 +189,37 @@ export function WatchlistEditor({
           </button>
         )}
       </p>
-      <p className="watchlist-editor-hint">
-        {t(
-          "Changes are saved on the server and shown to every visitor right away. The Quant System's stock book picks them up at its next daily run.",
-          "修改保存在服务器上，所有访问者立即可见；量化系统的个股组合会在下一次每日运行时纳入这些变化。",
-        )}
-      </p>
+      <div className="watchlist-editor-footer">
+        <p className="watchlist-editor-hint">
+          {account
+            ? t(
+                `Saved to your account (${account}); only you see these changes. Everyone else, the Quant System and Models keep using the default lists.`,
+                `修改保存在你的账户（${account}）中，只有你能看到；其他访问者、量化系统和模型页仍使用默认列表。`,
+              )
+            : t(
+                "Saved to your account; only you see these changes.",
+                "修改保存在你的账户中，只有你能看到。",
+              )}
+        </p>
+        <button
+          type="button"
+          className={`watchlist-reset ${confirmingReset ? "confirming" : ""}`}
+          disabled={busy}
+          onClick={() => {
+            if (!confirmingReset) {
+              setConfirmingReset(true);
+              return;
+            }
+            setConfirmingReset(false);
+            onReset();
+          }}
+        >
+          <RotateCcw size={13} aria-hidden="true" />
+          {confirmingReset
+            ? t("Click again to reset", "再点一次确认恢复")
+            : t("Reset to default list", "恢复默认列表")}
+        </button>
+      </div>
     </section>
   );
 }
@@ -222,10 +261,25 @@ export function watchlistEditErrorMessage(
         "The symbol could not be verified right now. Try again shortly.",
         "暂时无法核验该代码，请稍后重试。",
       );
-    case "RESEARCH_IP_FORBIDDEN":
+    case "AUTH_REQUIRED":
       return t(
-        "This IP address is not allowed to edit watchlists.",
-        "当前 IP 无权编辑列表。",
+        "Your session has ended. Sign in again to keep editing.",
+        "登录已失效，请重新登录后继续编辑。",
+      );
+    case "ACCOUNT_LIMIT":
+      return t(
+        "New accounts cannot save watchlist edits right now.",
+        "暂时无法为新账户保存板块编辑。",
+      );
+    case "STORAGE_LOW":
+      return t(
+        "Saving is paused while the server is low on storage. Try again later.",
+        "服务器存储空间不足，暂停保存，请稍后再试。",
+      );
+    case "EDIT_RATE_LIMIT":
+      return t(
+        "Too many changes in a short time. Try again in a few minutes.",
+        "短时间内修改次数过多，请几分钟后再试。",
       );
     case "WATCHLIST_SUBSECTOR_NOT_FOUND":
       return t(

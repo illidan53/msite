@@ -15,10 +15,13 @@ import { ApiError, apiErrorHandler } from "./http/apiError";
 import { MarketDataProvider } from "./market/marketDataProvider";
 import { PolygonClient } from "./market/polygonClient";
 import { createConfigRoutes } from "./routes/configRoutes";
+import { createAuth, type AuthOptions, type ProviderCredentials } from "./auth/oidc";
 import { createMarketRoutes } from "./routes/marketRoutes";
 import { createRateRoutes } from "./routes/rateRoutes";
 
 export interface CreateAppOptions {
+  /** Overrides for sign-in; by default read from the environment. */
+  auth?: Partial<AuthOptions>;
   configDir?: string;
   nodeEnv?: string;
   polygonApiKey?: string;
@@ -41,13 +44,39 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const indexHtml = resolve(staticDir, "index.html");
   const researchDir =
     process.env.RESEARCH_DATA_DIR ?? resolve(process.cwd(), "data/research");
-  // Runtime watchlist edits live beside research data, which survives deploys.
+  // Per-account watchlist edits live beside research data, which survives deploys.
   const configRepository = new ConfigRepository({
     configDir,
     dataDir: researchDir,
   });
 
+  app.disable("x-powered-by");
   app.use(express.json());
+  const publicBaseUrl =
+    process.env.PUBLIC_BASE_URL?.trim() || "https://finance.nphunter.net";
+  if (nodeEnv === "production" && publicBaseUrl.startsWith("https://"))
+    // Sign-in cookies are Secure; keep browsers on HTTPS for this host only.
+    app.use((_request, response, next) => {
+      response.set("Strict-Transport-Security", "max-age=31536000");
+      next();
+    });
+
+  const credentials = (prefix: string): ProviderCredentials | undefined => {
+    const clientId = process.env[`${prefix}_CLIENT_ID`]?.trim();
+    const clientSecret = process.env[`${prefix}_CLIENT_SECRET`]?.trim();
+    return clientId && clientSecret ? { clientId, clientSecret } : undefined;
+  };
+  // Sign-in with Google (Gmail) and Microsoft (Outlook); each provider is on
+  // only when its client id and secret are configured.
+  const auth = createAuth({
+    baseUrl: publicBaseUrl,
+    dataDir: researchDir,
+    google: credentials("GOOGLE"),
+    microsoft: credentials("MICROSOFT"),
+    deleteAccountData: (account) => configRepository.deleteAccountEdits(account),
+    ...options.auth,
+  });
+  app.use("/api", auth.router);
 
   app.get("/api/health", (_request, response) => {
     response.json({
@@ -60,6 +89,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     "/api",
     createConfigRoutes({
       repository: configRepository,
+      resolveAccount: auth.accountFor,
       lookupSymbol: async (symbol) => {
         try {
           const details = await marketDataProvider.getTickerDetails(symbol);
@@ -91,7 +121,8 @@ export function createApp(options: CreateAppOptions = {}): Express {
     createModelRoutes(
       new ModelScanService(
         marketDataProvider,
-        async () => scanUniverse(await configRepository.readWatchlists()),
+        // Models and the Quant System use the YAML lists, never personal edits.
+        async () => scanUniverse(await configRepository.readBaseWatchlists()),
         researchDir,
       ),
     ),
@@ -100,7 +131,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     market: marketDataProvider,
     configDir,
     dataDir: researchDir,
-    readWatchlists: () => configRepository.readWatchlists(),
+    readWatchlists: () => configRepository.readBaseWatchlists(),
     mailer: createMailer(process.env),
     baseUrl: process.env.PUBLIC_BASE_URL?.trim() || "https://finance.nphunter.net",
   });

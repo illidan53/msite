@@ -1,4 +1,6 @@
 import type {
+  AuthProvider,
+  AuthSession,
   MarketSnapshot,
   PriceSeries,
   RatePlanEvaluation,
@@ -17,8 +19,11 @@ export interface WorkbenchApi {
   fetchSnapshots(symbols: string[]): Promise<MarketSnapshot[]>;
   getHistory(symbol: string, range: PriceSeries["range"]): Promise<PriceSeries>;
   evaluateRatePlan(input: unknown): Promise<RatePlanEvaluation>;
-  /** Whether this visitor may edit watchlists (the research IP allowlist). */
-  getEditAccess(): Promise<{ canEdit: boolean; clientIp: string | null }>;
+  getSession(): Promise<AuthSession>;
+  logout(): Promise<void>;
+  /** Deletes the signed-in account's saved edits and ends all its sessions. */
+  deleteAccount(): Promise<void>;
+  /** Edits below apply to the signed-in account only. */
   addWatchlistSymbol(
     watchlistId: string,
     input: { symbol: string; rowId: string; description?: string },
@@ -27,6 +32,14 @@ export interface WorkbenchApi {
     watchlistId: string,
     symbol: string,
   ): Promise<WatchlistEditResult>;
+  resetWatchlist(
+    watchlistId: string,
+  ): Promise<Pick<WatchlistEditResult, "watchlists">>;
+}
+
+/** Sign-in is a full-page redirect to the provider and back to `returnTo`. */
+export function loginHref(provider: AuthProvider, returnTo = "/") {
+  return `/api/auth/login/${provider}?returnTo=${encodeURIComponent(returnTo)}`;
 }
 
 /** A failed API request; `code` is the server's error code when it sent one. */
@@ -95,10 +108,16 @@ export const apiClient: WorkbenchApi = {
       method: "POST",
       body: JSON.stringify(input),
     }),
-  getEditAccess: () =>
-    requestJson<{ canRun: boolean; clientIp: string | null }>(
-      "/api/research/access",
-    ).then(({ canRun, clientIp }) => ({ canEdit: canRun, clientIp })),
+  getSession: () => requestJson<AuthSession>("/api/auth/session"),
+  deleteAccount: () =>
+    requestJson<{ ok: true }>("/api/auth/account", { method: "DELETE" }).then(
+      () => undefined,
+    ),
+  logout: () =>
+    requestJson<{ ok: true }>("/api/auth/logout", {
+      method: "POST",
+      body: "{}",
+    }).then(() => undefined),
   addWatchlistSymbol: (watchlistId, input) =>
     requestJson<WatchlistEditResult>(
       `/api/watchlists/${encodeURIComponent(watchlistId)}/symbols`,
@@ -107,6 +126,11 @@ export const apiClient: WorkbenchApi = {
   removeWatchlistSymbol: (watchlistId, symbol) =>
     requestJson<WatchlistEditResult>(
       `/api/watchlists/${encodeURIComponent(watchlistId)}/symbols/${encodeURIComponent(symbol)}`,
+      { method: "DELETE" },
+    ),
+  resetWatchlist: (watchlistId) =>
+    requestJson<Pick<WatchlistEditResult, "watchlists">>(
+      `/api/watchlists/${encodeURIComponent(watchlistId)}/edits`,
       { method: "DELETE" },
     ),
 };

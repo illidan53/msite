@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistsConfig } from "../../shared/types";
 import { apiErrorHandler } from "../http/apiError";
 import { createConfigRoutes, type SymbolLookup } from "../routes/configRoutes";
-import { ConfigRepository } from "./configRepository";
+import { ConfigRepository, type EditingAccount } from "./configRepository";
 import { applyWatchlistEdits, type WatchlistEdits } from "./watchlistEdits";
 
 const watchlistsYaml = `watchlists:
@@ -103,14 +103,25 @@ describe("applyWatchlistEdits", () => {
   });
 });
 
+const ALICE: EditingAccount = {
+  id: "alice-account-0000000000",
+  provider: "google",
+  email: "alice@example.com",
+};
+const BOB: EditingAccount = { id: "bob-account-00000000000", provider: "microsoft" };
+
 describe("watchlist editing", () => {
   let root: string;
   let configDir: string;
   let dataDir: string;
   let repository: ConfigRepository;
   let lookupSymbol: ReturnType<typeof vi.fn<SymbolLookup>>;
+  const aliceFile = () => join(dataDir, "accounts", ALICE.id, "watchlist-edits.json");
 
-  const app = (allowedIps: string[] = ["127.0.0.1", "::1", "::ffff:127.0.0.1"]) => {
+  /** The X-Account test header picks the signed-in account; "none" is a visitor. */
+  /** Accounts whose session has ended (sign-out or Delete my data). */
+  const ended = new Set<string>();
+  const app = (editLimit?: { max: number; windowMs: number }) => {
     const server = express();
     server.use(express.json());
     server.use(
@@ -118,7 +129,12 @@ describe("watchlist editing", () => {
       createConfigRoutes({
         repository,
         lookupSymbol,
-        access: { allowedIps, trustedProxyIps: [] },
+        editLimit,
+        resolveAccount: (request) => {
+          const account =
+            ({ alice: ALICE, bob: BOB })[request.get("x-account") ?? "alice"] ?? null;
+          return account && !ended.has(account.id) ? account : null;
+        },
       }),
     );
     server.use(apiErrorHandler);
@@ -133,6 +149,7 @@ describe("watchlist editing", () => {
     await writeFile(join(configDir, "watchlists.yaml"), watchlistsYaml);
     await writeFile(join(configDir, "settings.yaml"), settingsYaml);
     repository = new ConfigRepository({ configDir, dataDir });
+    ended.clear();
     lookupSymbol = vi.fn<SymbolLookup>(async (symbol) =>
       symbol === "NOPE" ? null : { symbol, name: `${symbol} Inc.` },
     );
@@ -153,12 +170,17 @@ describe("watchlist editing", () => {
     expect(symbolsOf(response.body.watchlists, "chips").tools).toEqual(["ASML", "TSM"]);
 
     const reloaded = new ConfigRepository({ configDir, dataDir });
-    const config = await reloaded.readConfig();
+    const config = await reloaded.readConfig(ALICE);
     expect(symbolsOf(config.watchlists, "chips").tools).toEqual(["ASML", "TSM"]);
     expect(config.watchlists.watchlists[0].symbolDescriptions?.TSM).toBe("Foundry");
     const listed = await request(app()).get("/api/watchlists").expect(200);
-    expect(listed.headers["cache-control"]).toBe("no-store");
+    expect(listed.headers["cache-control"]).toBe("private, no-store");
+    expect(listed.headers.vary).toMatch(/Cookie/);
     expect(symbolsOf(listed.body, "chips").tools).toEqual(["ASML", "TSM"]);
+    expect(JSON.parse(await readFile(aliceFile(), "utf8")).account).toEqual({
+      provider: "google",
+      email: "alice@example.com",
+    });
     // The YAML itself is never rewritten.
     expect(await readFile(join(configDir, "watchlists.yaml"), "utf8")).toBe(watchlistsYaml);
   });
@@ -178,7 +200,7 @@ describe("watchlist editing", () => {
       .expect(201);
     expect(symbolsOf(restored.body.watchlists, "chips").compute).toEqual(["NVDA", "AMD"]);
     // An undone removal leaves no edits behind.
-    expect(JSON.parse(await readFile(join(dataDir, "watchlist-edits.json"), "utf8")).lists).toEqual({});
+    expect(JSON.parse(await readFile(aliceFile(), "utf8")).lists).toEqual({});
   });
 
   it("moves a YAML symbol to another row after removing it", async () => {
@@ -268,19 +290,27 @@ describe("watchlist editing", () => {
 
     lookupSymbol.mockRejectedValueOnce(new Error("provider down"));
     expect(await code(post("chips", { symbol: "TSM", rowId: "tools" }), 502)).toBe("SYMBOL_LOOKUP_FAILED");
-    expect(symbolsOf(await repository.readWatchlists(), "chips").tools).toEqual(["ASML"]);
+    expect(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools).toEqual(["ASML"]);
   });
 
-  it("keeps edits to the IP allowlist and same-site JSON requests", async () => {
-    const denied = app([]);
-    const forbidden = await request(denied)
+  it("requires a signed-in account and same-site JSON requests", async () => {
+    const server = app();
+    const visitor = await request(server)
       .post("/api/watchlists/chips/symbols")
+      .set("X-Account", "none")
       .send({ symbol: "TSM", rowId: "tools" });
-    expect(forbidden.status).toBe(403);
-    expect(forbidden.body.code).toBe("RESEARCH_IP_FORBIDDEN");
-    await request(denied).delete("/api/watchlists/chips/symbols/NVDA").expect(403);
+    expect(visitor.status).toBe(401);
+    expect(visitor.body.code).toBe("AUTH_REQUIRED");
+    await request(server)
+      .delete("/api/watchlists/chips/symbols/NVDA")
+      .set("X-Account", "none")
+      .expect(401);
+    await request(server)
+      .delete("/api/watchlists/chips/edits")
+      .set("X-Account", "none")
+      .expect(401);
 
-    const allowed = app();
+    const allowed = server;
     await request(allowed)
       .post("/api/watchlists/chips/symbols")
       .set("Content-Type", "application/x-www-form-urlencoded")
@@ -297,7 +327,148 @@ describe("watchlist editing", () => {
       .send({ symbol: "TSM", rowId: "tools" })
       .expect(403);
     expect(lookupSymbol).not.toHaveBeenCalled();
-    expect(await repository.readWatchlists()).toEqual(await repository.readBaseWatchlists());
+    expect(await repository.readWatchlists(ALICE)).toEqual(await repository.readBaseWatchlists());
+  });
+
+  it("keeps each account's edits to itself", async () => {
+    const server = app();
+    await request(server)
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "TSM", rowId: "tools" })
+      .expect(201);
+    await request(server)
+      .delete("/api/watchlists/chips/symbols/AMD")
+      .set("X-Account", "bob")
+      .expect(200);
+
+    const tools = async (account: string) =>
+      symbolsOf((await request(server).get("/api/watchlists").set("X-Account", account)).body, "chips");
+    expect(await tools("alice")).toEqual({ compute: ["NVDA", "AMD"], tools: ["ASML", "TSM"] });
+    expect(await tools("bob")).toEqual({ compute: ["NVDA"], tools: ["ASML"] });
+    expect(await tools("none")).toEqual({ compute: ["NVDA", "AMD"], tools: ["ASML"] });
+    const config = await request(server).get("/api/config").set("X-Account", "bob");
+    expect(symbolsOf(config.body.watchlists, "chips").compute).toEqual(["NVDA"]);
+  });
+
+  it("resets one list back to the YAML without touching the others", async () => {
+    const server = app();
+    await request(server)
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "TSM", rowId: "tools" })
+      .expect(201);
+    await request(server)
+      .post("/api/watchlists/staples/symbols")
+      .send({ symbol: "WMT", rowId: "core" })
+      .expect(201);
+
+    const reset = await request(server).delete("/api/watchlists/chips/edits").expect(200);
+    expect(Object.keys(reset.body)).toEqual(["watchlists"]);
+    expect(symbolsOf(reset.body.watchlists, "chips").tools).toEqual(["ASML"]);
+    expect(symbolsOf(reset.body.watchlists, "staples").core).toEqual(["COST", "WMT"]);
+    // Resetting with nothing saved never creates a file for a new account.
+    await request(server).delete("/api/watchlists/chips/edits").set("X-Account", "bob").expect(200);
+    await expect(readFile(join(dataDir, "accounts", BOB.id, "watchlist-edits.json"))).rejects.toThrow();
+  });
+
+  it("deletes one account's edits for Delete my data", async () => {
+    const server = app();
+    await request(server)
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "TSM", rowId: "tools" })
+      .expect(201);
+    await request(server)
+      .post("/api/watchlists/chips/symbols")
+      .set("X-Account", "bob")
+      .send({ symbol: "MU", rowId: "tools" })
+      .expect(201);
+
+    await repository.deleteAccountEdits(ALICE);
+
+    await expect(readFile(aliceFile())).rejects.toThrow();
+    expect(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools).toEqual(["ASML"]);
+    expect(symbolsOf(await repository.readWatchlists(BOB), "chips").tools).toEqual(["ASML", "MU"]);
+  });
+
+  it("caps new accounts and each account's edit rate", async () => {
+    repository = new ConfigRepository({ configDir, dataDir, limits: { maxAccounts: 1 } });
+    const server = app({ max: 2, windowMs: 60_000 });
+    const add = (account: string, symbol: string) =>
+      request(server)
+        .post("/api/watchlists/chips/symbols")
+        .set("X-Account", account)
+        .send({ symbol, rowId: "tools" });
+
+    expect((await add("alice", "TSM")).status).toBe(201);
+    const full = await add("bob", "MU");
+    expect(full.status).toBe(503);
+    expect(full.body.code).toBe("ACCOUNT_LIMIT");
+    // Existing accounts keep working; reads never need capacity.
+    expect((await add("alice", "MU")).status).toBe(201);
+    await request(server).get("/api/watchlists").set("X-Account", "bob").expect(200);
+
+    const limited = await add("alice", "INTC");
+    expect(limited.status).toBe(429);
+    expect(limited.body.code).toBe("EDIT_RATE_LIMIT");
+  });
+
+  it("keeps the disk from filling: new accounts need 1 GB free, every write 256 MB", async () => {
+    let free = 900 * 1024 ** 2;
+    repository = new ConfigRepository({
+      configDir,
+      dataDir,
+      limits: { freeBytes: async () => free },
+    });
+    const server = app();
+    const add = (account: string, symbol: string) =>
+      request(server)
+        .post("/api/watchlists/chips/symbols")
+        .set("X-Account", account)
+        .send({ symbol, rowId: "tools" });
+
+    const tooSmall = await add("alice", "TSM");
+    expect(tooSmall.status).toBe(503);
+    expect(tooSmall.body.code).toBe("ACCOUNT_LIMIT");
+    free = 2 * 1024 ** 3;
+    expect((await add("alice", "TSM")).status).toBe(201);
+    // An existing account keeps saving below the new-account threshold...
+    free = 900 * 1024 ** 2;
+    expect((await add("alice", "MU")).status).toBe(201);
+    // ...until the volume itself is nearly full.
+    free = 100 * 1024 ** 2;
+    const low = await add("alice", "INTC");
+    expect(low.status).toBe(503);
+    expect(low.body.code).toBe("STORAGE_LOW");
+    expect(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools).toEqual(["ASML", "TSM", "MU"]);
+  });
+
+  it("never recreates a deleted account's file from an edit already in flight", async () => {
+    const server = app();
+    await request(server)
+      .post("/api/watchlists/staples/symbols")
+      .send({ symbol: "WMT", rowId: "core" })
+      .expect(201);
+    let releaseLookup: (() => void) | undefined;
+    lookupSymbol.mockImplementationOnce(
+      (symbol) =>
+        new Promise((resolve) => {
+          releaseLookup = () => resolve({ symbol, name: "Slow" });
+        }),
+    );
+    const pending = request(server)
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "TSM", rowId: "tools" })
+      .then((response) => response);
+    await vi.waitFor(() => expect(releaseLookup).toBeTypeOf("function"));
+
+    // Delete my data: sessions end first, then the files go.
+    ended.add(ALICE.id);
+    await repository.deleteAccountEdits(ALICE);
+    releaseLookup!();
+
+    const late = await pending;
+    expect(late.status).toBe(401);
+    expect(late.body.code).toBe("AUTH_REQUIRED");
+    await expect(readFile(aliceFile())).rejects.toThrow();
   });
 
   it("serialises concurrent additions so none is lost", async () => {
@@ -311,7 +482,7 @@ describe("watchlist editing", () => {
       ),
     );
 
-    expect(new Set(symbolsOf(await repository.readWatchlists(), "chips").tools)).toEqual(
+    expect(new Set(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools)).toEqual(
       new Set(["ASML", "TSM", "MU", "INTC"]),
     );
   });

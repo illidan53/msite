@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { WatchlistsConfig } from "../../shared/types";
+import type { AuthSession, WatchlistsConfig } from "../../shared/types";
 
 test.skip(
   !process.env.MSITE_PUBLIC_BASE_URL,
@@ -197,17 +197,17 @@ test("public research authorization resists spoofed source headers", async ({
       data: { job: "invalid" },
     });
     expect(strategyDenied.status()).toBe(access.canRun ? 400 : 403);
-    // Invalid edits check authorization without changing a watchlist.
+    // Watchlist edits need a signed-in account whatever the IP.
     const addDenied = await request.post(
       "/api/watchlists/semiconductors/symbols",
       { headers, data: {} },
     );
-    expect(addDenied.status()).toBe(access.canRun ? 400 : 403);
+    expect(addDenied.status()).toBe(401);
     const removeDenied = await request.delete(
       "/api/watchlists/semiconductors/symbols/%24BAD",
       { headers },
     );
-    expect(removeDenied.status()).toBe(access.canRun ? 400 : 403);
+    expect(removeDenied.status()).toBe(401);
   }
 });
 
@@ -246,4 +246,50 @@ test("public deployment serves the quant system read-only", async ({
   expect(await outbox.text()).not.toMatch(/[\w.+-]+@[a-z0-9-]+\.[a-z]/i);
   const invalid = await request.get("/api/strategy/charts/stocks/%24BAD");
   expect(invalid.status()).toBe(400);
+});
+
+test("public deployment exposes sign-in without a session", async ({
+  request,
+}) => {
+  const response = await request.get("/api/auth/session");
+  expect(response.ok()).toBe(true);
+  expect(response.headers()["cache-control"]).toContain("no-store");
+  const session = (await response.json()) as AuthSession;
+  expect(session.user).toBeNull();
+  for (const provider of ["google", "microsoft"] as const) {
+    const login = await request.get(`/api/auth/login/${provider}?returnTo=%2F`, {
+      maxRedirects: 0,
+    });
+    if (!session.providers.includes(provider)) {
+      expect(login.status()).toBe(404);
+      continue;
+    }
+    expect(login.status()).toBe(302);
+    const target = new URL(login.headers()["location"]);
+    expect(target.origin).toBe(
+      provider === "google"
+        ? "https://accounts.google.com"
+        : "https://login.microsoftonline.com",
+    );
+    expect(target.searchParams.get("redirect_uri")).toBe(
+      `https://finance.nphunter.net/api/auth/callback/${provider}`,
+    );
+    expect(target.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(target.searchParams.get("state")).toBeTruthy();
+    expect(target.searchParams.get("nonce")).toBeTruthy();
+    expect(login.headers()["set-cookie"]).toContain("__Host-");
+  }
+  // A callback without this browser's sealed transaction never signs in.
+  const forged = await request.get(
+    "/api/auth/callback/google?code=x&state=forged&iss=https%3A%2F%2Faccounts.google.com",
+    { maxRedirects: 0 },
+  );
+  expect(forged.status()).toBe(303);
+  expect(forged.headers()["location"]).toBe("/?login=failed");
+  expect(forged.headers()["referrer-policy"]).toBe("no-referrer");
+  expect(forged.headers()["set-cookie"] ?? "").not.toContain("msite_session=");
+  expect(forged.headers()["strict-transport-security"]).toBe("max-age=31536000");
+  const privacy = await request.get("/privacy.html");
+  expect(privacy.ok()).toBe(true);
+  expect(await privacy.text()).toContain("Delete my data");
 });
