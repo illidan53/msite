@@ -22,7 +22,6 @@ const SYMBOL_PATTERN = /^[A-Z][A-Z0-9.-]{0,11}$/;
 
 export function WatchlistEditor({
   watchlist,
-  account,
   defaultSubsectorId,
   busy,
   status,
@@ -31,15 +30,13 @@ export function WatchlistEditor({
   onReset,
 }: {
   watchlist: Watchlist;
-  /** Email or name of the signed-in account the edits are saved to. */
-  account: string | null;
   /** The subsector being viewed; a new stock is tagged with it by default. */
   defaultSubsectorId: string | null;
   busy: boolean;
   status: WatchlistEditStatus | null;
   onAdd(addition: WatchlistAddition): Promise<boolean>;
   onUndo(addition: WatchlistAddition): void;
-  /** Drops this account's edits to the list. */
+  /** Drops this browser's edits to the list. */
   onReset(): void;
 }) {
   const { t } = useLocale();
@@ -191,15 +188,10 @@ export function WatchlistEditor({
       </p>
       <div className="watchlist-editor-footer">
         <p className="watchlist-editor-hint">
-          {account
-            ? t(
-                `Saved to your account (${account}); only you see these changes. Everyone else, the Quant System and Models keep using the default lists.`,
-                `修改保存在你的账户（${account}）中，只有你能看到；其他访问者、量化系统和模型页仍使用默认列表。`,
-              )
-            : t(
-                "Saved to your account; only you see these changes.",
-                "修改保存在你的账户中，只有你能看到。",
-              )}
+          {t(
+            "Changes apply to this browser only and are kept in the server's memory, so a server restart or update clears them. Other visitors, the Quant System and Models keep using the default lists.",
+            "修改只对当前浏览器生效，暂存在服务器内存中，服务器重启或更新后会清空；其他访问者、量化系统和模型页仍使用默认列表。",
+          )}
         </p>
         <button
           type="button"
@@ -256,25 +248,15 @@ export function watchlistEditErrorMessage(
         "This watchlist has reached its limit of added symbols.",
         "该列表新增的股票已达上限。",
       );
+    case "BROWSER_ADD_LIMIT":
+      return t(
+        "This browser has reached its limit of added symbols. Remove some first.",
+        "当前浏览器新增的股票已达上限，请先移除一些。",
+      );
     case "SYMBOL_LOOKUP_FAILED":
       return t(
         "The symbol could not be verified right now. Try again shortly.",
         "暂时无法核验该代码，请稍后重试。",
-      );
-    case "AUTH_REQUIRED":
-      return t(
-        "Your session has ended. Sign in again to keep editing.",
-        "登录已失效，请重新登录后继续编辑。",
-      );
-    case "ACCOUNT_LIMIT":
-      return t(
-        "New accounts cannot save watchlist edits right now.",
-        "暂时无法为新账户保存板块编辑。",
-      );
-    case "STORAGE_LOW":
-      return t(
-        "Saving is paused while the server is low on storage. Try again later.",
-        "服务器存储空间不足，暂停保存，请稍后再试。",
       );
     case "EDIT_RATE_LIMIT":
       return t(

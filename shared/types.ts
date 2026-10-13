@@ -53,15 +53,6 @@ export interface WatchlistsConfig {
   watchlists: Watchlist[];
 }
 
-export type AuthProvider = "google" | "microsoft";
-
-/** GET /api/auth/session: who is signed in, and which sign-in options exist. */
-export interface AuthSession {
-  user: { provider: AuthProvider; email?: string; name?: string } | null;
-  /** Providers configured on the server; empty when sign-in is off. */
-  providers: AuthProvider[];
-}
-
 /** Response of adding or removing a watchlist symbol: the updated lists. */
 export interface WatchlistEditResult {
   symbol: string;

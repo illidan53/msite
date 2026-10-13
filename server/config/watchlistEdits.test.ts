@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WatchlistsConfig } from "../../shared/types";
 import { apiErrorHandler } from "../http/apiError";
 import { createConfigRoutes, type SymbolLookup } from "../routes/configRoutes";
-import { ConfigRepository, type EditingAccount } from "./configRepository";
+import { createBrowserIds } from "../browser/browserId";
+import { ConfigRepository } from "./configRepository";
 import { applyWatchlistEdits, type WatchlistEdits } from "./watchlistEdits";
 
 const watchlistsYaml = `watchlists:
@@ -103,25 +104,24 @@ describe("applyWatchlistEdits", () => {
   });
 });
 
-const ALICE: EditingAccount = {
-  id: "alice-account-0000000000",
-  provider: "google",
-  email: "alice@example.com",
-};
-const BOB: EditingAccount = { id: "bob-account-00000000000", provider: "microsoft" };
-
-describe("watchlist editing", () => {
+describe("watchlist editing per browser", () => {
   let root: string;
   let configDir: string;
-  let dataDir: string;
   let repository: ConfigRepository;
   let lookupSymbol: ReturnType<typeof vi.fn<SymbolLookup>>;
-  const aliceFile = () => join(dataDir, "accounts", ALICE.id, "watchlist-edits.json");
+  const key = Buffer.alloc(32, 9);
 
-  /** The X-Account test header picks the signed-in account; "none" is a visitor. */
-  /** Accounts whose session has ended (sign-out or Delete my data). */
-  const ended = new Set<string>();
-  const app = (editLimit?: { max: number; windowMs: number }) => {
+  type Budget = { max: number; windowMs: number };
+  /** The X-Test-Ip header stands in for the client IP from the proxy. */
+  const app = (
+    options: {
+      editLimit?: Budget;
+      ipEditLimit?: Budget;
+      ipNewBrowserLimit?: Budget;
+      siteEditLimit?: Budget;
+      browserIds?: boolean;
+    } = {},
+  ) => {
     const server = express();
     server.use(express.json());
     server.use(
@@ -129,27 +129,29 @@ describe("watchlist editing", () => {
       createConfigRoutes({
         repository,
         lookupSymbol,
-        editLimit,
-        resolveAccount: (request) => {
-          const account =
-            ({ alice: ALICE, bob: BOB })[request.get("x-account") ?? "alice"] ?? null;
-          return account && !ended.has(account.id) ? account : null;
-        },
+        editLimit: options.editLimit,
+        ipEditLimit: options.ipEditLimit,
+        ipNewBrowserLimit: options.ipNewBrowserLimit,
+        siteEditLimit: options.siteEditLimit,
+        clientIp: (request) => request.get("x-test-ip") ?? "203.0.113.1",
+        ...(options.browserIds === false
+          ? {}
+          : { browserIds: createBrowserIds({ secure: false, key }) }),
       }),
     );
     server.use(apiErrorHandler);
     return server;
   };
+  /** A supertest agent keeps its own cookies: one agent is one browser. */
+  const browser = (server: express.Express) => request.agent(server);
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "watchlist-edits-"));
     configDir = join(root, "config");
-    dataDir = join(root, "data");
     await mkdir(configDir);
     await writeFile(join(configDir, "watchlists.yaml"), watchlistsYaml);
     await writeFile(join(configDir, "settings.yaml"), settingsYaml);
-    repository = new ConfigRepository({ configDir, dataDir });
-    ended.clear();
+    repository = new ConfigRepository({ configDir, browserEdits: true });
     lookupSymbol = vi.fn<SymbolLookup>(async (symbol) =>
       symbol === "NOPE" ? null : { symbol, name: `${symbol} Inc.` },
     );
@@ -159,8 +161,10 @@ describe("watchlist editing", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  it("adds a verified symbol to a row and persists it across instances", async () => {
-    const response = await request(app())
+  it("gives a browser its own copy on its first edit, in memory only", async () => {
+    const server = app();
+    const alice = browser(server);
+    const response = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: " tsm ", rowId: "tools", description: " Foundry " })
       .expect(201);
@@ -168,44 +172,46 @@ describe("watchlist editing", () => {
     expect(lookupSymbol).toHaveBeenCalledWith("TSM");
     expect(response.body).toMatchObject({ symbol: "TSM", name: "TSM Inc." });
     expect(symbolsOf(response.body.watchlists, "chips").tools).toEqual(["ASML", "TSM"]);
+    const cookie = String(response.headers["set-cookie"]);
+    expect(cookie).toMatch(/^msite_browser=[\w-]{22}\.[\w-]{43};/);
+    expect(cookie).toMatch(/HttpOnly/);
+    expect(cookie).toMatch(/SameSite=Lax/);
 
-    const reloaded = new ConfigRepository({ configDir, dataDir });
-    const config = await reloaded.readConfig(ALICE);
-    expect(symbolsOf(config.watchlists, "chips").tools).toEqual(["ASML", "TSM"]);
-    expect(config.watchlists.watchlists[0].symbolDescriptions?.TSM).toBe("Foundry");
-    const listed = await request(app()).get("/api/watchlists").expect(200);
-    expect(listed.headers["cache-control"]).toBe("private, no-store");
-    expect(listed.headers.vary).toMatch(/Cookie/);
-    expect(symbolsOf(listed.body, "chips").tools).toEqual(["ASML", "TSM"]);
-    expect(JSON.parse(await readFile(aliceFile(), "utf8")).account).toEqual({
-      provider: "google",
-      email: "alice@example.com",
-    });
-    // The YAML itself is never rewritten.
+    const mine = await alice.get("/api/watchlists").expect(200);
+    expect(mine.headers["cache-control"]).toBe("private, no-store");
+    expect(mine.headers.vary).toMatch(/Cookie/);
+    expect(symbolsOf(mine.body, "chips").tools).toEqual(["ASML", "TSM"]);
+    expect(mine.body.watchlists[0].symbolDescriptions?.TSM).toBe("Foundry");
+    // A visitor without the cookie sees the YAML; reads never issue a cookie.
+    const visitor = await request(server).get("/api/config").expect(200);
+    expect(visitor.headers["set-cookie"]).toBeUndefined();
+    expect(symbolsOf(visitor.body.watchlists, "chips").tools).toEqual(["ASML"]);
+    // The YAML itself is never rewritten, and a restart forgets the edits.
     expect(await readFile(join(configDir, "watchlists.yaml"), "utf8")).toBe(watchlistsYaml);
+    repository = new ConfigRepository({ configDir, browserEdits: true });
+    expect(symbolsOf((await browser(app()).get("/api/watchlists")).body, "chips").tools).toEqual(["ASML"]);
   });
 
   it("removes a symbol and restores it to its own row when re-added", async () => {
-    const removed = await request(app())
-      .delete("/api/watchlists/chips/symbols/nvda")
-      .expect(200);
+    const alice = browser(app());
+    const removed = await alice.delete("/api/watchlists/chips/symbols/nvda").expect(200);
 
     expect(removed.body.symbol).toBe("NVDA");
     expect(symbolsOf(removed.body.watchlists, "chips").compute).toEqual(["AMD"]);
     expect(removed.body.watchlists.watchlists[0].pinnedSymbols).toEqual([]);
 
-    const restored = await request(app())
+    const restored = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: "NVDA", rowId: "compute", description: "GPUs" })
       .expect(201);
     expect(symbolsOf(restored.body.watchlists, "chips").compute).toEqual(["NVDA", "AMD"]);
-    // An undone removal leaves no edits behind.
-    expect(JSON.parse(await readFile(aliceFile(), "utf8")).lists).toEqual({});
+    expect((await alice.get("/api/watchlists")).body).toEqual(await repository.readBaseWatchlists());
   });
 
   it("moves a YAML symbol to another row after removing it", async () => {
-    await request(app()).delete("/api/watchlists/chips/symbols/AMD").expect(200);
-    const moved = await request(app())
+    const alice = browser(app());
+    await alice.delete("/api/watchlists/chips/symbols/AMD").expect(200);
+    const moved = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: "AMD", rowId: "tools" })
       .expect(201);
@@ -217,33 +223,30 @@ describe("watchlist editing", () => {
   });
 
   it("removes a runtime addition entirely", async () => {
-    await request(app())
-      .post("/api/watchlists/staples/symbols")
-      .send({ symbol: "WMT", rowId: "core" })
-      .expect(201);
-    const removed = await request(app())
-      .delete("/api/watchlists/staples/symbols/WMT")
-      .expect(200);
+    const alice = browser(app());
+    await alice.post("/api/watchlists/staples/symbols").send({ symbol: "WMT", rowId: "core" }).expect(201);
+    const removed = await alice.delete("/api/watchlists/staples/symbols/WMT").expect(200);
 
     expect(symbolsOf(removed.body.watchlists, "staples").core).toEqual(["COST"]);
   });
 
   it("tags additions with subsectors and drops removed symbols from them", async () => {
+    const alice = browser(app());
     const subsectorsOf = (config: WatchlistsConfig) =>
       Object.fromEntries(
         config.watchlists[0].subsectors!.map((subsector) => [subsector.id, subsector.symbols]),
       );
-    const added = await request(app())
+    const added = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: "TSM", rowId: "tools", subsectors: ["litho", "litho"] })
       .expect(201);
     expect(subsectorsOf(added.body.watchlists)).toEqual({ ai: ["NVDA", "AMD"], litho: ["ASML", "TSM"] });
 
-    const removed = await request(app()).delete("/api/watchlists/chips/symbols/NVDA").expect(200);
+    const removed = await alice.delete("/api/watchlists/chips/symbols/NVDA").expect(200);
     expect(subsectorsOf(removed.body.watchlists).ai).toEqual(["AMD"]);
 
     // Undo sends the subsectors the symbol had: still a plain restore.
-    const restored = await request(app())
+    const restored = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: "NVDA", rowId: "compute", subsectors: ["ai"] })
       .expect(201);
@@ -251,8 +254,8 @@ describe("watchlist editing", () => {
     expect(subsectorsOf(restored.body.watchlists).ai).toEqual(["NVDA", "AMD"]);
 
     // A new tag on a YAML symbol is recorded as an addition.
-    await request(app()).delete("/api/watchlists/chips/symbols/AMD").expect(200);
-    const tagged = await request(app())
+    await alice.delete("/api/watchlists/chips/symbols/AMD").expect(200);
+    const tagged = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: "AMD", rowId: "compute", subsectors: ["ai", "litho"] })
       .expect(201);
@@ -262,7 +265,7 @@ describe("watchlist editing", () => {
       litho: ["ASML", "TSM", "AMD"],
     });
 
-    const unknown = await request(app())
+    const unknown = await alice
       .post("/api/watchlists/chips/symbols")
       .send({ symbol: "MU", rowId: "tools", subsectors: ["nope"] });
     expect(unknown.status).toBe(400);
@@ -270,9 +273,9 @@ describe("watchlist editing", () => {
   });
 
   it("rejects invalid, unknown, duplicate and last-symbol edits", async () => {
-    const server = app();
+    const alice = browser(app());
     const post = (listId: string, body: object) =>
-      request(server).post(`/api/watchlists/${listId}/symbols`).send(body);
+      alice.post(`/api/watchlists/${listId}/symbols`).send(body);
     const code = async (response: Promise<request.Response>, status: number) => {
       const result = await response;
       expect(result.status).toBe(status);
@@ -285,212 +288,151 @@ describe("watchlist editing", () => {
     expect(await code(post("nope", { symbol: "TSM", rowId: "tools" }), 404)).toBe("WATCHLIST_NOT_FOUND");
     expect(await code(post("chips", { symbol: "TSM", rowId: "nope" }), 400)).toBe("WATCHLIST_ROW_NOT_FOUND");
     expect(await code(post("chips", { symbol: "AMD", rowId: "tools" }), 409)).toBe("WATCHLIST_SYMBOL_EXISTS");
-    expect(await code(request(server).delete("/api/watchlists/chips/symbols/TSM"), 404)).toBe("WATCHLIST_SYMBOL_NOT_FOUND");
-    expect(await code(request(server).delete("/api/watchlists/staples/symbols/COST"), 409)).toBe("WATCHLIST_LAST_SYMBOL");
+    expect(await code(alice.delete("/api/watchlists/chips/symbols/TSM"), 404)).toBe("WATCHLIST_SYMBOL_NOT_FOUND");
+    expect(await code(alice.delete("/api/watchlists/staples/symbols/COST"), 409)).toBe("WATCHLIST_LAST_SYMBOL");
 
     lookupSymbol.mockRejectedValueOnce(new Error("provider down"));
     expect(await code(post("chips", { symbol: "TSM", rowId: "tools" }), 502)).toBe("SYMBOL_LOOKUP_FAILED");
-    expect(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools).toEqual(["ASML"]);
+    expect(symbolsOf((await alice.get("/api/watchlists")).body, "chips").tools).toEqual(["ASML"]);
   });
 
-  it("requires a signed-in account and same-site JSON requests", async () => {
+  it("only takes same-origin JSON writes", async () => {
     const server = app();
-    const visitor = await request(server)
-      .post("/api/watchlists/chips/symbols")
-      .set("X-Account", "none")
-      .send({ symbol: "TSM", rowId: "tools" });
-    expect(visitor.status).toBe(401);
-    expect(visitor.body.code).toBe("AUTH_REQUIRED");
     await request(server)
-      .delete("/api/watchlists/chips/symbols/NVDA")
-      .set("X-Account", "none")
-      .expect(401);
-    await request(server)
-      .delete("/api/watchlists/chips/edits")
-      .set("X-Account", "none")
-      .expect(401);
-
-    const allowed = server;
-    await request(allowed)
       .post("/api/watchlists/chips/symbols")
       .set("Content-Type", "application/x-www-form-urlencoded")
       .send("symbol=TSM&rowId=tools")
       .expect(415);
-    const foreign = await request(allowed)
+    const foreign = await request(server)
       .delete("/api/watchlists/chips/symbols/NVDA")
       .set("Origin", "https://evil.example");
     expect(foreign.status).toBe(403);
     expect(foreign.body.code).toBe("CROSS_SITE_REQUEST");
-    await request(allowed)
+    expect(foreign.headers["set-cookie"]).toBeUndefined();
+    // A sibling *.nphunter.net app is "same-site", not "same-origin".
+    await request(server)
       .post("/api/watchlists/chips/symbols")
-      .set("Sec-Fetch-Site", "cross-site")
+      .set("Sec-Fetch-Site", "same-site")
       .send({ symbol: "TSM", rowId: "tools" })
       .expect(403);
     expect(lookupSymbol).not.toHaveBeenCalled();
-    expect(await repository.readWatchlists(ALICE)).toEqual(await repository.readBaseWatchlists());
   });
 
-  it("keeps each account's edits to itself", async () => {
+  it("keeps each browser's edits to itself and ignores forged ids", async () => {
     const server = app();
-    await request(server)
-      .post("/api/watchlists/chips/symbols")
-      .send({ symbol: "TSM", rowId: "tools" })
-      .expect(201);
-    await request(server)
-      .delete("/api/watchlists/chips/symbols/AMD")
-      .set("X-Account", "bob")
-      .expect(200);
+    const alice = browser(server);
+    const bob = browser(server);
+    await alice.post("/api/watchlists/chips/symbols").send({ symbol: "TSM", rowId: "tools" }).expect(201);
+    await bob.delete("/api/watchlists/chips/symbols/AMD").expect(200);
 
-    const tools = async (account: string) =>
-      symbolsOf((await request(server).get("/api/watchlists").set("X-Account", account)).body, "chips");
-    expect(await tools("alice")).toEqual({ compute: ["NVDA", "AMD"], tools: ["ASML", "TSM"] });
-    expect(await tools("bob")).toEqual({ compute: ["NVDA"], tools: ["ASML"] });
-    expect(await tools("none")).toEqual({ compute: ["NVDA", "AMD"], tools: ["ASML"] });
-    const config = await request(server).get("/api/config").set("X-Account", "bob");
-    expect(symbolsOf(config.body.watchlists, "chips").compute).toEqual(["NVDA"]);
+    expect(symbolsOf((await alice.get("/api/watchlists")).body, "chips")).toEqual({
+      compute: ["NVDA", "AMD"],
+      tools: ["ASML", "TSM"],
+    });
+    expect(symbolsOf((await bob.get("/api/config")).body.watchlists, "chips")).toEqual({
+      compute: ["NVDA"],
+      tools: ["ASML"],
+    });
+    for (const forged of ["msite_browser=AAAAAAAAAAAAAAAAAAAAAA.forged", "msite_browser=../../x", "msite_browser="])
+      expect(
+        symbolsOf((await request(server).get("/api/watchlists").set("Cookie", forged)).body, "chips"),
+      ).toEqual({ compute: ["NVDA", "AMD"], tools: ["ASML"] });
   });
 
   it("resets one list back to the YAML without touching the others", async () => {
-    const server = app();
-    await request(server)
-      .post("/api/watchlists/chips/symbols")
-      .send({ symbol: "TSM", rowId: "tools" })
-      .expect(201);
-    await request(server)
-      .post("/api/watchlists/staples/symbols")
-      .send({ symbol: "WMT", rowId: "core" })
-      .expect(201);
+    const alice = browser(app());
+    await alice.post("/api/watchlists/chips/symbols").send({ symbol: "TSM", rowId: "tools" }).expect(201);
+    await alice.post("/api/watchlists/staples/symbols").send({ symbol: "WMT", rowId: "core" }).expect(201);
 
-    const reset = await request(server).delete("/api/watchlists/chips/edits").expect(200);
+    const reset = await alice.delete("/api/watchlists/chips/edits").expect(200);
     expect(Object.keys(reset.body)).toEqual(["watchlists"]);
     expect(symbolsOf(reset.body.watchlists, "chips").tools).toEqual(["ASML"]);
     expect(symbolsOf(reset.body.watchlists, "staples").core).toEqual(["COST", "WMT"]);
-    // Resetting with nothing saved never creates a file for a new account.
-    await request(server).delete("/api/watchlists/chips/edits").set("X-Account", "bob").expect(200);
-    await expect(readFile(join(dataDir, "accounts", BOB.id, "watchlist-edits.json"))).rejects.toThrow();
   });
 
-  it("deletes one account's edits for Delete my data", async () => {
-    const server = app();
-    await request(server)
-      .post("/api/watchlists/chips/symbols")
-      .send({ symbol: "TSM", rowId: "tools" })
-      .expect(201);
-    await request(server)
-      .post("/api/watchlists/chips/symbols")
-      .set("X-Account", "bob")
-      .send({ symbol: "MU", rowId: "tools" })
-      .expect(201);
+  it("limits each browser, each client IP, new browsers per IP and the whole site", async () => {
+    const minute = 60_000;
+    const server = app({
+      editLimit: { max: 2, windowMs: minute },
+      ipEditLimit: { max: 4, windowMs: minute },
+      ipNewBrowserLimit: { max: 3, windowMs: minute },
+      siteEditLimit: { max: 6, windowMs: minute },
+    });
+    const add = (client: ReturnType<typeof browser>, symbol: string, ip = "203.0.113.1") =>
+      client.post("/api/watchlists/chips/symbols").set("X-Test-Ip", ip).send({ symbol, rowId: "tools" });
+    const [alice, bob] = [browser(server), browser(server)];
 
-    await repository.deleteAccountEdits(ALICE);
-
-    await expect(readFile(aliceFile())).rejects.toThrow();
-    expect(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools).toEqual(["ASML"]);
-    expect(symbolsOf(await repository.readWatchlists(BOB), "chips").tools).toEqual(["ASML", "MU"]);
+    expect((await add(alice, "TSM")).status).toBe(201);
+    expect((await add(alice, "MU")).status).toBe(201);
+    const perBrowser = await add(alice, "INTC");
+    expect(perBrowser.status).toBe(429);
+    expect(perBrowser.body.code).toBe("EDIT_RATE_LIMIT");
+    expect((await add(bob, "INTC")).status).toBe(201);
+    expect((await add(browser(server), "QCOM")).status).toBe(201);
+    // Dropping the cookie does not reset the IP's budgets (4 writes, 3 new ids).
+    expect((await add(browser(server), "TXN")).status).toBe(429);
+    // Another IP still has its own budget, until the whole site's runs out.
+    expect((await add(browser(server), "TXN", "198.51.100.2")).status).toBe(201);
+    expect((await add(browser(server), "ADI", "198.51.100.3")).status).toBe(201);
+    expect((await add(browser(server), "MPWR", "198.51.100.4")).status).toBe(429);
   });
 
-  it("caps new accounts and each account's edit rate", async () => {
-    repository = new ConfigRepository({ configDir, dataDir, limits: { maxAccounts: 1 } });
-    const server = app({ max: 2, windowMs: 60_000 });
-    const add = (account: string, symbol: string) =>
-      request(server)
-        .post("/api/watchlists/chips/symbols")
-        .set("X-Account", account)
-        .send({ symbol, rowId: "tools" });
-
-    expect((await add("alice", "TSM")).status).toBe(201);
-    const full = await add("bob", "MU");
-    expect(full.status).toBe(503);
-    expect(full.body.code).toBe("ACCOUNT_LIMIT");
-    // Existing accounts keep working; reads never need capacity.
-    expect((await add("alice", "MU")).status).toBe(201);
-    await request(server).get("/api/watchlists").set("X-Account", "bob").expect(200);
-
-    const limited = await add("alice", "INTC");
-    expect(limited.status).toBe(429);
-    expect(limited.body.code).toBe("EDIT_RATE_LIMIT");
+  it("spends no budget and issues no cookie for requests it rejects", async () => {
+    const server = app({ siteEditLimit: { max: 1, windowMs: 60_000 } });
+    for (const bad of [
+      request(server).post("/api/watchlists/chips/symbols").send({}),
+      request(server).post("/api/watchlists/nope/symbols").send({ symbol: "TSM", rowId: "tools" }),
+      request(server).delete("/api/watchlists/chips/symbols/%24BAD"),
+      request(server).delete("/api/watchlists/nope/edits"),
+    ]) {
+      const response = await bad;
+      expect([400, 404]).toContain(response.status);
+      expect(response.headers["set-cookie"]).toBeUndefined();
+    }
+    // The single site-wide edit is still available.
+    await browser(server).post("/api/watchlists/chips/symbols").send({ symbol: "TSM", rowId: "tools" }).expect(201);
   });
 
-  it("keeps the disk from filling: new accounts need 1 GB free, every write 256 MB", async () => {
-    let free = 900 * 1024 ** 2;
+  it("bounds memory: additions per browser and least-recently-used browsers", async () => {
     repository = new ConfigRepository({
       configDir,
-      dataDir,
-      limits: { freeBytes: async () => free },
+      browserEdits: true,
+      limits: { maxBrowsers: 2, maxAddedPerBrowser: 2 },
     });
     const server = app();
-    const add = (account: string, symbol: string) =>
-      request(server)
-        .post("/api/watchlists/chips/symbols")
-        .set("X-Account", account)
-        .send({ symbol, rowId: "tools" });
+    const [first, second, third] = [browser(server), browser(server), browser(server)];
+    const add = (client: ReturnType<typeof browser>, symbol: string) =>
+      client.post("/api/watchlists/chips/symbols").send({ symbol, rowId: "tools" });
 
-    const tooSmall = await add("alice", "TSM");
-    expect(tooSmall.status).toBe(503);
-    expect(tooSmall.body.code).toBe("ACCOUNT_LIMIT");
-    free = 2 * 1024 ** 3;
-    expect((await add("alice", "TSM")).status).toBe(201);
-    // An existing account keeps saving below the new-account threshold...
-    free = 900 * 1024 ** 2;
-    expect((await add("alice", "MU")).status).toBe(201);
-    // ...until the volume itself is nearly full.
-    free = 100 * 1024 ** 2;
-    const low = await add("alice", "INTC");
-    expect(low.status).toBe(503);
-    expect(low.body.code).toBe("STORAGE_LOW");
-    expect(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools).toEqual(["ASML", "TSM", "MU"]);
-  });
-
-  it("never recreates a deleted account's file from an edit already in flight", async () => {
-    const server = app();
-    await request(server)
-      .post("/api/watchlists/staples/symbols")
-      .send({ symbol: "WMT", rowId: "core" })
-      .expect(201);
-    let releaseLookup: (() => void) | undefined;
-    lookupSymbol.mockImplementationOnce(
-      (symbol) =>
-        new Promise((resolve) => {
-          releaseLookup = () => resolve({ symbol, name: "Slow" });
-        }),
-    );
-    const pending = request(server)
-      .post("/api/watchlists/chips/symbols")
-      .send({ symbol: "TSM", rowId: "tools" })
-      .then((response) => response);
-    await vi.waitFor(() => expect(releaseLookup).toBeTypeOf("function"));
-
-    // Delete my data: sessions end first, then the files go.
-    ended.add(ALICE.id);
-    await repository.deleteAccountEdits(ALICE);
-    releaseLookup!();
-
-    const late = await pending;
-    expect(late.status).toBe(401);
-    expect(late.body.code).toBe("AUTH_REQUIRED");
-    await expect(readFile(aliceFile())).rejects.toThrow();
+    expect((await add(first, "TSM")).status).toBe(201);
+    expect((await add(first, "MU")).status).toBe(201);
+    const full = await add(first, "INTC");
+    expect(full.status).toBe(409);
+    expect(full.body.code).toBe("BROWSER_ADD_LIMIT");
+    expect((await add(second, "INTC")).status).toBe(201);
+    // Reading keeps the first browser recent, so the second one is dropped.
+    await first.get("/api/watchlists");
+    expect((await add(third, "QCOM")).status).toBe(201);
+    expect(symbolsOf((await first.get("/api/watchlists")).body, "chips").tools).toEqual(["ASML", "TSM", "MU"]);
+    expect(symbolsOf((await second.get("/api/watchlists")).body, "chips").tools).toEqual(["ASML"]);
   });
 
   it("serialises concurrent additions so none is lost", async () => {
-    const server = app();
+    const alice = browser(app());
+    await alice.post("/api/watchlists/chips/symbols").send({ symbol: "TSM", rowId: "tools" }).expect(201);
     await Promise.all(
-      ["TSM", "MU", "INTC"].map((symbol) =>
-        request(server)
-          .post("/api/watchlists/chips/symbols")
-          .send({ symbol, rowId: "tools" })
-          .expect(201),
+      ["MU", "INTC", "QCOM"].map((symbol) =>
+        alice.post("/api/watchlists/chips/symbols").send({ symbol, rowId: "tools" }).expect(201),
       ),
     );
 
-    expect(new Set(symbolsOf(await repository.readWatchlists(ALICE), "chips").tools)).toEqual(
-      new Set(["ASML", "TSM", "MU", "INTC"]),
+    expect(new Set(symbolsOf((await alice.get("/api/watchlists")).body, "chips").tools)).toEqual(
+      new Set(["ASML", "TSM", "MU", "INTC", "QCOM"]),
     );
   });
 
-  it("is read-only without a data directory", async () => {
-    repository = new ConfigRepository({ configDir });
-    const response = await request(app())
-      .delete("/api/watchlists/chips/symbols/NVDA");
+  it("is read-only without browser ids", async () => {
+    const response = await request(app({ browserIds: false })).delete("/api/watchlists/chips/symbols/NVDA");
 
     expect(response.status).toBe(503);
     expect(response.body.code).toBe("WATCHLIST_EDITS_UNAVAILABLE");

@@ -631,10 +631,6 @@ describe("Workbench", () => {
       <Workbench
         api={createApi({
           config,
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google", "microsoft"],
-          }),
           addWatchlistSymbol,
         })}
       />,
@@ -703,326 +699,33 @@ describe("Workbench", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("hides editing and sign-in when the server has no sign-in providers", async () => {
-    const getSession = vi.fn(async () => ({ user: null, providers: [] }));
-    render(<Workbench api={createApi({ getSession })} />);
-
-    await screen.findByRole("table", { name: "Semiconductors quotes" });
-    await waitFor(() => expect(getSession).toHaveBeenCalledTimes(1));
-    expect(
-      screen.queryByRole("button", { name: "Edit list" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Sign in" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^Remove / }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("asks signed-out visitors to sign in with Google or Microsoft before editing", async () => {
+  it("lets every visitor edit, explaining that edits stay in this browser", async () => {
     const user = userEvent.setup();
-    render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({
-            user: null,
-            providers: ["google", "microsoft"],
-          }),
-        })}
-      />,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "Edit list" }));
-    const prompt = screen.getByRole("region", { name: "Edit watchlist" });
-    expect(
-      within(prompt).getByRole("link", { name: "Continue with Google (Gmail)" }),
-    ).toHaveAttribute("href", "/api/auth/login/google?returnTo=%2F");
-    expect(
-      within(prompt).getByRole("link", {
-        name: "Continue with Microsoft (Outlook)",
-      }),
-    ).toHaveAttribute("href", "/api/auth/login/microsoft?returnTo=%2F");
-    expect(within(prompt).queryByLabelText("Symbol")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /^Remove / }),
-    ).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Sign in" }));
-    const panel = screen.getByRole("group", { name: "Account" });
-    expect(within(panel).getAllByRole("link", { name: /^Continue with/ })).toHaveLength(2);
-    expect(within(panel).getByRole("link", { name: "Privacy" })).toBeInTheDocument();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("group", { name: "Account" })).not.toBeInTheDocument();
-  });
-
-  it("signs out, returns to the default lists and leaves edit mode", async () => {
-    const user = userEvent.setup();
-    const [semis, staples] = baseConfig.watchlists.watchlists;
-    const personal: WorkbenchConfig = {
-      ...baseConfig,
-      watchlists: {
-        watchlists: [
-          semis,
-          { ...staples, rows: [{ ...staples.rows[0], symbols: ["COST", "PLTR"] }] },
-        ],
-      },
-    };
-    let signedIn = true;
-    const logout = vi.fn(async () => {
-      signedIn = false;
-    });
-    const getConfig = vi.fn(async () => (signedIn ? personal : baseConfig));
-    const api = createApi({
-      getSession: async () => ({
-        user: { provider: "microsoft", email: "bob@outlook.com" },
-        providers: ["google", "microsoft"],
-      }),
-      logout,
-    });
-    api.getConfig = getConfig;
-    render(<Workbench api={api} />);
-
-    await user.click(await screen.findByRole("button", { name: "Watchlist" }));
-    await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
-    const table = screen.getByRole("table", { name: "Consumer Staples quotes" });
-    expect(within(table).getByRole("button", { name: "PLTR" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Edit list" }));
-    expect(
-      screen.getByText(/^Saved to your account \(bob@outlook\.com\)/),
-    ).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "bob@outlook.com" }));
-    expect(
-      screen.getByText("Signed in with Microsoft (Outlook)", { exact: false }),
-    ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Sign out" }));
-
-    await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(within(table).queryByRole("button", { name: "PLTR" })).not.toBeInTheDocument(),
-    );
-    expect(within(table).getByRole("button", { name: "WMT" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Symbol")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sign in" })).toBeInTheDocument();
-  });
-
-  it("deletes the account's data after a second click and returns to the default lists", async () => {
-    const user = userEvent.setup();
-    const deleteAccount = vi.fn(async () => undefined);
-    render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google"],
-          }),
-          deleteAccount,
-        })}
-      />,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "alice@example.com" }));
-    const panel = screen.getByRole("group", { name: "Account" });
-    expect(within(panel).getByRole("link", { name: "Privacy" })).toHaveAttribute(
-      "href",
-      "/privacy.html",
-    );
-    await user.click(within(panel).getByRole("button", { name: "Delete my data" }));
-    expect(deleteAccount).not.toHaveBeenCalled();
-    expect(
-      within(panel).getByText(/permanently deletes your saved watchlist edits/),
-    ).toBeInTheDocument();
-    expect(
-      within(panel).getByRole("button", { name: "Click again to delete" }),
-    ).toHaveAccessibleDescription(/permanently deletes your saved watchlist edits/);
-    await user.click(within(panel).getByRole("button", { name: "Click again to delete" }));
-    await waitFor(() => expect(deleteAccount).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("button", { name: "Sign in" })).toBeInTheDocument();
-    expect(
-      within(screen.getByRole("group", { name: "Account" })).getByRole("status"),
-    ).toHaveTextContent("Your data was deleted and you are signed out on every device.");
-  });
-
-  it("keeps the session and explains it in the account menu when sign-out fails", async () => {
-    const user = userEvent.setup();
-    const logout = vi.fn(async () => {
-      throw new ApiRequestError("failed", 502);
-    });
-    render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google"],
-          }),
-          logout,
-        })}
-      />,
-    );
-
-    await user.click(await screen.findByRole("button", { name: "alice@example.com" }));
-    await user.click(screen.getByRole("button", { name: "Sign out" }));
-    const panel = screen.getByRole("group", { name: "Account" });
-    expect(await within(panel).findByRole("alert")).toHaveTextContent(
-      "Could not sign out. Try again.",
-    );
-    expect(within(panel).getByRole("button", { name: "Sign out" })).toBeEnabled();
-    await user.keyboard("{Escape}");
-    expect(screen.getByRole("button", { name: "alice@example.com" })).toHaveFocus();
-  });
-
-  it("returns to the list and edit mode it was on when sign-in started", async () => {
-    const user = userEvent.setup();
-    const signedOut = render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({ user: null, providers: ["google"] }),
-        })}
-      />,
-    );
-    await user.click(await screen.findByRole("button", { name: "Watchlist" }));
-    await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
-    await user.click(screen.getByRole("button", { name: "Edit list" }));
-    const link = screen.getByRole("link", { name: "Continue with Google (Gmail)" });
-    // jsdom cannot navigate; the click handler still runs first.
-    link.addEventListener("click", (event) => event.preventDefault());
-    await user.click(link);
-    signedOut.unmount();
-    // The provider sends the browser back to returnTo, carrying the nonce.
-    const returnTo = new URL(link.getAttribute("href")!, "https://x.test").searchParams.get(
-      "returnTo",
-    )!;
-    expect(returnTo).toMatch(/^\/\?signin=[a-z0-9]+$/);
-    window.history.replaceState(null, "", returnTo);
-
-    render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google"],
-          }),
-        })}
-      />,
-    );
-    expect(
-      await screen.findByRole("table", { name: "Consumer Staples quotes" }),
-    ).toBeInTheDocument();
-    expect(await screen.findByLabelText("Symbol")).toBeInTheDocument();
-    // The saved context is used once, and the nonce leaves the address bar.
-    expect(window.sessionStorage.getItem("msite-sign-in-context")).toBeNull();
-    expect(window.location.search).toBe("");
-  });
-
-  it("ignores a saved sign-in context without the matching return nonce", async () => {
-    window.sessionStorage.setItem(
-      "msite-sign-in-context",
-      JSON.stringify({
-        page: "watchlist",
-        watchlistId: "consumer-staples",
-        editing: true,
-        nonce: "abandoned",
-        savedAt: Date.now(),
-      }),
-    );
     render(<Workbench api={createApi()} />);
-    expect(
-      await screen.findByRole("table", { name: "Semiconductors quotes" }),
-    ).toBeInTheDocument();
-    window.sessionStorage.clear();
-  });
 
-  it("never shows personal lists from an edit that finishes after sign-out", async () => {
-    const user = userEvent.setup();
-    const [semis, staples] = baseConfig.watchlists.watchlists;
-    const personal: WorkbenchConfig["watchlists"] = {
-      watchlists: [{ ...semis, rows: [{ ...semis.rows[0], symbols: ["PERSONAL"] }] }, staples],
-    };
-    let finishRemove!: () => void;
-    const removeWatchlistSymbol = vi.fn(
-      () =>
-        new Promise<{ symbol: string; watchlists: WorkbenchConfig["watchlists"] }>((resolve) => {
-          finishRemove = () => resolve({ symbol: "AMD", watchlists: personal });
-        }),
-    );
-    render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google"],
-          }),
-          removeWatchlistSymbol,
-        })}
-      />,
-    );
     await user.click(await screen.findByRole("button", { name: "Edit list" }));
+    expect(screen.getByLabelText("Symbol")).toBeInTheDocument();
+    expect(
+      screen.getByText(/^Changes apply to this browser only and are kept in the server's memory/),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in" })).not.toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Semiconductors quotes" });
-    await user.click(within(table).getByRole("button", { name: "Remove AMD" }));
-    await user.click(screen.getByRole("button", { name: "alice@example.com" }));
-    await user.click(screen.getByRole("button", { name: "Sign out" }));
-    await screen.findByRole("button", { name: "Sign in" });
-
-    await act(async () => finishRemove());
-    expect(within(table).queryByRole("button", { name: "PERSONAL" })).not.toBeInTheDocument();
-    expect(within(table).getByRole("button", { name: "AMD" })).toBeInTheDocument();
+    expect(within(table).getByRole("button", { name: "Remove AMD" })).toBeInTheDocument();
   });
 
-  it("explains a failed sign-in once and removes it from the address bar", async () => {
-    window.history.replaceState(null, "", "/?tab=x&login=failed");
-    const user = userEvent.setup();
-    render(<Workbench api={createApi()} />);
-
-    expect(
-      await screen.findByText(/^Sign-in did not complete\. Try again\./),
-    ).toBeInTheDocument();
-    expect(window.location.search).toBe("?tab=x");
-    await user.click(screen.getByRole("button", { name: "Dismiss" }));
-    expect(screen.queryByText(/^Sign-in did not complete/)).not.toBeInTheDocument();
-    window.history.replaceState(null, "", "/");
-  });
-
-  it("resets a list after a second click and recovers from an expired session", async () => {
+  it("resets a list after a second click", async () => {
     const user = userEvent.setup();
     const resetWatchlist = vi.fn(async () => ({ watchlists: baseConfig.watchlists }));
-    const removeWatchlistSymbol = vi.fn(async () => {
-      throw new ApiRequestError("failed", 401, "AUTH_REQUIRED");
-    });
-    render(
-      <Workbench
-        api={createApi({
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google"],
-          }),
-          resetWatchlist,
-          removeWatchlistSymbol,
-        })}
-      />,
-    );
+    render(<Workbench api={createApi({ resetWatchlist })} />);
 
     await user.click(await screen.findByRole("button", { name: "Edit list" }));
-    const reset = screen.getByRole("button", { name: "Reset to default list" });
-    await user.click(reset);
+    await user.click(screen.getByRole("button", { name: "Reset to default list" }));
     expect(resetWatchlist).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: "Click again to reset" }));
     expect(resetWatchlist).toHaveBeenCalledWith("semis");
     expect(
       await screen.findByText("Semiconductors is back to the default list."),
     ).toBeInTheDocument();
-
-    const table = screen.getByRole("table", { name: "Semiconductors quotes" });
-    await user.click(within(table).getByRole("button", { name: "Remove AMD" }));
-    expect(
-      await screen.findByText("Your session has ended. Sign in again to keep editing."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Continue with Google (Gmail)" }),
-    ).toBeInTheDocument();
-    expect(
-      within(table).queryByRole("button", { name: /^Remove / }),
-    ).not.toBeInTheDocument();
   });
 
   it("adds, removes and restores stocks in the selected watchlist", async () => {
@@ -1060,10 +763,6 @@ describe("Workbench", () => {
       <Workbench
         api={createApi({
           fetchSnapshots,
-          getSession: async () => ({
-            user: { provider: "google", email: "alice@example.com" },
-            providers: ["google", "microsoft"],
-          }),
           addWatchlistSymbol,
           removeWatchlistSymbol,
         })}
@@ -1240,9 +939,6 @@ function createApi({
   fetchSnapshots = vi.fn(async (symbols: string[]) => symbols.map(snapshotFor)),
   getHistory = vi.fn(async (symbol, range) => priceSeries(symbol, range)),
   evaluateRatePlan = vi.fn(async () => ratePlanEvaluation),
-  getSession = vi.fn(async () => ({ user: null, providers: [] })),
-  logout = vi.fn(async () => undefined),
-  deleteAccount = vi.fn(async () => undefined),
   resetWatchlist = vi.fn(async () => {
     throw new Error("Unexpected watchlist reset");
   }),
@@ -1259,9 +955,6 @@ function createApi({
   fetchSnapshots?: WorkbenchApi["fetchSnapshots"];
   getHistory?: WorkbenchApi["getHistory"];
   evaluateRatePlan?: WorkbenchApi["evaluateRatePlan"];
-  getSession?: WorkbenchApi["getSession"];
-  logout?: WorkbenchApi["logout"];
-  deleteAccount?: WorkbenchApi["deleteAccount"];
   resetWatchlist?: WorkbenchApi["resetWatchlist"];
   addWatchlistSymbol?: WorkbenchApi["addWatchlistSymbol"];
   removeWatchlistSymbol?: WorkbenchApi["removeWatchlistSymbol"];
@@ -1277,9 +970,6 @@ function createApi({
     fetchSnapshots,
     getHistory,
     evaluateRatePlan,
-    getSession,
-    logout,
-    deleteAccount,
     resetWatchlist,
     addWatchlistSymbol,
     removeWatchlistSymbol,

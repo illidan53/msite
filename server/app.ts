@@ -15,13 +15,12 @@ import { ApiError, apiErrorHandler } from "./http/apiError";
 import { MarketDataProvider } from "./market/marketDataProvider";
 import { PolygonClient } from "./market/polygonClient";
 import { createConfigRoutes } from "./routes/configRoutes";
-import { createAuth, type AuthOptions, type ProviderCredentials } from "./auth/oidc";
+import { createBrowserIds } from "./browser/browserId";
+import { parseIps, researchAccess } from "./research/access";
 import { createMarketRoutes } from "./routes/marketRoutes";
 import { createRateRoutes } from "./routes/rateRoutes";
 
 export interface CreateAppOptions {
-  /** Overrides for sign-in; by default read from the environment. */
-  auth?: Partial<AuthOptions>;
   configDir?: string;
   nodeEnv?: string;
   polygonApiKey?: string;
@@ -44,10 +43,15 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const indexHtml = resolve(staticDir, "index.html");
   const researchDir =
     process.env.RESEARCH_DATA_DIR ?? resolve(process.cwd(), "data/research");
-  // Per-account watchlist edits live beside research data, which survives deploys.
+  // Each browser's watchlist edits live in memory until the next restart.
   const configRepository = new ConfigRepository({
     configDir,
-    dataDir: researchDir,
+    browserEdits: true,
+  });
+
+  const proxyAccess = researchAccess({
+    allowedIps: [],
+    trustedProxyIps: parseIps(process.env.RESEARCH_TRUSTED_PROXY_IPS),
   });
 
   app.disable("x-powered-by");
@@ -55,28 +59,11 @@ export function createApp(options: CreateAppOptions = {}): Express {
   const publicBaseUrl =
     process.env.PUBLIC_BASE_URL?.trim() || "https://finance.nphunter.net";
   if (nodeEnv === "production" && publicBaseUrl.startsWith("https://"))
-    // Sign-in cookies are Secure; keep browsers on HTTPS for this host only.
+    // The browser-id cookie is Secure; keep browsers on HTTPS for this host.
     app.use((_request, response, next) => {
       response.set("Strict-Transport-Security", "max-age=31536000");
       next();
     });
-
-  const credentials = (prefix: string): ProviderCredentials | undefined => {
-    const clientId = process.env[`${prefix}_CLIENT_ID`]?.trim();
-    const clientSecret = process.env[`${prefix}_CLIENT_SECRET`]?.trim();
-    return clientId && clientSecret ? { clientId, clientSecret } : undefined;
-  };
-  // Sign-in with Google (Gmail) and Microsoft (Outlook); each provider is on
-  // only when its client id and secret are configured.
-  const auth = createAuth({
-    baseUrl: publicBaseUrl,
-    dataDir: researchDir,
-    google: credentials("GOOGLE"),
-    microsoft: credentials("MICROSOFT"),
-    deleteAccountData: (account) => configRepository.deleteAccountEdits(account),
-    ...options.auth,
-  });
-  app.use("/api", auth.router);
 
   app.get("/api/health", (_request, response) => {
     response.json({
@@ -89,7 +76,13 @@ export function createApp(options: CreateAppOptions = {}): Express {
     "/api",
     createConfigRoutes({
       repository: configRepository,
-      resolveAccount: auth.accountFor,
+      browserIds: createBrowserIds({
+        // Plain cookie over http:// in development (Safari rejects Secure there).
+        secure: nodeEnv === "production" && publicBaseUrl.startsWith("https://"),
+      }),
+      // Behind Caddy the peer is the proxy: trust its X-Forwarded-For only.
+      clientIp: (request) =>
+        proxyAccess(request).clientIp ?? request.socket.remoteAddress ?? null,
       lookupSymbol: async (symbol) => {
         try {
           const details = await marketDataProvider.getTickerDetails(symbol);

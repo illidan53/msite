@@ -5,30 +5,17 @@ import type { SettingsConfig, WatchlistsConfig } from "../../shared/types";
 import { ApiError } from "../http/apiError";
 import { resolveConfigPaths } from "./configPaths";
 import {
-  AccountEditStores,
   applyWatchlistEdits,
-  type AccountStorageLimits,
+  BrowserEditStore,
+  type BrowserEditLimits,
 } from "./watchlistEdits";
 
 export interface ConfigRepositoryOptions {
   configDir?: string;
-  /** Where per-account watchlist edits are kept; without it lists are read-only. */
-  dataDir?: string;
-  /** Storage limits for per-account edits; defaults below. */
-  limits?: Partial<AccountStorageLimits>;
-}
-
-/** The signed-in account whose edits are read or written. */
-export interface EditingAccount {
-  id: string;
-  provider: string;
-  email?: string;
-  /**
-   * Re-checked inside the account's write queue, just before writing: false
-   * means the session ended (sign-out or "Delete my data") after the request
-   * was authorised, and the edit is refused.
-   */
-  isCurrent?: () => Promise<boolean>;
+  /** Keep per-browser watchlist edits in memory; without it lists are read-only. */
+  browserEdits?: boolean;
+  /** Memory limits for per-browser edits; defaults below. */
+  limits?: Partial<BrowserEditLimits>;
 }
 
 export interface StockWorkbenchConfig {
@@ -36,17 +23,16 @@ export interface StockWorkbenchConfig {
   watchlists: WatchlistsConfig;
 }
 
-/** Runtime additions per list, so a stuck client cannot grow a list without bound. */
-export const MAX_ADDED_SYMBOLS_PER_LIST = 100;
+/** Runtime additions per list (each browser also has an overall cap). */
+export const MAX_ADDED_SYMBOLS_PER_LIST = 50;
 /**
- * Storage guards for the 8 GB production volume, which also holds Docker
- * images and Quant System data. Free space is the real limit; the count is a
- * backstop. One account's file is at most a few hundred KB.
+ * Memory guards for the 912 MB production host. An addition with a full
+ * 160-character note and every sub-sector tag retains about 0.6–0.8 KB of
+ * heap (measured), so the worst case is about 1,000 × 60 × 0.8 KB ≈ 48 MB.
  */
-export const DEFAULT_STORAGE_LIMITS: AccountStorageLimits = {
-  maxAccounts: 50_000,
-  newAccountFreeBytes: 1024 ** 3,
-  writeFreeBytes: 256 * 1024 ** 2,
+export const DEFAULT_BROWSER_LIMITS: BrowserEditLimits = {
+  maxBrowsers: 1_000,
+  maxAddedPerBrowser: 60,
 };
 
 const watchlistError = (status: number, code: string, message: string) =>
@@ -54,34 +40,31 @@ const watchlistError = (status: number, code: string, message: string) =>
 
 export class ConfigRepository {
   private readonly paths: ReturnType<typeof resolveConfigPaths>;
-  private readonly accounts: AccountEditStores | null;
+  private readonly edits: BrowserEditStore | null;
 
   constructor(options: ConfigRepositoryOptions = {}) {
     this.paths = resolveConfigPaths(options.configDir);
-    this.accounts = options.dataDir
-      ? new AccountEditStores(options.dataDir, {
-          ...DEFAULT_STORAGE_LIMITS,
-          ...options.limits,
-        })
+    this.edits = options.browserEdits
+      ? new BrowserEditStore({ ...DEFAULT_BROWSER_LIMITS, ...options.limits })
       : null;
   }
 
-  async readConfig(account: Pick<EditingAccount, "id"> | null = null): Promise<StockWorkbenchConfig> {
-    const [watchlists, settings] = await Promise.all([this.readWatchlists(account), this.readSettings()]);
+  async readConfig(browserId: string | null = null): Promise<StockWorkbenchConfig> {
+    const [watchlists, settings] = await Promise.all([this.readWatchlists(browserId), this.readSettings()]);
 
     return { watchlists, settings };
   }
 
   /**
-   * The YAML watchlists, with the account's own additions and removals
-   * applied when one is given. Everyone else, the Quant System and Models
+   * The YAML watchlists, with the browser's own additions and removals
+   * applied when one is given. Other browsers, the Quant System and Models
    * see the YAML lists only.
    */
-  async readWatchlists(account: Pick<EditingAccount, "id"> | null = null): Promise<WatchlistsConfig> {
+  async readWatchlists(browserId: string | null = null): Promise<WatchlistsConfig> {
     const base = await this.readBaseWatchlists();
-    if (!account || !this.accounts) return base;
+    if (!browserId || !this.edits) return base;
 
-    return applyWatchlistEdits(base, await this.accounts.for(account.id).read());
+    return applyWatchlistEdits(base, this.edits.read(browserId));
   }
 
   async readBaseWatchlists(): Promise<WatchlistsConfig> {
@@ -103,13 +86,13 @@ export class ConfigRepository {
    * the end of that row.
    */
   async addWatchlistSymbol(
-    account: EditingAccount,
+    browserId: string,
     listId: string,
     input: { symbol: string; rowId: string; description?: string; subsectors?: string[] },
   ): Promise<WatchlistsConfig> {
     const { symbol, rowId, description } = input;
     const subsectors = [...new Set(input.subsectors ?? [])];
-    const { base, list, store, options } = await this.editableList(account, listId);
+    const { base, list, store } = await this.editableList(listId);
     if (!list.rows.some((row) => row.id === rowId))
       throw watchlistError(400, "WATCHLIST_ROW_NOT_FOUND", "Unknown watchlist row");
     if (subsectors.some((id) => !list.subsectors?.some((subsector) => subsector.id === id)))
@@ -122,7 +105,7 @@ export class ConfigRepository {
       baseRow === rowId &&
       (!description || description === list.symbolDescriptions?.[symbol]) &&
       subsectors.every((id) => baseSubsectors.has(id));
-    const edits = await store.update(listId, (listEdits, current) => {
+    const edits = store.update(browserId, listId, (listEdits, current) => {
       const merged = applyWatchlistEdits(base, current).watchlists.find((l) => l.id === listId);
       if (merged?.rows.some((row) => row.symbols.includes(symbol)))
         throw watchlistError(409, "WATCHLIST_SYMBOL_EXISTS", "The symbol is already in this watchlist");
@@ -139,20 +122,20 @@ export class ConfigRepository {
         ...(description ? { description } : {}),
         ...(subsectors.length ? { subsectors } : {}),
       });
-    }, options);
+    });
 
     return applyWatchlistEdits(base, edits);
   }
 
   /** Removes `symbol` from every row of a list; a list keeps at least one symbol. */
   async removeWatchlistSymbol(
-    account: EditingAccount,
+    browserId: string,
     listId: string,
     symbol: string,
   ): Promise<WatchlistsConfig> {
-    const { base, list, store, options } = await this.editableList(account, listId);
+    const { base, list, store } = await this.editableList(listId);
     const inBase = list.rows.some((row) => row.symbols.includes(symbol));
-    const edits = await store.update(listId, (listEdits, current) => {
+    const edits = store.update(browserId, listId, (listEdits, current) => {
       const merged = applyWatchlistEdits(base, current).watchlists.find((l) => l.id === listId);
       const members = new Set(merged?.rows.flatMap((row) => row.symbols));
       if (!members.has(symbol))
@@ -161,50 +144,29 @@ export class ConfigRepository {
         throw watchlistError(409, "WATCHLIST_LAST_SYMBOL", "A watchlist must keep at least one symbol");
       listEdits.added = listEdits.added.filter((entry) => entry.symbol !== symbol);
       if (inBase && !listEdits.removed.includes(symbol)) listEdits.removed.push(symbol);
-    }, options);
+    });
 
     return applyWatchlistEdits(base, edits);
   }
 
-  /** Drops the account's edits to one list, back to the YAML version. */
-  async resetWatchlist(account: EditingAccount, listId: string): Promise<WatchlistsConfig> {
-    const { base, store, options } = await this.editableList(account, listId);
-    const edits = await store.update(listId, (listEdits) => {
+  /** Drops the browser's edits to one list, back to the YAML version. */
+  async resetWatchlist(browserId: string, listId: string): Promise<WatchlistsConfig> {
+    const { base, store } = await this.editableList(listId);
+    const edits = store.update(browserId, listId, (listEdits) => {
       listEdits.added = [];
       listEdits.removed = [];
-    }, options);
+    });
 
     return applyWatchlistEdits(base, edits);
   }
 
-  /** Deletes everything stored for the account (its "Delete my data"). */
-  async deleteAccountEdits(account: Pick<EditingAccount, "id">): Promise<void> {
-    await this.accounts?.delete(account.id);
-  }
-
-  private async editableList(account: EditingAccount, listId: string) {
-    if (!this.accounts)
+  private async editableList(listId: string) {
+    if (!this.edits)
       throw watchlistError(503, "WATCHLIST_EDITS_UNAVAILABLE", "Watchlist editing is not configured");
     const base = await this.readBaseWatchlists();
     const list = base.watchlists.find((item) => item.id === listId);
     if (!list) throw watchlistError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist");
-    const accounts = this.accounts;
 
-    return {
-      base,
-      list,
-      store: accounts.for(account.id),
-      options: {
-        account: { provider: account.provider, ...(account.email ? { email: account.email } : {}) },
-        guard: async () => {
-          if (account.isCurrent && !(await account.isCurrent()))
-            throw watchlistError(401, "AUTH_REQUIRED", "Sign in to edit watchlists");
-        },
-        beforeWrite: async (isNew: boolean) => {
-          if (isNew) await accounts.ensureCapacity(account.id);
-          await accounts.ensureWriteSpace();
-        },
-      },
-    };
+    return { base, list, store: this.edits };
   }
 }

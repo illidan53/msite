@@ -1,7 +1,8 @@
-import { Router, type Request } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { WatchlistEditResult } from "../../shared/types";
-import { ConfigRepository, type EditingAccount } from "../config/configRepository";
+import type { BrowserIds } from "../browser/browserId";
+import { ConfigRepository } from "../config/configRepository";
 import { ApiError } from "../http/apiError";
 import { assertSameSiteWrite } from "../http/ownerWrite";
 
@@ -17,12 +18,39 @@ export interface ConfigRoutesOptions {
   repository?: ConfigRepository;
   configDir?: string;
   lookupSymbol?: SymbolLookup;
-  /** The signed-in account for a request, or null for visitors. */
-  resolveAccount?: (
-    request: Request,
-  ) => Promise<EditingAccount | null> | EditingAccount | null;
-  /** Watchlist writes allowed per account per window (default 60 per 10 min). */
-  editLimit?: { max: number; windowMs: number };
+  /** Identifies each browser; without it every visitor sees the YAML lists. */
+  browserIds?: BrowserIds;
+  /** The client's IP (via the trusted proxy); defaults to the socket peer. */
+  clientIp?: (request: Request) => string | null;
+  /** Watchlist writes per browser per window (default 60 per 10 min). */
+  editLimit?: Budget;
+  /** Writes per client IP per window (default 120 per 10 min). */
+  ipEditLimit?: Budget;
+  /** New browser ids per client IP per window (default 10 per hour). */
+  ipNewBrowserLimit?: Budget;
+  /** Writes from everyone together per window (default 600 per 10 min). */
+  siteEditLimit?: Budget;
+}
+
+interface Budget {
+  max: number;
+  windowMs: number;
+}
+
+/** Sliding-window counters per key; the map is bounded by clearing it. */
+function slidingWindow({ max, windowMs }: Budget) {
+  const hits = new Map<string, number[]>();
+  return {
+    full(key: string, now: number) {
+      const recent = (hits.get(key) ?? []).filter((time) => now - time < windowMs);
+      hits.set(key, recent);
+      return recent.length >= max;
+    },
+    take(key: string, now: number) {
+      hits.get(key)?.push(now) ?? hits.set(key, [now]);
+      if (hits.size > 10_000) hits.clear();
+    },
+  };
 }
 
 const symbolSchema = z
@@ -60,54 +88,73 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
   const router = Router();
   const repository =
     options.repository ?? new ConfigRepository({ configDir: options.configDir });
-  const resolveAccount = options.resolveAccount ?? (() => null);
-  const limit = options.editLimit ?? { max: 60, windowMs: 10 * 60_000 };
-  const recentEdits = new Map<string, number[]>();
+  const browserIds = options.browserIds;
+  const clientIp =
+    options.clientIp ?? ((request: Request) => request.socket.remoteAddress ?? null);
+  const perBrowser = slidingWindow(options.editLimit ?? { max: 60, windowMs: 10 * 60_000 });
+  const perIp = slidingWindow(options.ipEditLimit ?? { max: 120, windowMs: 10 * 60_000 });
+  const newBrowsersPerIp = slidingWindow(
+    options.ipNewBrowserLimit ?? { max: 10, windowMs: 60 * 60_000 },
+  );
+  const site = slidingWindow(options.siteEditLimit ?? { max: 600, windowMs: 10 * 60_000 });
+  const rateLimited = () =>
+    new ApiError(429, "EDIT_RATE_LIMIT", "Too many watchlist edits", { source: "watchlists" });
 
   /**
-   * Writes are same-site only and need a signed-in account; each account
-   * has a sliding-window budget so a script cannot hammer the ticker lookup
-   * or the disk.
+   * Writes are same-site only and change the requesting browser's copy.
+   * Call it after the request has been validated and its list found, so a
+   * malformed request never spends a budget or gets a cookie. Budgets are
+   * per browser, per client IP (a script can always drop its cookie), for
+   * new browser ids per IP (each one costs memory), and for the whole site.
    */
-  const editingAccount = async (request: Request, requireJson = true) => {
-    assertSameSiteWrite(request, { source: "watchlists", requireJson });
-    const account = await resolveAccount(request);
-    if (!account)
-      throw new ApiError(401, "AUTH_REQUIRED", "Sign in to edit watchlists", {
+  const editingBrowser = (request: Request, response: Response) => {
+    if (!browserIds)
+      throw new ApiError(503, "WATCHLIST_EDITS_UNAVAILABLE", "Watchlist editing is not configured", {
         source: "watchlists",
       });
     const now = Date.now();
-    const recent = (recentEdits.get(account.id) ?? []).filter(
-      (time) => now - time < limit.windowMs,
-    );
-    if (recent.length >= limit.max)
-      throw new ApiError(429, "EDIT_RATE_LIMIT", "Too many watchlist edits", {
-        source: "watchlists",
-      });
-    recent.push(now);
-    recentEdits.set(account.id, recent);
-    if (recentEdits.size > 10_000) recentEdits.clear();
-    // The edit may wait on a ticker lookup; its write re-checks the session.
-    return {
-      ...account,
-      isCurrent: async () => (await resolveAccount(request))?.id === account.id,
-    };
+    const ip = clientIp(request) ?? "unknown";
+    const known = browserIds.read(request);
+    if (
+      site.full("site", now) ||
+      perIp.full(ip, now) ||
+      (known ? perBrowser.full(known, now) : newBrowsersPerIp.full(ip, now))
+    )
+      throw rateLimited();
+    const browserId = known ?? browserIds.ensure(request, response);
+    if (!known) newBrowsersPerIp.take(ip, now);
+    site.take("site", now);
+    perIp.take(ip, now);
+    perBrowser.take(browserId, now);
+    return browserId;
   };
-  // Responses depend on the session cookie: never cache them anywhere shared.
+  /** Same-origin checks and validation come before any budget is spent. */
+  const checkedList = async (request: Request, requireJson: boolean) => {
+    assertSameSiteWrite(request, { source: "watchlists", requireJson });
+    const listId = parse(idSchema, request.params.watchlistId);
+    const known = (await repository.readBaseWatchlists()).watchlists.some(
+      (list) => list.id === listId,
+    );
+    if (!known)
+      throw new ApiError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist", { source: "watchlists" });
+    return listId;
+  };
+  // Responses depend on the browser cookie: never cache them anywhere shared.
   const personal = { "Cache-Control": "private, no-store", Vary: "Cookie" };
+  const browserOf = (request: Request) => browserIds?.read(request) ?? null;
 
   router.get("/config", async (request, response) => {
-    response.set(personal).json(await repository.readConfig(await resolveAccount(request)));
+    response.set(personal).json(await repository.readConfig(browserOf(request)));
   });
 
   router.get("/watchlists", async (request, response) => {
-    response.set(personal).json(await repository.readWatchlists(await resolveAccount(request)));
+    response.set(personal).json(await repository.readWatchlists(browserOf(request)));
   });
 
   router.post("/watchlists/:watchlistId/symbols", async (request, response) => {
-    const account = await editingAccount(request);
-    const listId = parse(idSchema, request.params.watchlistId);
+    const listId = await checkedList(request, true);
     const input = parse(addSchema, request.body);
+    const browserId = editingBrowser(request, response);
     let found: Awaited<ReturnType<SymbolLookup>>;
     try {
       found = options.lookupSymbol
@@ -126,7 +173,7 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
         source: "watchlists",
       });
     const symbol = found.symbol.toUpperCase();
-    const watchlists = await repository.addWatchlistSymbol(account, listId, {
+    const watchlists = await repository.addWatchlistSymbol(browserId, listId, {
       ...input,
       symbol,
     });
@@ -135,18 +182,18 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
   });
 
   router.delete("/watchlists/:watchlistId/symbols/:symbol", async (request, response) => {
-    const account = await editingAccount(request, false);
-    const listId = parse(idSchema, request.params.watchlistId);
+    const listId = await checkedList(request, false);
     const symbol = parse(symbolSchema, request.params.symbol);
-    const watchlists = await repository.removeWatchlistSymbol(account, listId, symbol);
+    const browserId = editingBrowser(request, response);
+    const watchlists = await repository.removeWatchlistSymbol(browserId, listId, symbol);
     const result: WatchlistEditResult = { symbol, watchlists };
     response.set(personal).json(result);
   });
 
   router.delete("/watchlists/:watchlistId/edits", async (request, response) => {
-    const account = await editingAccount(request, false);
-    const listId = parse(idSchema, request.params.watchlistId);
-    const watchlists = await repository.resetWatchlist(account, listId);
+    const listId = await checkedList(request, false);
+    const browserId = editingBrowser(request, response);
+    const watchlists = await repository.resetWatchlist(browserId, listId);
     response.set(personal).json({ watchlists });
   });
 

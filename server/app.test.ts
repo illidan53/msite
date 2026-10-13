@@ -17,18 +17,27 @@ describe("createApp", () => {
     expect(JSON.stringify(response.body)).not.toContain("POLYGON_API_KEY");
   });
 
-  it("offers no sign-in without provider credentials and hardens production responses", async () => {
+  it("lets any browser edit its own lists and hardens production responses", async () => {
     const app = createApp({ nodeEnv: "production", staticDir: await mkdtemp(join(tmpdir(), "msite-static-")) });
-    const session = await request(app).get("/api/auth/session").expect(200);
+    const health = await request(app).get("/api/health").expect(200);
 
-    expect(session.body).toEqual({ user: null, providers: [] });
-    expect(session.headers["x-powered-by"]).toBeUndefined();
-    expect(session.headers["strict-transport-security"]).toBe("max-age=31536000");
-    await request(app).get("/api/auth/login/google").expect(404);
-    // Edits need an account, whatever the client IP.
+    expect(health.headers["x-powered-by"]).toBeUndefined();
+    expect(health.headers["strict-transport-security"]).toBe("max-age=31536000");
+    // No sign-in: edits belong to the browser, so an invalid one is just 400.
+    await request(app).get("/api/auth/session").expect(404);
     const edit = await request(app).post("/api/watchlists/semiconductors/symbols").send({});
-    expect(edit.status).toBe(401);
-    expect(edit.body.code).toBe("AUTH_REQUIRED");
+    expect(edit.status).toBe(400);
+    expect(edit.body.code).toBe("INVALID_WATCHLIST_EDIT");
+    // A rejected edit gets no browser cookie; a valid one gets a Secure one.
+    expect(edit.headers["set-cookie"]).toBeUndefined();
+    const reset = await request(app).delete("/api/watchlists/semiconductors/edits").expect(200);
+    expect(String(reset.headers["set-cookie"])).toMatch(/^__Host-msite_browser=.+; Secure; SameSite=Lax/);
+    // Development over http:// uses a plain cookie.
+    const dev = await request(createApp({ nodeEnv: "development" }))
+      .delete("/api/watchlists/semiconductors/edits")
+      .expect(200);
+    expect(String(dev.headers["set-cookie"])).toMatch(/^msite_browser=/);
+    expect(String(dev.headers["set-cookie"])).not.toMatch(/Secure/);
   });
 
   it("serves the production frontend shell and static assets", async () => {
