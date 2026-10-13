@@ -787,6 +787,79 @@ for (const width of [1440, 390]) {
 }
 
 for (const width of [1440, 390]) {
+  test(`filters a watchlist by sub-sector at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const mocks = await mockWorkbenchApis(page);
+    await page.goto("/");
+    const toolbar = page.getByRole("toolbar", { name: "Table controls" });
+    const bar = page.getByRole("group", { name: "Sub-sectors" });
+    const quotes = page.getByRole("table", { name: "Semiconductors quotes" });
+    await expect(bar.getByRole("button", { name: /^All/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(quotes.getByRole("button", { name: "ASML", exact: true })).toBeVisible();
+    // Between the table controls and the table header.
+    const [toolbarBox, barBox, tableBox] = await Promise.all([
+      toolbar.boundingBox(),
+      bar.boundingBox(),
+      quotes.boundingBox(),
+    ]);
+    expect(barBox!.y).toBeGreaterThanOrEqual(toolbarBox!.y + toolbarBox!.height);
+    expect(barBox!.y + barBox!.height).toBeLessThanOrEqual(tableBox!.y);
+
+    const aiChips = bar.getByRole("button", { name: /^AI chips/ });
+    await aiChips.click();
+    await expect(aiChips).toHaveAttribute("aria-pressed", "true");
+    await expect(quotes.getByRole("button", { name: "NVDA", exact: true })).toBeVisible();
+    await expect(quotes.getByRole("button", { name: "AMD", exact: true })).toBeVisible();
+    await expect(quotes.getByRole("button", { name: "ASML", exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText("2 symbols · GPU and custom AI accelerator (ASIC) designers", {
+        exact: false,
+      }),
+    ).toBeVisible();
+    // The highlight slides under the chosen option.
+    await expect
+      .poll(async () => {
+        const [indicator, chosen] = await Promise.all([
+          bar.locator(".subsector-indicator").boundingBox(),
+          aiChips.boundingBox(),
+        ]);
+        return (
+          Math.abs(indicator!.x - chosen!.x) < 1 &&
+          Math.abs(indicator!.width - chosen!.width) < 1
+        );
+      })
+      .toBe(true);
+
+    await bar.getByRole("button", { name: "Next sub-sector" }).click();
+    await expect(
+      bar.getByRole("button", { name: /^Equipment & test/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(quotes.getByRole("button", { name: "ASML", exact: true })).toBeVisible();
+    await expect(quotes.getByRole("button", { name: "NVDA", exact: true })).toHaveCount(0);
+    await expect(
+      bar.getByRole("button", { name: "Next sub-sector" }),
+    ).toBeDisabled();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    await page.getByLabel("Language", { exact: true }).selectOption("zh");
+    const zhBar = page.getByRole("group", { name: "子板块" });
+    await expect(zhBar.getByRole("button", { name: /^设备与测试/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await expect(zhBar.getByRole("button", { name: /^AI 芯片/ })).toBeVisible();
+    expect(mocks.unexpectedApiRequests).toEqual([]);
+  });
+}
+
+for (const width of [1440, 390]) {
   test(`adds and removes watchlist stocks from an allowed IP at ${width}px`, async ({
     page,
   }) => {
@@ -1077,6 +1150,15 @@ const workbenchConfig: {
             expandedByDefault: true,
             symbols: sectorSymbols.slice(3),
           },
+        ],
+        subsectors: [
+          {
+            id: "ai-chips",
+            name: "AI chips",
+            description: "GPU and custom AI accelerator (ASIC) designers",
+            symbols: ["NVDA", "AMD"],
+          },
+          { id: "equipment", name: "Equipment & test", symbols: ["ASML"] },
         ],
       },
       {

@@ -103,6 +103,20 @@ describe("ConfigRepository", () => {
     expect(cloud.rows.find((row) => row.name === "GPU cloud operators")?.symbols).toEqual(["CRWV", "NBIS", "IREN"]);
     expect(cloud.rows.flatMap((row) => row.symbols)).toContain("P");
     expect(cloud.rows.flatMap((row) => row.symbols)).not.toContain("AMT");
+    // Popular, overlapping subsectors only where a list spans unrelated trades.
+    const withSubsectors = watchlists.watchlists.filter((item) => item.subsectors?.length).map((item) => item.id);
+    expect(withSubsectors).toEqual(["semiconductors", "software", "ai-cloud-infrastructure"]);
+    for (const item of watchlists.watchlists.filter((item) => item.subsectors?.length)) {
+      const covered = new Set(item.subsectors!.flatMap((subsector) => subsector.symbols));
+      expect(item.rows.flatMap((row) => row.symbols).filter((symbol) => !covered.has(symbol))).toEqual([]);
+    }
+    const semiconductorSubsectors = Object.fromEntries(
+      watchlists.watchlists[0].subsectors!.map((subsector) => [subsector.id, subsector.symbols]),
+    );
+    expect(semiconductorSubsectors.networking).toEqual(expect.arrayContaining(["ALAB", "CRDO"]));
+    expect(semiconductorSubsectors.optical).toEqual(expect.arrayContaining(["LITE", "COHR", "AAOI"]));
+    expect(semiconductorSubsectors.cpu).toEqual(expect.arrayContaining(["AMD", "INTC", "ARM"]));
+    expect(semiconductorSubsectors["ai-chips"]).toEqual(expect.arrayContaining(["NVDA", "AMD"]));
     expect(closeWatch).toMatchObject({
       name: "close watch",
       symbolDescriptions: {

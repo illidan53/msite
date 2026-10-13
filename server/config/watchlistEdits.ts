@@ -14,6 +14,7 @@ const listEditsSchema = z.object({
       symbol: z.string().min(1),
       rowId: z.string().min(1),
       description: z.string().optional(),
+      subsectors: z.array(z.string().min(1)).optional(),
     }),
   ),
   removed: z.array(z.string().min(1)),
@@ -40,7 +41,8 @@ const isEdits = (value: unknown): value is WatchlistEdits =>
  * Base rows minus removed symbols, then added symbols appended to their row
  * (or the list's last row if that row no longer exists in the YAML). A symbol
  * the YAML already carries is never duplicated. Rows are kept even when empty
- * so a later add can target them.
+ * so a later add can target them. Subsectors keep only present symbols and
+ * gain the additions tagged with them.
  */
 export function applyWatchlistEdits(
   base: WatchlistsConfig,
@@ -65,6 +67,17 @@ export function applyWatchlistEdits(
         present.add(entry.symbol);
         if (entry.description) descriptions[entry.symbol] = entry.description;
       }
+      const subsectors = list.subsectors?.map((subsector) => {
+        const symbols = subsector.symbols.filter((s) => present.has(s));
+        for (const entry of listEdits.added)
+          if (
+            entry.subsectors?.includes(subsector.id) &&
+            present.has(entry.symbol) &&
+            !symbols.includes(entry.symbol)
+          )
+            symbols.push(entry.symbol);
+        return { ...subsector, symbols };
+      });
       return {
         ...list,
         pinnedSymbols: list.pinnedSymbols.filter((s) => !removed.has(s)),
@@ -72,6 +85,7 @@ export function applyWatchlistEdits(
           ? { symbolDescriptions: descriptions }
           : {}),
         rows,
+        ...(subsectors ? { subsectors } : {}),
       };
     }),
   };

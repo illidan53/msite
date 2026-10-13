@@ -98,6 +98,47 @@ describe("shared config schemas", () => {
     });
   });
 
+  it("parses overlapping subsectors and rejects ones outside the rows", () => {
+    const config = (subsectors: unknown) => ({
+      watchlists: [
+        {
+          id: "chips",
+          name: "Chips",
+          rows: [{ id: "core", name: "Core", symbols: ["NVDA", "AMD", "ALAB"] }],
+          subsectors,
+        },
+      ],
+    });
+
+    expect(
+      parseWatchlistsConfig(
+        config([
+          { id: "ai-chips", name: "AI chips", symbols: ["nvda", " amd "] },
+          { id: "cpu", name: "CPUs", description: "Processors", symbols: ["AMD"] },
+        ]),
+      ).watchlists[0].subsectors,
+    ).toEqual([
+      { id: "ai-chips", name: "AI chips", symbols: ["NVDA", "AMD"] },
+      { id: "cpu", name: "CPUs", description: "Processors", symbols: ["AMD"] },
+    ]);
+    expect(() =>
+      parseWatchlistsConfig(
+        config([{ id: "optical", name: "Optical", symbols: ["LITE"] }]),
+      ),
+    ).toThrow(/LITE, which is not in the watchlist rows/);
+    expect(() =>
+      parseWatchlistsConfig(
+        config([
+          { id: "cpu", name: "CPUs", symbols: ["AMD"] },
+          { id: "cpu", name: "Again", symbols: ["NVDA"] },
+        ]),
+      ),
+    ).toThrow(/Duplicate subsector id cpu/);
+    expect(() =>
+      parseWatchlistsConfig(config([{ id: "cpu", name: "CPUs", symbols: [] }])),
+    ).toThrow(/symbols/i);
+  });
+
   it("rejects an empty watchlist row symbols array", () => {
     expect(() =>
       parseWatchlistsConfig({

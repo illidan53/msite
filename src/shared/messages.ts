@@ -310,4 +310,62 @@ export const chineseMessages: Record<string, string> = {
   "construction equipment rental tech": "建筑设备租赁技术",
   "U.S. natural gas production": "美国天然气生产",
   "AI hardware manufacturing services": "AI 硬件制造服务",
+  // Watchlist subsectors (config/watchlists.yaml → subsectors)
+  "AI chips": "AI 芯片",
+  "GPU and custom AI accelerator (ASIC) designers": "GPU 与定制 AI 加速芯片（ASIC）设计商",
+  Networking: "网络通信",
+  "Ethernet switching, SerDes, retimers, PCIe/CXL and active cables that link AI clusters":
+    "连接 AI 集群的以太网交换、SerDes、Retimer、PCIe/CXL 与有源铜缆",
+  "Optical modules": "光模块",
+  "Optical transceivers, lasers and photonic components for data-center links":
+    "数据中心互连用光模块、激光器与光电器件",
+  CPUs: "CPU",
+  "x86 and Arm processors, processor IP and PC/mobile SoCs":
+    "x86 与 Arm 处理器、处理器 IP 及 PC/手机 SoC",
+  Memory: "存储",
+  "DRAM, HBM, NAND flash and memory-interface chips":
+    "DRAM、HBM、NAND 闪存与内存接口芯片",
+  Foundry: "晶圆代工",
+  "Contract chip manufacturing": "芯片代工制造",
+  "Equipment & test": "设备与测试",
+  "Lithography, deposition, etch, inspection and test":
+    "光刻、沉积、刻蚀、检测与测试",
+  "Analog & power": "模拟与功率",
+  "Analog, power-management, GaN/SiC and RF chips":
+    "模拟、电源管理、GaN/SiC 与射频芯片",
+  Neoclouds: "新云",
+  "GPU clouds renting AI compute": "出租 AI 算力的 GPU 云",
+  "Ex-miner AI hosts": "矿企转型 AI 托管",
+  "Bitcoin miners and hosts converting power and sites to AI and HPC":
+    "将电力与场地转向 AI 和高性能计算的比特币矿企与托管商",
+  Hyperscalers: "云巨头",
+  "The largest public cloud platforms": "最大的公有云平台",
+  "AI servers": "AI 服务器",
+  "AI server and rack builders": "AI 服务器与整机柜制造商",
+  "Networking & optics": "网络与光通信",
+  "Data-center switching, optical transport and fiber":
+    "数据中心交换、光传输与光纤",
+  "Power & cooling": "电力与散热",
+  "Data-center cooling and electrical gear": "数据中心散热与电气设备",
+  "Data-center landlords": "数据中心房东",
+  Storage: "存储",
+  "Storage arrays, hard drives and flash": "存储阵列、硬盘与闪存",
+  "AI software": "AI 软件",
+  "AI platforms, agents and AI-driven applications":
+    "AI 平台、智能体与 AI 驱动的应用",
+  "Network, endpoint, identity and cloud security":
+    "网络、终端、身份与云安全",
+  "Data & cloud": "数据与云",
+  "Databases, analytics, observability and edge cloud":
+    "数据库、分析、可观测性与边缘云",
+  "Enterprise SaaS": "企业 SaaS",
+  "Enterprise application suites and workflow software":
+    "企业应用套件与工作流软件",
+  "Dev tools & EDA": "开发工具与 EDA",
+  "Developer platforms and chip-design (EDA) software":
+    "开发者平台与芯片设计（EDA）软件",
+  Adtech: "广告科技",
+  "Advertising and marketing technology": "广告与营销技术",
+  "Consumer & commerce": "消费与电商",
+  "Consumer apps and commerce platforms": "消费应用与电商平台",
 };

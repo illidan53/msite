@@ -8,6 +8,7 @@ export interface WatchlistAddition {
   symbol: string;
   rowId: string;
   description?: string;
+  subsectors?: string[];
 }
 
 export interface WatchlistEditStatus {
@@ -21,12 +22,15 @@ const SYMBOL_PATTERN = /^[A-Z][A-Z0-9.-]{0,11}$/;
 
 export function WatchlistEditor({
   watchlist,
+  defaultSubsectorId,
   busy,
   status,
   onAdd,
   onUndo,
 }: {
   watchlist: Watchlist;
+  /** The subsector being viewed; a new stock is tagged with it by default. */
+  defaultSubsectorId: string | null;
   busy: boolean;
   status: WatchlistEditStatus | null;
   onAdd(addition: WatchlistAddition): Promise<boolean>;
@@ -36,7 +40,9 @@ export function WatchlistEditor({
   const [symbol, setSymbol] = useState("");
   const [rowId, setRowId] = useState(watchlist.rows[0]?.id ?? "");
   const [description, setDescription] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
+  const subsectors = watchlist.subsectors ?? [];
 
   useEffect(() => {
     setRowId(watchlist.rows[0]?.id ?? "");
@@ -44,6 +50,10 @@ export function WatchlistEditor({
     setDescription("");
     setInputError(null);
   }, [watchlist.id]);
+
+  useEffect(() => {
+    setTags(defaultSubsectorId ? [defaultSubsectorId] : []);
+  }, [watchlist.id, defaultSubsectorId]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -62,10 +72,12 @@ export function WatchlistEditor({
       symbol: normalized,
       rowId,
       description: description.trim() || undefined,
+      ...(tags.length ? { subsectors: tags } : {}),
     });
     if (added) {
       setSymbol("");
       setDescription("");
+      setTags(defaultSubsectorId ? [defaultSubsectorId] : []);
     }
   }
 
@@ -90,7 +102,7 @@ export function WatchlistEditor({
           />
         </div>
         <div className="control-field">
-          <label htmlFor="watchlist-add-row">{t("Segment", "细分板块")}</label>
+          <label htmlFor="watchlist-add-row">{t("Segment", "分组")}</label>
           <select
             id="watchlist-add-row"
             value={rowId}
@@ -114,6 +126,27 @@ export function WatchlistEditor({
             onChange={(event) => setDescription(event.target.value)}
           />
         </div>
+        {subsectors.length > 0 && (
+          <fieldset className="watchlist-editor-tags">
+            <legend>{t("Sub-sectors (optional)", "子板块（可多选）")}</legend>
+            {subsectors.map((subsector) => (
+              <label key={subsector.id}>
+                <input
+                  type="checkbox"
+                  checked={tags.includes(subsector.id)}
+                  onChange={(event) =>
+                    setTags((current) =>
+                      event.target.checked
+                        ? [...current, subsector.id]
+                        : current.filter((id) => id !== subsector.id),
+                    )
+                  }
+                />
+                {t(subsector.name)}
+              </label>
+            ))}
+          </fieldset>
+        )}
         <button type="submit" disabled={busy || !symbol.trim()}>
           <Plus size={14} aria-hidden="true" />
           {t("Add stock", "添加股票")}
@@ -193,6 +226,11 @@ export function watchlistEditErrorMessage(
       return t(
         "This IP address is not allowed to edit watchlists.",
         "当前 IP 无权编辑列表。",
+      );
+    case "WATCHLIST_SUBSECTOR_NOT_FOUND":
+      return t(
+        "A selected sub-sector no longer exists. Reload the page.",
+        "所选子板块已不存在，请刷新页面。",
       );
     case "INVALID_WATCHLIST_EDIT":
       return t(

@@ -43,6 +43,7 @@ const addSchema = z
       .max(160)
       .optional()
       .transform((value) => value || undefined),
+    subsectors: z.array(idSchema).max(20).optional(),
   })
   .strict();
 

@@ -27,6 +27,13 @@ const symbolDescriptionsSchema = z
     ),
   );
 
+const subsectorSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+  name: z.string().min(1),
+  description: z.string().optional(),
+  symbols: z.array(symbolSchema).min(1),
+});
+
 const watchlistSchema = z.object({
   navigationGroup: z.enum(["primary", "other"]).optional(),
   selectionNote: z.string().optional(),
@@ -60,6 +67,26 @@ const watchlistSchema = z.object({
   pinnedSymbols: z.array(symbolSchema).default([]),
   symbolDescriptions: symbolDescriptionsSchema.optional(),
   rows: z.array(watchlistRowSchema).min(1),
+  subsectors: z.array(subsectorSchema).optional(),
+}).superRefine((watchlist, context) => {
+  const members = new Set(watchlist.rows.flatMap((row) => row.symbols));
+  const ids = new Set<string>();
+  watchlist.subsectors?.forEach((subsector, index) => {
+    if (ids.has(subsector.id))
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Duplicate subsector id ${subsector.id}`,
+        path: ["subsectors", index, "id"],
+      });
+    ids.add(subsector.id);
+    for (const symbol of subsector.symbols)
+      if (!members.has(symbol))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Subsector ${subsector.id} lists ${symbol}, which is not in the watchlist rows`,
+          path: ["subsectors", index, "symbols"],
+        });
+  });
 });
 
 export const watchlistsConfigSchema = z.object({

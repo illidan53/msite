@@ -69,6 +69,39 @@ watchlists:
           - NOK
           - SMTC
           - MTSI
+    subsectors:
+      - id: ai-chips
+        name: AI chips
+        description: GPU and custom AI accelerator (ASIC) designers
+        symbols: [NVDA, AMD, AVGO, MRVL]
+      - id: networking
+        name: Networking
+        description: Ethernet switching, SerDes, retimers, PCIe/CXL and active cables that link AI clusters
+        symbols: [AVGO, MRVL, ALAB, CRDO, SMTC]
+      - id: optical
+        name: Optical modules
+        description: Optical transceivers, lasers and photonic components for data-center links
+        symbols: [LITE, COHR, AAOI, NOK, MTSI]
+      - id: cpu
+        name: CPUs
+        description: x86 and Arm processors, processor IP and PC/mobile SoCs
+        symbols: [AMD, INTC, ARM, QCOM]
+      - id: memory
+        name: Memory
+        description: DRAM, HBM, NAND flash and memory-interface chips
+        symbols: [MU, SNDK, RMBS]
+      - id: foundry
+        name: Foundry
+        description: Contract chip manufacturing
+        symbols: [TSM, INTC, GFS]
+      - id: equipment
+        name: "Equipment & test"
+        description: Lithography, deposition, etch, inspection and test
+        symbols: [ASML, AMAT, LRCX, KLAC, TER, FORM]
+      - id: analog-power
+        name: "Analog & power"
+        description: Analog, power-management, GaN/SiC and RF chips
+        symbols: [TXN, ADI, MPWR, NVTS, QCOM, MTSI]
     navigationGroup: primary
     selectionNote: Retain chip and equipment anchors; add SNDK, AAOI, MTSI and NVTS for memory, photonics and power-semiconductor coverage. LITE, NOK, CRDO and ALAB are explicit user priorities. NOK supplies network equipment and is adjacent exposure, not a pure chip company. Indexed discussion samples identify candidates, not a popularity order.
     selectionReviewedAt: 2026-09-20
@@ -264,6 +297,35 @@ watchlists:
         expandedByDefault: true
         symbols:
           - DUOL
+    subsectors:
+      - id: ai-software
+        name: AI software
+        description: AI platforms, agents and AI-driven applications
+        symbols: [PLTR, NOW, CRM, SOUN, PATH, APP]
+      - id: cybersecurity
+        name: Cybersecurity
+        description: Network, endpoint, identity and cloud security
+        symbols: [PANW, CRWD, FTNT, ZS, NET]
+      - id: data-cloud
+        name: "Data & cloud"
+        description: Databases, analytics, observability and edge cloud
+        symbols: [PLTR, SNOW, MDB, DDOG, NET]
+      - id: enterprise-saas
+        name: Enterprise SaaS
+        description: Enterprise application suites and workflow software
+        symbols: [MSFT, ORCL, CRM, NOW, ADBE, INTU, SHOP, IOT]
+      - id: dev-tools-eda
+        name: "Dev tools & EDA"
+        description: Developer platforms and chip-design (EDA) software
+        symbols: [TEAM, GTLB, CDNS, SNPS]
+      - id: adtech
+        name: Adtech
+        description: Advertising and marketing technology
+        symbols: [APP, TTD, ZETA]
+      - id: consumer-commerce
+        name: "Consumer & commerce"
+        description: Consumer apps and commerce platforms
+        symbols: [SHOP, INTU, DUOL]
     selectionReviewedAt: 2026-09-20
     selectionSources:
       - *a1
@@ -347,6 +409,39 @@ watchlists:
           - P
           - STX
           - WDC
+    subsectors:
+      - id: neoclouds
+        name: Neoclouds
+        description: GPU clouds renting AI compute
+        symbols: [CRWV, NBIS, IREN]
+      - id: ex-miner-hosts
+        name: Ex-miner AI hosts
+        description: Bitcoin miners and hosts converting power and sites to AI and HPC
+        symbols: [IREN, APLD, WULF, CIFR, CORZ, HUT]
+      - id: hyperscalers
+        name: Hyperscalers
+        description: The largest public cloud platforms
+        symbols: [MSFT, AMZN, GOOGL, ORCL]
+      - id: ai-servers
+        name: AI servers
+        description: AI server and rack builders
+        symbols: [DELL, SMCI, HPE, CLS]
+      - id: networking-optics
+        name: "Networking & optics"
+        description: Data-center switching, optical transport and fiber
+        symbols: [ANET, CIEN, GLW, CLS]
+      - id: power-cooling
+        name: "Power & cooling"
+        description: Data-center cooling and electrical gear
+        symbols: [VRT, ETN, MOD]
+      - id: dc-reits
+        name: Data-center REITs
+        description: Data-center landlords
+        symbols: [EQIX, DLR]
+      - id: storage
+        name: Storage
+        description: Storage arrays, hard drives and flash
+        symbols: [P, STX, WDC]
     navigationGroup: other
     selectionNote: CRWV and NBIS are direct AI-cloud exposures. IREN combines AI cloud with a transition from mining. Separate APLD, WULF, CIFR, CORZ and HUT as data-center developers and mixed-compute businesses; hosting power capacity is not the same as renting GPUs. Keep supply-chain peers in distinct groups. Move power generators to Power & Energy Transition; remove tower REITs and duplicate chip exposure here. P is Everpure, formerly PSTG.
     selectionReviewedAt: 2026-09-20

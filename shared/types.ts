@@ -17,6 +17,18 @@ export interface WatchlistRow {
   symbols: string[];
 }
 
+/**
+ * A display-only filter over a watchlist's symbols (popular themes such as
+ * optical modules). Unlike rows, subsectors may overlap and never affect the
+ * Quant System books.
+ */
+export interface WatchlistSubsector {
+  id: string;
+  name: string;
+  description?: string;
+  symbols: string[];
+}
+
 export interface Watchlist {
   navigationGroup?: "primary" | "other";
   selectionNote?: string;
@@ -34,6 +46,7 @@ export interface Watchlist {
   pinnedSymbols: string[];
   symbolDescriptions?: Record<string, string>;
   rows: WatchlistRow[];
+  subsectors?: WatchlistSubsector[];
 }
 
 export interface WatchlistsConfig {

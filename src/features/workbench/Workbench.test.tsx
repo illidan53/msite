@@ -601,6 +601,105 @@ describe("Workbench", () => {
     );
   });
 
+  it("filters the quote table by sub-sector from a sliding bar", async () => {
+    const user = userEvent.setup();
+    const [semis, staples] = baseConfig.watchlists.watchlists;
+    const config: WorkbenchConfig = {
+      ...baseConfig,
+      watchlists: {
+        watchlists: [
+          {
+            ...semis,
+            subsectors: [
+              {
+                id: "ai-chips",
+                name: "AI chips",
+                description: "GPU and custom AI accelerator (ASIC) designers",
+                symbols: ["NVDA", "AMD"],
+              },
+              { id: "equipment", name: "Equipment & test", symbols: ["ASML"] },
+            ],
+          },
+          staples,
+        ],
+      },
+    };
+    const addWatchlistSymbol = vi.fn<WorkbenchApi["addWatchlistSymbol"]>(
+      async (_id, { symbol }) => ({ symbol, watchlists: config.watchlists }),
+    );
+    render(
+      <Workbench
+        api={createApi({
+          config,
+          getEditAccess: async () => ({ canEdit: true, clientIp: "127.0.0.1" }),
+          addWatchlistSymbol,
+        })}
+      />,
+    );
+
+    const bar = await screen.findByRole("group", { name: "Sub-sectors" });
+    const table = screen.getByRole("table", { name: "Semiconductors quotes" });
+    const option = (name: RegExp) => within(bar).getByRole("button", { name });
+    expect(option(/^All/)).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getAllByRole("button", { name: /^[A-Z.]+$/ })).toHaveLength(20);
+    expect(
+      within(bar).getByRole("button", { name: "Previous sub-sector" }),
+    ).toBeDisabled();
+
+    await user.click(option(/^AI chips/));
+    expect(option(/^AI chips/)).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(table)
+        .getAllByRole("button", { name: /^[A-Z.]+$/ })
+        .map((button) => button.textContent),
+    ).toEqual(["NVDANVIDIA Corporation", "AMDAdvanced Micro Devices"]);
+    expect(
+      screen.getByText(/^2 symbols · GPU and custom AI accelerator \(ASIC\) designers/),
+    ).toBeInTheDocument();
+    // The whole-list heading is unchanged by the filter.
+    expect(screen.getByText(/^23 symbols/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Edit list" }));
+    const editor = screen.getByRole("region", { name: "Edit watchlist" });
+    expect(within(editor).getByRole("checkbox", { name: "AI chips" })).toBeChecked();
+    expect(
+      within(editor).getByRole("checkbox", { name: "Equipment & test" }),
+    ).not.toBeChecked();
+    await user.type(within(editor).getByLabelText("Symbol"), "tsm");
+    await user.click(within(editor).getByRole("button", { name: "Add stock" }));
+    expect(addWatchlistSymbol).toHaveBeenCalledWith("semis", {
+      symbol: "TSM",
+      rowId: "leaders",
+      description: undefined,
+      subsectors: ["ai-chips"],
+    });
+
+    await user.click(within(bar).getByRole("button", { name: "Next sub-sector" }));
+    expect(option(/^Equipment & test/)).toHaveAttribute("aria-pressed", "true");
+    expect(within(table).getByRole("button", { name: "ASML" })).toBeInTheDocument();
+    expect(within(table).queryByRole("button", { name: "NVDA" })).not.toBeInTheDocument();
+    expect(
+      within(bar).getByRole("button", { name: "Next sub-sector" }),
+    ).toBeDisabled();
+    option(/^Equipment & test/).focus();
+    await user.keyboard("{ArrowLeft}");
+    expect(option(/^AI chips/)).toHaveAttribute("aria-pressed", "true");
+    expect(option(/^AI chips/)).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Watchlist" }));
+    await user.click(screen.getByRole("button", { name: "Consumer Staples" }));
+    expect(
+      screen.queryByRole("group", { name: "Sub-sectors" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Semiconductors" }));
+    expect(
+      within(screen.getByRole("group", { name: "Sub-sectors" })).getByRole(
+        "button",
+        { name: /^All/ },
+      ),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("hides watchlist editing from visitors outside the IP allowlist", async () => {
     const getEditAccess = vi.fn(async () => ({
       canEdit: false,

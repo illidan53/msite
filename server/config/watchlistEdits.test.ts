@@ -23,6 +23,13 @@ const watchlistsYaml = `watchlists:
       - id: tools
         name: Tools
         symbols: [ASML]
+    subsectors:
+      - id: ai
+        name: AI
+        symbols: [NVDA, AMD]
+      - id: litho
+        name: Litho
+        symbols: [ASML]
   - id: staples
     name: Staples
     rows:
@@ -197,6 +204,47 @@ describe("watchlist editing", () => {
       .expect(200);
 
     expect(symbolsOf(removed.body.watchlists, "staples").core).toEqual(["COST"]);
+  });
+
+  it("tags additions with subsectors and drops removed symbols from them", async () => {
+    const subsectorsOf = (config: WatchlistsConfig) =>
+      Object.fromEntries(
+        config.watchlists[0].subsectors!.map((subsector) => [subsector.id, subsector.symbols]),
+      );
+    const added = await request(app())
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "TSM", rowId: "tools", subsectors: ["litho", "litho"] })
+      .expect(201);
+    expect(subsectorsOf(added.body.watchlists)).toEqual({ ai: ["NVDA", "AMD"], litho: ["ASML", "TSM"] });
+
+    const removed = await request(app()).delete("/api/watchlists/chips/symbols/NVDA").expect(200);
+    expect(subsectorsOf(removed.body.watchlists).ai).toEqual(["AMD"]);
+
+    // Undo sends the subsectors the symbol had: still a plain restore.
+    const restored = await request(app())
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "NVDA", rowId: "compute", subsectors: ["ai"] })
+      .expect(201);
+    expect(symbolsOf(restored.body.watchlists, "chips").compute).toEqual(["NVDA", "AMD"]);
+    expect(subsectorsOf(restored.body.watchlists).ai).toEqual(["NVDA", "AMD"]);
+
+    // A new tag on a YAML symbol is recorded as an addition.
+    await request(app()).delete("/api/watchlists/chips/symbols/AMD").expect(200);
+    const tagged = await request(app())
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "AMD", rowId: "compute", subsectors: ["ai", "litho"] })
+      .expect(201);
+    expect(symbolsOf(tagged.body.watchlists, "chips").compute).toEqual(["NVDA", "AMD"]);
+    expect(subsectorsOf(tagged.body.watchlists)).toEqual({
+      ai: ["NVDA", "AMD"],
+      litho: ["ASML", "TSM", "AMD"],
+    });
+
+    const unknown = await request(app())
+      .post("/api/watchlists/chips/symbols")
+      .send({ symbol: "MU", rowId: "tools", subsectors: ["nope"] });
+    expect(unknown.status).toBe(400);
+    expect(unknown.body.code).toBe("WATCHLIST_SUBSECTOR_NOT_FOUND");
   });
 
   it("rejects invalid, unknown, duplicate and last-symbol edits", async () => {

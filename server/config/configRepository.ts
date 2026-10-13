@@ -58,21 +58,30 @@ export class ConfigRepository {
   }
 
   /**
-   * Adds `symbol` to one row of a list. Re-adding a YAML symbol to its own row
-   * with no or its YAML description just undoes its removal; any other row,
-   * or a new description, records an addition at the end of that row.
+   * Adds `symbol` to one row of a list, optionally tagged with subsectors.
+   * Re-adding a YAML symbol to its own row with no new description or
+   * subsector just undoes its removal; anything else records an addition at
+   * the end of that row.
    */
   async addWatchlistSymbol(
     listId: string,
-    input: { symbol: string; rowId: string; description?: string },
+    input: { symbol: string; rowId: string; description?: string; subsectors?: string[] },
   ): Promise<WatchlistsConfig> {
     const { symbol, rowId, description } = input;
+    const subsectors = [...new Set(input.subsectors ?? [])];
     const { base, list, store } = await this.editableList(listId);
     if (!list.rows.some((row) => row.id === rowId))
       throw watchlistError(400, "WATCHLIST_ROW_NOT_FOUND", "Unknown watchlist row");
+    if (subsectors.some((id) => !list.subsectors?.some((subsector) => subsector.id === id)))
+      throw watchlistError(400, "WATCHLIST_SUBSECTOR_NOT_FOUND", "Unknown watchlist subsector");
     const baseRow = list.rows.find((row) => row.symbols.includes(symbol))?.id;
+    const baseSubsectors = new Set(
+      list.subsectors?.filter((s) => s.symbols.includes(symbol)).map((s) => s.id),
+    );
     const restores =
-      baseRow === rowId && (!description || description === list.symbolDescriptions?.[symbol]);
+      baseRow === rowId &&
+      (!description || description === list.symbolDescriptions?.[symbol]) &&
+      subsectors.every((id) => baseSubsectors.has(id));
     const edits = await store.update(listId, (listEdits, current) => {
       const merged = applyWatchlistEdits(base, current).watchlists.find((l) => l.id === listId);
       if (merged?.rows.some((row) => row.symbols.includes(symbol)))
@@ -84,7 +93,12 @@ export class ConfigRepository {
       }
       if (listEdits.added.length >= MAX_ADDED_SYMBOLS_PER_LIST)
         throw watchlistError(409, "WATCHLIST_ADD_LIMIT", "This watchlist has too many added symbols");
-      listEdits.added.push({ symbol, rowId, ...(description ? { description } : {}) });
+      listEdits.added.push({
+        symbol,
+        rowId,
+        ...(description ? { description } : {}),
+        ...(subsectors.length ? { subsectors } : {}),
+      });
     });
 
     return applyWatchlistEdits(base, edits);

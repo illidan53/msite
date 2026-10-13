@@ -39,6 +39,7 @@ import {
   type WatchlistAddition,
   type WatchlistEditStatus,
 } from "./WatchlistEditor";
+import { SubsectorBar } from "./SubsectorBar";
 
 interface WorkbenchProps {
   api: WorkbenchApi;
@@ -108,6 +109,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     null,
   );
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [selectedSubsectorId, setSelectedSubsectorId] = useState<
+    string | null
+  >(null);
   const [selectedRange, setSelectedRange] =
     useState<PriceSeries["range"]>(DEFAULT_RANGE);
   const [historySeries, setHistorySeries] = useState<PriceSeries | null>(null);
@@ -163,6 +167,22 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     () => (watchlist ? flattenWatchlistSymbols(watchlist) : []),
     [watchlist],
   );
+  // Subsectors emptied by runtime removals are hidden.
+  const subsectors = useMemo(
+    () =>
+      (watchlist?.subsectors ?? []).filter(
+        (subsector) => subsector.symbols.length > 0,
+      ),
+    [watchlist],
+  );
+  const selectedSubsector = subsectors.find(
+    (subsector) => subsector.id === selectedSubsectorId,
+  );
+  const visibleSymbols = useMemo(() => {
+    if (!selectedSubsector) return activeSymbols;
+    const members = new Set(selectedSubsector.symbols);
+    return activeSymbols.filter((symbol) => members.has(symbol));
+  }, [activeSymbols, selectedSubsector]);
   const allTrackedSymbols = useMemo(
     () =>
       uniqueUppercaseSymbols(
@@ -174,21 +194,41 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     () => watchlistPerformances(watchlists, snapshotsBySymbol),
     [watchlists, snapshotsBySymbol],
   );
+  const performanceBySubsector = useMemo(
+    () =>
+      watchlistPerformances(
+        subsectors.map((subsector) => ({
+          id: subsector.id,
+          name: subsector.name,
+          pinnedSymbols: [],
+          rows: [
+            {
+              id: subsector.id,
+              name: subsector.name,
+              expandedByDefault: true,
+              symbols: subsector.symbols,
+            },
+          ],
+        })),
+        snapshotsBySymbol,
+      ),
+    [subsectors, snapshotsBySymbol],
+  );
   const shouldPollSnapshots = activePage === "watchlist" || watchlistOpen;
   const spanMetricsBySymbol = useMemo(
     () =>
-      mapSpanMetricsForRange(activeSymbols, spanMetricsByKey, selectedRange),
-    [activeSymbols, selectedRange, spanMetricsByKey],
+      mapSpanMetricsForRange(visibleSymbols, spanMetricsByKey, selectedRange),
+    [visibleSymbols, selectedRange, spanMetricsByKey],
   );
   const sortedSymbols = useMemo(
     () =>
       sortSymbols(
-        activeSymbols,
+        visibleSymbols,
         snapshotsBySymbol,
         spanMetricsBySymbol,
         sortMode,
       ),
-    [activeSymbols, snapshotsBySymbol, sortMode, spanMetricsBySymbol],
+    [visibleSymbols, snapshotsBySymbol, sortMode, spanMetricsBySymbol],
   );
   const totalPages = Math.max(1, Math.ceil(sortedSymbols.length / pageSize));
   const boundedPage = Math.min(currentPage, totalPages);
@@ -198,8 +238,8 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     [boundedPage, pageSize, sortedSymbols],
   );
   const spanSymbolsForHistory = useMemo(
-    () => (sortMode === "heat" ? activeSymbols : pageSymbols),
-    [activeSymbols, pageSymbols, sortMode],
+    () => (sortMode === "heat" ? visibleSymbols : pageSymbols),
+    [visibleSymbols, pageSymbols, sortMode],
   );
   const spanSymbolsForHistoryKey = spanSymbolsForHistory.join("|");
   const totalWorkbenchRequestCount = quoteRequestCount + historyRequestCount;
@@ -309,11 +349,12 @@ function WorkbenchContent({ api }: WorkbenchProps) {
 
   useEffect(() => {
     setEditStatus(null);
+    setSelectedSubsectorId(null);
   }, [selectedWatchlistId]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [pageSize, selectedWatchlistId, sortMode]);
+  }, [pageSize, selectedWatchlistId, selectedSubsectorId, sortMode]);
 
   useEffect(() => {
     if (currentPage !== boundedPage) {
@@ -596,6 +637,9 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     const target = watchlist;
     const rowId = target.rows.find((row) => row.symbols.includes(symbol))?.id;
     const description = target.symbolDescriptions?.[symbol];
+    const tags = (target.subsectors ?? [])
+      .filter((subsector) => subsector.symbols.includes(symbol))
+      .map((subsector) => subsector.id);
     setEditBusy(true);
     try {
       const result = await api.removeWatchlistSymbol(target.id, symbol);
@@ -607,7 +651,14 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           `Removed ${symbol} from ${t(target.name)}.`,
           `已从「${t(target.name)}」移除 ${symbol}。`,
         ),
-        undo: rowId ? { symbol, rowId, description } : undefined,
+        undo: rowId
+          ? {
+              symbol,
+              rowId,
+              description,
+              ...(tags.length ? { subsectors: tags } : {}),
+            }
+          : undefined,
       });
     } catch (error) {
       setEditStatus({
@@ -1125,9 +1176,50 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             aria-label={`${t(watchlist.name)} dashboard`}
           >
             {errorMessage ? <ErrorAlert message={errorMessage} /> : null}
+            {subsectors.length > 0 ? (
+              <>
+                <SubsectorBar
+                  options={[
+                    {
+                      id: null,
+                      label: t("All", "全部"),
+                      changePercent:
+                        performanceByWatchlist[watchlist.id]?.changePercent ??
+                        null,
+                    },
+                    ...subsectors.map((subsector) => ({
+                      id: subsector.id,
+                      label: t(subsector.name),
+                      changePercent:
+                        performanceBySubsector[subsector.id]?.changePercent ??
+                        null,
+                    })),
+                  ]}
+                  selectedId={selectedSubsector?.id ?? null}
+                  onSelect={setSelectedSubsectorId}
+                />
+                {selectedSubsector ? (
+                  <p className="subsector-caption">
+                    {t(
+                      `${visibleSymbols.length} symbols`,
+                      `${visibleSymbols.length} 只`,
+                    )}
+                    {selectedSubsector.description
+                      ? ` · ${t(selectedSubsector.description)}`
+                      : ""}
+                    {" · "}
+                    {t(
+                      "Sub-sectors can overlap; the daily change is equal-weight.",
+                      "子板块之间可以重叠；日涨跌为等权平均。",
+                    )}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
             {canEdit && editing ? (
               <WatchlistEditor
                 watchlist={watchlist}
+                defaultSubsectorId={selectedSubsector?.id ?? null}
                 busy={editBusy}
                 status={editStatus}
                 onAdd={(addition) => handleAddSymbol(addition)}

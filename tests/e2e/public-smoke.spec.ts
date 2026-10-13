@@ -24,6 +24,14 @@ test("public deployment serves the workbench shell and health endpoint", async (
   const cloud = config.watchlists.find(
     (list) => list.id === "ai-cloud-infrastructure",
   );
+  const semis = config.watchlists.find((list) => list.id === "semiconductors");
+  expect(
+    semis?.subsectors?.find((subsector) => subsector.id === "networking")
+      ?.name,
+  ).toBe("Networking");
+  expect(semis?.subsectors?.map((subsector) => subsector.id)).toEqual(
+    expect.arrayContaining(["ai-chips", "optical", "cpu"]),
+  );
   // Members can be edited at runtime, so check the structure, not the symbols.
   expect(
     cloud?.rows.find((row) => row.name === "GPU cloud operators")?.symbols
@@ -47,6 +55,11 @@ test("public deployment serves the workbench shell and health endpoint", async (
   await expect(
     page.locator(".watchlist-heading-line > .watchlist-performance"),
   ).toBeVisible();
+  const subsectorBar = page.getByRole("group", { name: "Sub-sectors" });
+  await subsectorBar.getByRole("button", { name: /^Optical modules/ }).click();
+  await expect(
+    subsectorBar.getByRole("button", { name: /^Optical modules/ }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Watchlist", exact: true }).click();
   await expect(
     page.locator(".watchlist-buttons > .watchlist-performance-button"),
