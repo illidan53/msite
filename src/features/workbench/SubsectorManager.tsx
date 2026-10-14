@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Plus, Settings2, Trash2, Save } from "lucide-react";
 import type {
   SubsectorEditorState,
@@ -11,8 +12,10 @@ import { useLocale } from "../../shared/locale";
 export function SubsectorManager({
   watchlist,
   onSaved,
+  triggerContainer,
 }: {
   watchlist: Watchlist;
+  triggerContainer: HTMLElement | null;
   onSaved(lists: WatchlistsConfig): void;
 }) {
   const { t } = useLocale();
@@ -139,26 +142,32 @@ export function SubsectorManager({
   }
   return (
     <section className="subsector-management">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls="subsector-manager"
-        disabled={busy}
-        onClick={() => {
-          if (open) {
-            setState(null);
-            setSaved(null);
-          }
-          setOpen(!open);
-        }}
-      >
-        <Settings2 size={15} aria-hidden="true" />
-        {open
-          ? dirty
-            ? t("Discard and close", "放弃修改并关闭")
-            : t("Close sub-sector manager", "关闭子板块管理")
-          : t("Manage sub-sectors", "管理子板块")}
-      </button>
+      {triggerContainer &&
+        createPortal(
+          <button
+            className="edit-toggle"
+            type="button"
+            aria-pressed={open}
+            aria-expanded={open}
+            aria-controls="subsector-manager"
+            disabled={busy}
+            onClick={() => {
+              if (open) {
+                setState(null);
+                setSaved(null);
+              }
+              setOpen(!open);
+            }}
+          >
+            <Settings2 size={14} aria-hidden="true" />
+            {open
+              ? dirty
+                ? t("Discard and close", "放弃修改并关闭")
+                : t("Close sub-sector manager", "关闭子板块管理")
+              : t("Manage sub-sectors", "管理子板块")}
+          </button>,
+          triggerContainer,
+        )}
       {open && (
         <div
           className="subsector-manager"

@@ -145,6 +145,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
     disabledIntervals: [] as number[],
   });
   const [editing, setEditing] = useState(false);
+  const [subsectorTriggerContainer, setSubsectorTriggerContainer] = useState<HTMLSpanElement | null>(null);
   const [editBusy, setEditBusy] = useState(false);
   const [editStatus, setEditStatus] = useState<WatchlistEditStatus | null>(
     null,
@@ -978,26 +979,29 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           >
             {t(expandedColumns ? "Essential columns" : "All columns")}
           </button>
-          {canEditList ? (
-            <button
-              className="edit-toggle"
-              type="button"
-              aria-pressed={editing}
-              onClick={() => {
-                setEditing(!editing);
-                setEditStatus(null);
-              }}
-            >
-              <PencilLine size={14} aria-hidden="true" />
-              {t("Edit list", "编辑列表")}
-            </button>
-          ) : null}
+          <div className="watchlist-edit-actions">
+            {canEditList ? (
+              <button
+                className="edit-toggle"
+                type="button"
+                aria-pressed={editing}
+                onClick={() => {
+                  setEditing(!editing);
+                  setEditStatus(null);
+                }}
+              >
+                <PencilLine size={14} aria-hidden="true" />
+                {t("Edit list", "编辑列表")}
+              </button>
+            ) : null}
+            <span className="subsector-trigger" ref={setSubsectorTriggerContainer} />
+          </div>
         </header>
       )}
       {activePage === "watchlist" && (subsectors.length > 0 || watchlist?.subsectorManaged?.canEdit) && (
         // Full width like the table controls, so the focus panel starts below it.
         <div className="subsector-strip">
-          {watchlist.subsectorManaged?.canEdit && <SubsectorManager key={watchlist.id} watchlist={watchlist} onSaved={(lists) => {
+          {watchlist.subsectorManaged?.canEdit && <SubsectorManager key={watchlist.id} triggerContainer={subsectorTriggerContainer} watchlist={watchlist} onSaved={(lists) => {
             applyWatchlists(lists);
             setSelectedSubsectorId(null);
           }} />}

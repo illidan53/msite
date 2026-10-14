@@ -267,6 +267,8 @@ summary {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.watchlist-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.subsector-trigger { display: contents; }
 .edit-toggle {
   display: inline-flex;
   align-items: center;
@@ -1588,7 +1590,7 @@ body:has(.metric-help-dialog[open]) {
   .google-account-panel { right: -60px; }
 }
 
-.subsector-management { margin: 12px 0; }
+.subsector-management:has(.subsector-manager) { margin: 12px 0; }
 .subsector-management button { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; }
 .subsector-manager { margin-top: 12px; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .subsector-manager h3 { margin: 0 0 8px; }
