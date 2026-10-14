@@ -1,3 +1,4 @@
+import { GoogleAccount } from "../auth/GoogleAccount";
 import { Research } from "../research/Research";
 import { Models } from "../models/Models";
 import { QuantSystem } from "../strategy/QuantSystem";
@@ -1893,6 +1894,7 @@ function BrandBar() {
         <span className="brand-caption">
           {t("MARKET OBSERVATORY / US EQUITIES")}
         </span>
+        <GoogleAccount />
         <LanguageSwitcher />
       </div>
     </header>

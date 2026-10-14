@@ -100,11 +100,17 @@ jobs:
           echo "instance_id=$instance_id" >> "$GITHUB_OUTPUT"
 
       - name: Deploy image on EC2 through SSM
+        env:
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         run: |
           set -euo pipefail
           image_uri="${{ steps.image.outputs.image_uri }}"
           registry="${{ steps.ecr.outputs.registry }}"
           deploy_comment="Deploy msite-finance ${GITHUB_SHA:0:12}"
+          if [[ -n "$GOOGLE_CLIENT_ID" && ! "$GOOGLE_CLIENT_ID" =~ ^[a-zA-Z0-9.-]+\.apps\.googleusercontent\.com$ ]]; then
+            echo "Invalid Google client ID" >&2
+            exit 1
+          fi
 
           cat > remote-deploy.sh <<'REMOTE_DEPLOY'
           set -euo pipefail
@@ -112,6 +118,10 @@ jobs:
           image_uri="$1"
           registry="$2"
           region="$3"
+          google_env=""
+          if [ -n "${4:-}" ]; then
+            google_env="-e GOOGLE_CLIENT_ID=$4"
+          fi
 
           if ! command -v docker >/dev/null 2>&1; then
             dnf install -y docker
@@ -137,7 +147,7 @@ jobs:
           Restart=always
           RestartSec=5
           ExecStartPre=-/usr/bin/docker rm -f msite-finance
-          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -e OPENAI_MODEL=gpt-5.6-sol -e RESEARCH_ALLOWED_IPS=70.111.76.119 -e RESEARCH_TRUSTED_PROXY_IPS=$proxy_ip -e RESEARCH_DATA_DIR=/app/data/research -e STRATEGY_SCHEDULER=on -e AWS_REGION=us-east-1 -v /var/lib/msite/research:/app/data/research -p 127.0.0.1:8787:8787 $image_uri
+          ExecStart=/usr/bin/docker run --rm --name msite-finance --env-file /etc/msite/msite.env -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=8787 -e CONFIG_DIR=/app/config -e STATIC_DIR=/app/dist -e OPENAI_MODEL=gpt-5.6-sol $google_env -e GOOGLE_OWNER_EMAIL=shenglei.zhao.us@gmail.com -e RESEARCH_ALLOWED_IPS=70.111.76.119 -e RESEARCH_TRUSTED_PROXY_IPS=$proxy_ip -e RESEARCH_DATA_DIR=/app/data/research -e STRATEGY_SCHEDULER=on -e AWS_REGION=us-east-1 -v /var/lib/msite/research:/app/data/research -p 127.0.0.1:8787:8787 $image_uri
           ExecStop=/usr/bin/docker stop msite-finance
 
           [Install]
@@ -163,7 +173,7 @@ jobs:
             "commands": [
               "set -euo pipefail",
               "echo '${script_b64}' | base64 -d >/tmp/msite-ecr-deploy.sh",
-              "bash /tmp/msite-ecr-deploy.sh '${image_uri}' '${registry}' '${AWS_REGION}'",
+              "bash /tmp/msite-ecr-deploy.sh '${image_uri}' '${registry}' '${AWS_REGION}' '${GOOGLE_CLIENT_ID}'",
               "rm -f /tmp/msite-ecr-deploy.sh"
             ]
           }

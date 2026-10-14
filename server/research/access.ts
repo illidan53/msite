@@ -1,3 +1,4 @@
+import { googleOwnerAccess } from "../auth/googleAuth";
 import { isIP } from "node:net";
 import type { Request } from "express";
 
@@ -43,6 +44,11 @@ export function researchAccess(options: ResearchAccessOptions) {
           ? normalizeIp(forwarded)
           : null;
     }
-    return { canRun: clientIp !== null && allowed.has(clientIp), clientIp };
+    return {
+      canRun:
+        googleOwnerAccess.get(request) ??
+        (clientIp !== null && allowed.has(clientIp)),
+      clientIp,
+    };
   };
 }

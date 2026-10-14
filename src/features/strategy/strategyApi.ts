@@ -22,7 +22,7 @@ export async function api<T>(
   body?: unknown,
 ) {
   // POSTs always send JSON: the content type forces a CORS preflight, so a
-  // cross-site page cannot replay them from an allowed IP.
+  // cross-site page cannot replay them by the site owner.
   const payload = body ?? (method === "POST" ? {} : undefined);
   const response = await fetch(`/api${path}`, {
     method,

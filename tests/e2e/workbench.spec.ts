@@ -1072,6 +1072,10 @@ async function mockWorkbenchApis(page: Page) {
     const url = new URL(request.url());
     const label = `${request.method()} ${url.pathname}${url.search}`;
 
+    if (url.pathname === "/api/auth/session" && request.method() === "GET") {
+      await route.fulfill({ json: { enabled: false, clientId: null, nonce: null, user: null } });
+      return;
+    }
     if (isMockedApiRequest(request.method(), url)) {
       await route.fallback();
       return;
@@ -1867,11 +1871,11 @@ test("keeps research read-only for visitors outside the IP allowlist", async ({
     page.getByRole("button", { name: "Run analysis", exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByText("Only authorized IP addresses", { exact: false }),
-  ).toContainText("198.51.100.7");
+    page.getByText("Only the site owner", { exact: false }),
+  ).toBeVisible();
   await expect(page.getByLabel("Saved reports")).toBeEnabled();
   await page.getByLabel("Language", { exact: true }).selectOption("zh");
-  await expect(page.getByText("仅白名单 IP", { exact: false })).toBeVisible();
+  await expect(page.getByText("仅站长", { exact: false })).toBeVisible();
   expect(posts).toBe(0);
 });
 

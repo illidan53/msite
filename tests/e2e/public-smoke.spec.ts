@@ -276,13 +276,16 @@ test("public deployment serves the quant system read-only", async ({
   expect(invalid.status()).toBe(400);
 });
 
-test("public deployment hardens responses and has no sign-in", async ({
+test("public deployment hardens responses and serves sign-in status", async ({
   request,
 }) => {
   const health = await request.get("/api/health");
   expect(health.headers()["strict-transport-security"]).toBe("max-age=31536000");
   expect(health.headers()["x-powered-by"]).toBeUndefined();
-  expect((await request.get("/api/auth/session")).status()).toBe(404);
+  const session = await request.get("/api/auth/session");
+  expect(session.status()).toBe(200);
+  expect((await session.json()).user).toBeNull();
+  expect(session.headers()["cache-control"]).toBe("no-store");
   // Reads never hand out the browser cookie.
   const lists = await request.get("/api/watchlists");
   expect(lists.headers()["set-cookie"]).toBeUndefined();

@@ -1,3 +1,4 @@
+import { createGoogleAuth } from "./auth/googleAuth";
 import express from "express";
 import { ResearchService } from "./research/service";
 import { ModelScanService, scanUniverse } from "./research/modelScan";
@@ -67,6 +68,12 @@ export function createApp(options: CreateAppOptions = {}): Express {
       response.set("Strict-Transport-Security", "max-age=31536000");
       next();
     });
+
+  app.use("/api", createGoogleAuth({
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    ownerEmail: process.env.GOOGLE_OWNER_EMAIL,
+    secure: nodeEnv === "production" && publicBaseUrl.startsWith("https://"),
+  }));
 
   app.get("/api/health", (_request, response) => {
     response.json({

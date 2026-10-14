@@ -153,8 +153,8 @@ export const ema200Notes: ModelNotes = {
     {
       title: ["Limits and missing data", "限制与缺失数据"],
       body: [
-        "EMA200 starts with the first 200 closes' simple mean, then updates with 2/201 weighting. Current split-adjusted history can be revised; finite history affects initialization. Incomplete windows and invalid entry prices are missing, never zero or failure. Returns exclude costs and reinvested dividends. Market drift, overlapping observations, regime changes, rare events and repeated testing can mislead; a block bootstrap does not make observations independent. No causality or out-of-sample validation is established. This model is not included in the buy/sell score. Saved reports automatically prepare the current model when opened from an allowed IP; this uses market history, not an LLM. Results are then shared with all readers.",
-        "EMA200 先以 200 个收盘价的均值初始化，再按 2/201 权重递推。当前拆股调整历史可能被修订，有限历史影响初始化。未完成窗口和无效入场价留空，绝不当作零收益或失败。收益不含费用和分红再投资。市场漂移、重叠观察、环境变化、稀少事件和反复检验都可能误导；分块重采样不保证观察独立。尚未证明因果或完成样本外验证，此模型不加入买卖决策分数。白名单 IP 打开旧报告时，会自动准备当前模型结果；只用历史行情，不调用 LLM，保存后所有访客均可阅读。",
+        "EMA200 starts with the first 200 closes' simple mean, then updates with 2/201 weighting. Current split-adjusted history can be revised; finite history affects initialization. Incomplete windows and invalid entry prices are missing, never zero or failure. Returns exclude costs and reinvested dividends. Market drift, overlapping observations, regime changes, rare events and repeated testing can mislead; a block bootstrap does not make observations independent. No causality or out-of-sample validation is established. This model is not included in the buy/sell score. Saved reports automatically prepare the current model when opened by the site owner; this uses market history, not an LLM. Results are then shared with all readers.",
+        "EMA200 先以 200 个收盘价的均值初始化，再按 2/201 权重递推。当前拆股调整历史可能被修订，有限历史影响初始化。未完成窗口和无效入场价留空，绝不当作零收益或失败。收益不含费用和分红再投资。市场漂移、重叠观察、环境变化、稀少事件和反复检验都可能误导；分块重采样不保证观察独立。尚未证明因果或完成样本外验证，此模型不加入买卖决策分数。站长 打开旧报告时，会自动准备当前模型结果；只用历史行情，不调用 LLM，保存后所有访客均可阅读。",
       ],
     },
   ],
@@ -204,7 +204,7 @@ function sharedNotes(
       title: ["Limits and missing data", "限制与缺失数据"],
       body: [
         "Split-adjusted daily history (up to five years) excludes dividends and costs, and can be revised. Averages need warm-up sessions, so the earliest history is not tested. Incomplete windows and invalid entry prices are missing, never zero. Overlapping observations, market drift, regime changes and small samples can mislead; the bootstrap does not make observations independent. Nothing here establishes causality or out-of-sample performance. Allowed IPs prepare these results automatically from market history, without an LLM; saved results are visible to all readers.",
-        "使用最多五年的拆股调整日线，不含分红与成本，数据可能被修订。均线需要预热期，最早的一段历史不参与检验。未完成窗口与无效入场价留空，不当作零。重叠观察、市场漂移、环境变化与小样本都可能误导；分块重采样不保证观察独立。这里不证明因果，也未做样本外验证。白名单 IP 会用历史行情自动准备结果，不调用 LLM；保存后所有访客可见。",
+        "使用最多五年的拆股调整日线，不含分红与成本，数据可能被修订。均线需要预热期，最早的一段历史不参与检验。未完成窗口与无效入场价留空，不当作零。重叠观察、市场漂移、环境变化与小样本都可能误导；分块重采样不保证观察独立。这里不证明因果，也未做样本外验证。站长 会用历史行情自动准备结果，不调用 LLM；保存后所有访客可见。",
       ],
     },
   ];

@@ -153,8 +153,8 @@ export function MetricHistory({
           <p>
             {error === "403"
               ? t(
-                  "Only an allowed IP can generate missing history.",
-                  "仅白名单 IP 可以生成缺失历史。",
+                  "Only the site owner can generate missing history.",
+                  "仅站长 可以生成缺失历史。",
                 )
               : error === "429"
                 ? t(
@@ -230,8 +230,8 @@ export function MetricHistory({
       ) : (
         <p className="research-history-notice">
           {t(
-            "This saved report has no metric history yet. An allowed IP can generate it when a completed quantitative snapshot is available.",
-            "这份报告尚未保存指标历史。有完整量化快照时，白名单 IP 可生成历史曲线。",
+            "This saved report has no metric history yet. The site owner can generate it when a completed quantitative snapshot is available.",
+            "这份报告尚未保存指标历史。有完整量化快照时，站长可生成历史曲线。",
           )}
         </p>
       )}

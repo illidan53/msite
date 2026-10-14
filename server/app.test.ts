@@ -23,8 +23,9 @@ describe("createApp", () => {
 
     expect(health.headers["x-powered-by"]).toBeUndefined();
     expect(health.headers["strict-transport-security"]).toBe("max-age=31536000");
-    // No sign-in: edits belong to the browser, so an invalid one is just 400.
-    await request(app).get("/api/auth/session").expect(404);
+    // Personal edits still belong to the browser, independently of owner login.
+    const session = await request(app).get("/api/auth/session").expect(200);
+    expect(session.body.user).toBeNull();
     const edit = await request(app).post("/api/watchlists/semiconductors/symbols").send({});
     expect(edit.status).toBe(400);
     expect(edit.body.code).toBe("INVALID_WATCHLIST_EDIT");

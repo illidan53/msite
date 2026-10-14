@@ -326,8 +326,8 @@ export function Models() {
   const errorText =
     startError === "403"
       ? t(
-          "Your IP is not authorized to run model scans.",
-          "当前 IP 无权运行模型扫描。",
+          "You are not authorized to run model scans.",
+          "当前访客无权运行模型扫描。",
         )
       : startError === "429"
         ? t(
@@ -352,14 +352,8 @@ export function Models() {
       {access && !access.canRun && (
         <p className="research-notice" role="status">
           {t(
-            "Only authorized IP addresses may run a scan. The latest results remain available.",
-            "仅白名单 IP 可运行扫描，仍可查看最近一次结果。",
-          )}
-          {access.clientIp && (
-            <>
-              {" "}
-              {t("Your IP:", "当前 IP：")} {access.clientIp}
-            </>
+            "Only the site owner may run a scan. The latest results remain available.",
+            "仅站长 可运行扫描，仍可查看最近一次结果。",
           )}
         </p>
       )}
@@ -486,8 +480,8 @@ export function Models() {
                     "首次扫描正在运行，完成后结果会显示在这里。",
                   )
                 : t(
-                    "An authorized IP runs one scan of all watchlist symbols and sector ETFs; the results are saved for every visitor.",
-                    "由白名单 IP 对全部自选列表标的与板块 ETF 运行一次扫描，结果保存后所有访客可见。",
+                    "The site owner runs one scan of all watchlist symbols and sector ETFs; the results are saved for every visitor.",
+                    "由站长 对全部自选列表标的与板块 ETF 运行一次扫描，结果保存后所有访客可见。",
                   )}
           </p>
         </div>

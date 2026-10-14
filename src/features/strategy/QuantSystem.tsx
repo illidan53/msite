@@ -175,8 +175,8 @@ export function QuantSystem() {
   const failureText = failure
     ? failure.status === 403
       ? t(
-          "Your IP is not authorized to run Quant System jobs.",
-          "当前 IP 无权运行量化系统任务。",
+          "You are not authorized to run Quant System jobs.",
+          "当前访客无权运行量化系统任务。",
         )
       : failure.status === 409
         ? t(
@@ -243,14 +243,8 @@ export function QuantSystem() {
       {access && !access.canRun && (
         <p className="research-notice" role="status">
           {t(
-            "Signals, positions and reports are public; only authorized IP addresses may start runs.",
-            "信号、持仓与报告公开可见；仅白名单 IP 可发起运行。",
-          )}
-          {access.clientIp && (
-            <>
-              {" "}
-              {t("Your IP:", "当前 IP：")} {access.clientIp}
-            </>
+            "Signals, positions and reports are public; only the site owner may start runs.",
+            "信号、持仓与报告公开可见；仅站长 可发起运行。",
           )}
         </p>
       )}

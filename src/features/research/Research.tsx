@@ -275,14 +275,8 @@ export function Research() {
       {access && !access.canRun && (
         <p className="research-notice" role="status">
           {t(
-            "Only authorized IP addresses may run or refresh research. Saved reports remain available.",
-            "仅白名单 IP 可运行或刷新分析，仍可查看已有报告。",
-          )}
-          {access.clientIp && (
-            <>
-              {" "}
-              {t("Your IP:", "当前 IP：")} {access.clientIp}
-            </>
+            "Only the site owner may run or refresh research. Saved reports remain available.",
+            "仅站长 可运行或刷新分析，仍可查看已有报告。",
           )}
         </p>
       )}
@@ -351,8 +345,8 @@ export function Research() {
         <p role="alert" className="research-notice">
           {error === "FORBIDDEN"
             ? t(
-                "Your IP is not authorized to run research.",
-                "当前 IP 无权运行分析。",
+                "You are not authorized to run research.",
+                "当前访客无权运行分析。",
               )
             : error === "LIMIT"
               ? t(

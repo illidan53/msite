@@ -224,8 +224,8 @@ it("shows the saved scan read-only with the best-fit chart and switches models",
   renderModels();
   await screen.findByRole("heading", { name: "EMA200 pullback & rebound" });
   expect(
-    await screen.findByText(/Only authorized IP addresses/),
-  ).toHaveTextContent("198.51.100.7");
+    await screen.findByText(/Only the site owner/),
+  ).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: "Rescan all symbols" }),
   ).toBeDisabled();

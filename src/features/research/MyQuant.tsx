@@ -185,7 +185,7 @@ export function MyQuant({
         <div className="quant-model-error">
           <p role="alert">
             {error === "403"
-              ? t("This IP cannot run the model.", "当前 IP 无权运行模型。")
+              ? t("Only the site owner can run the model.", "当前访客无权运行模型。")
               : error === "429"
                 ? t(
                     "Calculation capacity reached; retry later.",

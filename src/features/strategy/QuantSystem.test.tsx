@@ -127,8 +127,8 @@ it("shows status, benchmark KPIs, equity curves, paper record and today's signal
     await screen.findByRole("heading", { name: "System status" }),
   ).toBeInTheDocument();
   expect(
-    await screen.findByText(/only authorized IP addresses may start runs/),
-  ).toHaveTextContent("198.51.100.7");
+    await screen.findByText(/only the site owner may start runs/),
+  ).toBeInTheDocument();
   for (const name of ["Run daily", "Run backtest", "Send test email"])
     expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
   expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
@@ -782,7 +782,7 @@ it("offers the first daily run on an empty system and explains rejected runs", a
   expect(screen.getByText("No backtest report yet")).toBeInTheDocument();
   expect(screen.getByText("Not configured")).toBeInTheDocument();
   expect(screen.getByText("Scheduler off on this server")).toBeInTheDocument();
-  expect(screen.queryByText(/only authorized IP/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/only the site owner/)).not.toBeInTheDocument();
   // Toolbar plus the empty-state shortcut.
   expect(screen.getAllByRole("button", { name: "Run daily" })).toHaveLength(2);
   await user.click(screen.getAllByRole("button", { name: "Run daily" })[1]);
@@ -798,7 +798,7 @@ it("offers the first daily run on an empty system and explains rejected runs", a
   expect(JSON.parse(String(run?.body))).toEqual({ job: "backtest" });
   await user.click(screen.getAllByRole("button", { name: "Run daily" })[0]);
   expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Your IP is not authorized",
+    "You are not authorized",
   );
   await user.click(screen.getByRole("tab", { name: "Positions" }));
   expect(await screen.findByText("No daily run yet")).toBeInTheDocument();
