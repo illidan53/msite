@@ -35,13 +35,21 @@ test("public deployment serves the workbench shell and health endpoint", async (
     (list) => list.id === "ai-cloud-infrastructure",
   );
   const semis = config.watchlists.find((list) => list.id === "semiconductors");
-  expect(
-    semis?.subsectors?.find((subsector) => subsector.id === "networking")
-      ?.name,
-  ).toBe("Networking");
-  expect(semis?.subsectors?.map((subsector) => subsector.id)).toEqual(
-    expect.arrayContaining(["ai-chips", "optical", "cpu"]),
-  );
+  // Classifications are owner-editable; verify consistency, not YAML defaults.
+  for (const list of config.watchlists) {
+    expect(list.subsectorManaged?.canEdit).toBe(access.canRun);
+    const members = new Set(list.rows.flatMap((row) => row.symbols));
+    const groups = list.subsectors ?? [];
+    expect(new Set(groups.map((group) => group.id)).size).toBe(groups.length);
+    for (const group of groups) {
+      expect(group.name.trim().length).toBeGreaterThan(0);
+      expect(group.symbols.every((symbol) => members.has(symbol))).toBe(true);
+    }
+  }
+  if (!access.canRun) {
+    expect((await request.get("/api/watchlists/semiconductors/subsectors")).status()).toBe(403);
+    expect((await request.put("/api/watchlists/semiconductors/subsectors", { data: {} })).status()).toBe(403);
+  }
   // Members can be edited at runtime, so check the structure, not the symbols.
   expect(
     cloud?.rows.find((row) => row.name === "GPU cloud operators")?.symbols
@@ -76,11 +84,11 @@ test("public deployment serves the workbench shell and health endpoint", async (
   await page
     .getByRole("button", { name: "Semiconductors", exact: true })
     .click();
-  const subsectorBar = page.getByRole("group", { name: "Sub-sectors" });
-  await subsectorBar.getByRole("button", { name: /^Optical modules/ }).click();
-  await expect(
-    subsectorBar.getByRole("button", { name: /^Optical modules/ }),
-  ).toHaveAttribute("aria-pressed", "true");
+  if (semis?.subsectors?.some((group) => group.symbols.length)) {
+    const firstSubsector = page.locator(".subsector-option").nth(1);
+    await firstSubsector.click();
+    await expect(firstSubsector).toHaveAttribute("aria-pressed", "true");
+  }
   const other = page.getByRole("button", { name: "Other", exact: true });
   await expect(other).toHaveAttribute("aria-expanded", "false");
   await other.click();

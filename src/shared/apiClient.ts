@@ -44,7 +44,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+export async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
 
   if (init?.body && !headers.has("content-type")) {

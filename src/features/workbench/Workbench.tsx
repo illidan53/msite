@@ -1,3 +1,4 @@
+import { SubsectorManager } from "./SubsectorManager";
 import { GoogleAccount } from "../auth/GoogleAccount";
 import { Research } from "../research/Research";
 import { Models } from "../models/Models";
@@ -993,10 +994,14 @@ function WorkbenchContent({ api }: WorkbenchProps) {
           ) : null}
         </header>
       )}
-      {activePage === "watchlist" && subsectors.length > 0 && (
+      {activePage === "watchlist" && (subsectors.length > 0 || watchlist?.subsectorManaged?.canEdit) && (
         // Full width like the table controls, so the focus panel starts below it.
         <div className="subsector-strip">
-          <SubsectorBar
+          {watchlist.subsectorManaged?.canEdit && <SubsectorManager key={watchlist.id} watchlist={watchlist} onSaved={(lists) => {
+            applyWatchlists(lists);
+            setSelectedSubsectorId(null);
+          }} />}
+          {subsectors.length > 0 && <SubsectorBar
             options={[
               {
                 id: null,
@@ -1015,7 +1020,7 @@ function WorkbenchContent({ api }: WorkbenchProps) {
             ]}
             selectedId={selectedSubsector?.id ?? null}
             onSelect={setSelectedSubsectorId}
-          />
+          />}
           {selectedSubsector ? (
             <p className="subsector-caption">
               {t(

@@ -1,3 +1,4 @@
+import { subsectorEditsSchema } from "../config/subsectors";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import type { WatchlistEditResult, WatchlistsConfig } from "../../shared/types";
@@ -179,6 +180,18 @@ export function createConfigRoutes(options: ConfigRoutesOptions = {}): Router {
 
   router.get("/watchlists", async (request, response) => {
     response.set(personal).json(await listsFor(request));
+  });
+
+  router.get("/watchlists/:watchlistId/subsectors", async (request, response) => {
+    if (!isOwner(request)) throw new ApiError(403, "RESEARCH_IP_FORBIDDEN", "Only the site owner can manage sub-sectors");
+    response.set(personal).json(await repository.readSubsectorEditor(parse(idSchema, request.params.watchlistId)));
+  });
+  router.put("/watchlists/:watchlistId/subsectors", async (request, response) => {
+    ownerWrite(request, true);
+    const input = parse(z.object({ revision: z.string().regex(/^[a-f0-9]{64}$/), subsectors: subsectorEditsSchema }).strict(), request.body);
+    spendOwnerBudget();
+    const editor = await repository.saveSubsectors(parse(idSchema, request.params.watchlistId), input.revision, input.subsectors);
+    response.set(personal).json({ editor, watchlists: await listsFor(request) });
   });
 
   router.post("/watchlists/:watchlistId/symbols", async (request, response) => {

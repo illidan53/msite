@@ -1,7 +1,8 @@
+import { SubsectorStore } from "./subsectors";
 import { readFile } from "node:fs/promises";
 import YAML from "yaml";
 import { parseSettingsConfig, parseWatchlistsConfig } from "../../shared/schemas";
-import type { SettingsConfig, WatchlistsConfig } from "../../shared/types";
+import type { SettingsConfig, WatchlistsConfig, WatchlistSubsector } from "../../shared/types";
 import { ApiError } from "../http/apiError";
 import { resolveConfigPaths } from "./configPaths";
 import {
@@ -24,6 +25,7 @@ export interface ConfigRepositoryOptions {
   limits?: Partial<BrowserEditLimits>;
   /** JSON file holding the Owner Focus list; without it there is no such list. */
   ownerFocusFile?: string;
+  subsectorsFile?: string;
 }
 
 export interface StockWorkbenchConfig {
@@ -49,9 +51,11 @@ const watchlistError = (status: number, code: string, message: string) =>
 export class ConfigRepository {
   private readonly paths: ReturnType<typeof resolveConfigPaths>;
   private readonly edits: BrowserEditStore | null;
+  private readonly subsectorStore: SubsectorStore | null;
   private readonly ownerFocus: OwnerFocusStore | null;
 
   constructor(options: ConfigRepositoryOptions = {}) {
+    this.subsectorStore = options.subsectorsFile ? new SubsectorStore(options.subsectorsFile) : null;
     this.paths = resolveConfigPaths(options.configDir);
     this.edits = options.browserEdits
       ? new BrowserEditStore({ ...DEFAULT_BROWSER_LIMITS, ...options.limits })
@@ -75,7 +79,7 @@ export class ConfigRepository {
    * whether this visitor may edit Owner Focus.
    */
   async readWatchlists(browserId: string | null = null, owner = false): Promise<WatchlistsConfig> {
-    const base = await this.readBaseWatchlists();
+    const base = await this.readDisplayWatchlists();
 
     return this.withOwnerFocus(
       browserId && this.edits ? applyWatchlistEdits(base, this.edits.read(browserId)) : base,
@@ -85,11 +89,32 @@ export class ConfigRepository {
 
   /** Puts the Owner Focus list (when configured) in front of `lists`. */
   async withOwnerFocus(lists: WatchlistsConfig, owner: boolean): Promise<WatchlistsConfig> {
-    if (!this.ownerFocus) return lists;
+    const focus = this.ownerFocus ? ownerFocusWatchlist(await this.ownerFocus.read(), owner) : null;
+    const all = focus ? [this.subsectorStore ? await this.subsectorStore.apply(focus) : focus, ...lists.watchlists] : lists.watchlists;
+    return { watchlists: all.map((list) => ({ ...list, ...(this.subsectorStore ? { subsectorManaged: { canEdit: owner } } : {}) })) };
+  }
 
-    return {
-      watchlists: [ownerFocusWatchlist(await this.ownerFocus.read(), owner), ...lists.watchlists],
-    };
+  private async readDisplayWatchlists(): Promise<WatchlistsConfig> {
+    const base = await this.readBaseWatchlists();
+    if (!this.subsectorStore) return base;
+    return { watchlists: await Promise.all(base.watchlists.map((list) => this.subsectorStore!.apply(list))) };
+  }
+
+  private async subsectorList(listId: string) {
+    if (this.isOwnerFocus(listId)) return ownerFocusWatchlist(await this.ownerFocus!.read(), true);
+    const list = (await this.readBaseWatchlists()).watchlists.find((item) => item.id === listId);
+    if (!list) throw watchlistError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist");
+    return list;
+  }
+
+  async readSubsectorEditor(listId: string) {
+    if (!this.subsectorStore) throw watchlistError(503, "SUBSECTORS_UNAVAILABLE", "Sub-sector editing is not configured");
+    return this.subsectorStore.editor(await this.subsectorList(listId));
+  }
+
+  async saveSubsectors(listId: string, revision: string, subsectors: WatchlistSubsector[]) {
+    if (!this.subsectorStore) throw watchlistError(503, "SUBSECTORS_UNAVAILABLE", "Sub-sector editing is not configured");
+    return this.subsectorStore.save(() => this.subsectorList(listId), revision, subsectors);
   }
 
   isOwnerFocus(listId: string): boolean {
@@ -212,7 +237,7 @@ export class ConfigRepository {
   private async editableList(listId: string) {
     if (!this.edits)
       throw watchlistError(503, "WATCHLIST_EDITS_UNAVAILABLE", "Watchlist editing is not configured");
-    const base = await this.readBaseWatchlists();
+    const base = await this.readDisplayWatchlists();
     const list = base.watchlists.find((item) => item.id === listId);
     if (!list) throw watchlistError(404, "WATCHLIST_NOT_FOUND", "Unknown watchlist");
 

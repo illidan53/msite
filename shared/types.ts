@@ -53,6 +53,8 @@ export interface Watchlist {
    * research IP allowlist) may edit it. `canEdit` is for this visitor.
    */
   ownerManaged?: { canEdit: boolean };
+  /** Shared sub-sector management is restricted to the authenticated owner. */
+  subsectorManaged?: { canEdit: boolean };
 }
 
 export interface WatchlistsConfig {
@@ -104,4 +106,10 @@ export interface RatePlanEvaluation {
   estimatedCallsPerMinute: number;
   message: string;
   disabledIntervals: number[];
+}
+
+export interface SubsectorEditorState {
+  symbols: string[];
+  subsectors: WatchlistSubsector[];
+  revision: string;
 }

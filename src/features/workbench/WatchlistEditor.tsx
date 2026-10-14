@@ -46,7 +46,7 @@ export function WatchlistEditor({
   const [tags, setTags] = useState<string[]>([]);
   const [inputError, setInputError] = useState<string | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
-  const subsectors = watchlist.subsectors ?? [];
+  const subsectors = watchlist.ownerManaged ? [] : watchlist.subsectors ?? [];
 
   useEffect(() => {
     if (!confirmingReset) return;
@@ -83,7 +83,7 @@ export function WatchlistEditor({
       symbol: normalized,
       rowId,
       description: description.trim() || undefined,
-      ...(tags.length ? { subsectors: tags } : {}),
+      ...(!watchlist.ownerManaged && tags.length ? { subsectors: tags } : {}),
     });
     if (added) {
       setSymbol("");

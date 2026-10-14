@@ -50,6 +50,7 @@ export function createApp(options: CreateAppOptions = {}): Express {
     configDir,
     browserEdits: true,
     ownerFocusFile: resolve(researchDir, "owner-focus.json"),
+    subsectorsFile: resolve(researchDir, "subsectors.json"),
   });
 
   // The research IP allowlist is the site owner.
